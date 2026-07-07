@@ -127,7 +127,8 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
   border-right: 1px solid rgba(255,255,255,0.08);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition: width 0.2s ease;
 }
 .sidebar h2 { margin: 0 0 var(--sp-4); font-size: 18px; font-weight: 700; letter-spacing: .2px; }
@@ -140,6 +141,11 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #064e3b;
+  flex-shrink: 0;
 }
 .sidebar-header .sidebar-title {
   flex: 1;
@@ -184,6 +190,7 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
 .sidebar-search {
   padding: 10px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
 }
 .sidebar-search input {
   width: 100%;
@@ -208,6 +215,7 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
   padding: 12px;
   background: rgba(255,255,255,0.1);
   border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
 }
 .sidebar-calendar-year {
   display: flex;
@@ -291,6 +299,7 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
   border: 1px solid rgba(255,255,255,0.08);
   font-size: 12px;
   color: rgba(255,255,255,0.5);
+  flex-shrink: 0;
 }
 .sidebar-qs-title {
   font-weight: 600;
@@ -308,7 +317,7 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
 .sidebar-qs-row:last-child { margin-bottom: 0; }
 
 /* Sidebar nav sections */
-.sidebar-nav { list-style: none; padding: 6px 12px; margin: 0; flex: 1; overflow-y: auto; }
+.sidebar-nav { list-style: none; padding: 6px 12px; margin: 0; flex-shrink: 0; }
 .sidebar-nav .nav-section { margin-bottom: 0; }
 .sidebar-nav .nav-section:not(:first-child) { margin-top: 24px; }
 .sidebar-nav .nav-section-header {
@@ -447,6 +456,7 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
 .sidebar-footer {
   padding: 8px 12px;
   border-top: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
 }
 .sidebar-footer .nav-item {
   position: relative;
