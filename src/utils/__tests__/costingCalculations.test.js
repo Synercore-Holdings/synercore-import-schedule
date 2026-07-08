@@ -208,6 +208,19 @@ describe('calculateCustomsItemsTotals', () => {
     expect(result.totalVat).toBe(1605);
   });
 
+  it('does not fall back to the USD/customs rate for EUR products when roe_eur is missing', () => {
+    const data = {
+      roe_customs: '18',
+      products: [
+        { invoice_value: '500', duty_percent: '5', duty_schedule1_percent: '2', currency: 'EUR' },
+      ],
+    };
+    const result = calculateCustomsItemsTotals(data);
+    // roe_eur is blank, so EUR items must convert at 0, not silently borrow the 18 USD/customs rate
+    expect(result.totalCustomsValue).toBe(0);
+    expect(result.totalDuties).toBe(0);
+  });
+
   it('handles ZAR currency with roe=1', () => {
     const data = {
       roe_customs: '18',

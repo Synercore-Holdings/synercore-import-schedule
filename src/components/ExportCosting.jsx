@@ -384,7 +384,7 @@ function ExportCosting() {
 
   const calculateProductCustomsValues = (product) => {
     const roeCustoms = parseFloat(formData.roe_customs) || parseFloat(formData.roe_origin) || 0;
-    const roeEur = parseFloat(formData.roe_eur) || roeCustoms;
+    const roeEur = parseFloat(formData.roe_eur) || 0;
     const invoiceValue = parseFloat(product.invoice_value) || 0;
     const dutyPercent = parseFloat(product.duty_percent) || 0;
     const dutySchedule1Percent = parseFloat(product.duty_schedule1_percent) || 0;

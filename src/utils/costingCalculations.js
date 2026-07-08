@@ -272,7 +272,7 @@ export const calculateAgencyFee = (dutiesAndVat, percentage = COSTING_DEFAULTS.A
 export const calculateCustomsItemsTotals = (data) => {
   const items = data.products || data.customs_items || [];
   const roeCustoms = parseFloat(data.roe_customs) || parseFloat(data.roe_origin) || 0;
-  const roeEur = parseFloat(data.roe_eur) || roeCustoms;
+  const roeEur = parseFloat(data.roe_eur) || 0;
 
   let totalCustomsValue = 0;
   let totalDuties = 0;
