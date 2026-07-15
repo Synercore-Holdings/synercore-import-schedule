@@ -36,6 +36,8 @@ const extractForwardingAgent = (shipment) => {
   return destinations[Math.floor(Math.random() * destinations.length)];
 };
 
+const formatDeliveryMonth = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }) : '';
+
 function ReportsView({ shipments: propShipments }) {
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
   const [savedReports, setSavedReports] = useState([]);
@@ -94,7 +96,7 @@ function ReportsView({ shipments: propShipments }) {
       'Supplier': s.supplier || '',
       'Order Ref': s.orderRef || s.order_ref || '',
       'Product': s.productName || '',
-      'Week': s.weekNumber || '',
+      'Month': formatDeliveryMonth(s.selectedWeekDate),
       'Expected Delivery Date': s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
       'Quantity': s.quantity || 0,
       'Pallet Qty': Math.round(s.palletQty || 0),
@@ -164,12 +166,12 @@ function ReportsView({ shipments: propShipments }) {
     // Shipments table
     doc.autoTable({
       startY: yPos,
-      head: [['Supplier', 'Order Ref', 'Product', 'Week', 'Expected Delivery', 'Qty', 'Pallets', 'Status', 'Warehouse']],
+      head: [['Supplier', 'Order Ref', 'Product', 'Month', 'Expected Delivery', 'Qty', 'Pallets', 'Status', 'Warehouse']],
       body: displayedShipments.map(s => [
         s.supplier || '',
         s.orderRef || s.order_ref || '',
         s.productName || '',
-        s.weekNumber || '-',
+        formatDeliveryMonth(s.selectedWeekDate) || '-',
         s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-',
         s.quantity || 0,
         Math.round(s.palletQty || 0) || 1,

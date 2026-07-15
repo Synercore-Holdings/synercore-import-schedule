@@ -8,6 +8,8 @@ import { applyPlugin } from 'jspdf-autotable';
 applyPlugin(jsPDF);
 import * as XLSX from 'xlsx';
 
+const formatDeliveryMonth = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }) : '';
+
 function AdvancedReports() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -322,7 +324,7 @@ function AdvancedReports() {
         'Supplier': s.supplier || '',
         'Order Ref': s.orderRef || '',
         'Product': s.productName || '',
-        'Week': s.weekNumber || '',
+        'Month': formatDeliveryMonth(s.selectedWeekDate),
         'Expected Delivery Date': s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
         'Quantity': s.quantity || 0,
         'Pallets': s.palletQty || 0,
@@ -403,12 +405,12 @@ function AdvancedReports() {
       // Detailed shipment list
       doc.autoTable({
         startY: yPos,
-        head: [['Supplier', 'Order Ref', 'Product', 'Week', 'Expected Delivery', 'Qty', 'Pallets', 'Status', 'Warehouse']],
+        head: [['Supplier', 'Order Ref', 'Product', 'Month', 'Expected Delivery', 'Qty', 'Pallets', 'Status', 'Warehouse']],
         body: filteredShipments.map(s => [
           s.supplier || '',
           s.orderRef || '',
           s.productName || '',
-          s.weekNumber || '-',
+          formatDeliveryMonth(s.selectedWeekDate) || '-',
           s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-',
           s.quantity || 0,
           Math.round(s.palletQty || 0) || 1,
@@ -848,7 +850,7 @@ function AdvancedReports() {
                     <th style={{ padding: '12px', textAlign: 'left' }}>Supplier</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Order Ref</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Product</th>
-                    <th style={{ padding: '12px', textAlign: 'center' }}>Week</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Month</th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>Expected Delivery</th>
                     <th style={{ padding: '12px', textAlign: 'right' }}>Quantity</th>
                     <th style={{ padding: '12px', textAlign: 'right' }}>Pallets</th>
@@ -874,7 +876,7 @@ function AdvancedReports() {
                       </td>
                       <td style={{ padding: '10px' }}>{shipment.productName || '-'}</td>
                       <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold', color: 'var(--info)' }}>
-                        {shipment.weekNumber || '-'}
+                        {formatDeliveryMonth(shipment.selectedWeekDate) || '-'}
                       </td>
                       <td style={{ padding: '10px', textAlign: 'center' }}>
                         {shipment.selectedWeekDate ? new Date(shipment.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}

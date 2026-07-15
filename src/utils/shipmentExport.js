@@ -147,8 +147,8 @@ export function generateExcel(shipments) {
       'Order/Ref',
       'Final POD',
       'Latest Status',
-      'Week Number',
-      'Estimated Arrival',
+      'Month',
+      'Expected Delivery Date',
       'Product',
       'Quantity',
       'Warehouse',
@@ -163,8 +163,8 @@ export function generateExcel(shipments) {
       sanitizeExcelValue(shipment.orderRef || ''),
       sanitizeExcelValue(shipment.finalPod || ''),
       sanitizeExcelValue(shipment.latestStatus || ''),
-      shipment.weekNumber || '',
-      shipment.estimatedArrival ? new Date(shipment.estimatedArrival).toLocaleDateString() : '',
+      shipment.selectedWeekDate ? new Date(shipment.selectedWeekDate).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }) : '',
+      shipment.selectedWeekDate ? new Date(shipment.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
       sanitizeExcelValue(shipment.product || ''),
       shipment.quantity || '',
       sanitizeExcelValue(shipment.warehouse || ''),
@@ -185,8 +185,8 @@ export function generateExcel(shipments) {
     { wch: 15 }, // Order/Ref
     { wch: 15 }, // Final POD
     { wch: 15 }, // Latest Status
-    { wch: 12 }, // Week Number
-    { wch: 15 }, // Estimated Arrival
+    { wch: 15 }, // Month
+    { wch: 15 }, // Expected Delivery Date
     { wch: 20 }, // Product
     { wch: 10 }, // Quantity
     { wch: 15 }, // Warehouse
