@@ -95,6 +95,7 @@ function ReportsView({ shipments: propShipments }) {
       'Order Ref': s.orderRef || s.order_ref || '',
       'Product': s.productName || '',
       'Week': s.weekNumber || '',
+      'Expected Delivery Date': s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
       'Quantity': s.quantity || 0,
       'Pallet Qty': Math.round(s.palletQty || 0),
       'CBM': s.cbm || 0,
@@ -163,12 +164,13 @@ function ReportsView({ shipments: propShipments }) {
     // Shipments table
     doc.autoTable({
       startY: yPos,
-      head: [['Supplier', 'Order Ref', 'Product', 'Week', 'Qty', 'Pallets', 'Status', 'Warehouse']],
+      head: [['Supplier', 'Order Ref', 'Product', 'Week', 'Expected Delivery', 'Qty', 'Pallets', 'Status', 'Warehouse']],
       body: displayedShipments.map(s => [
         s.supplier || '',
         s.orderRef || s.order_ref || '',
         s.productName || '',
         s.weekNumber || '-',
+        s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-',
         s.quantity || 0,
         Math.round(s.palletQty || 0) || 1,
         (s.latestStatus || '').replace(/_/g, ' '),
@@ -242,6 +244,7 @@ function ReportsView({ shipments: propShipments }) {
             latestStatus: s.latest_status || s.latestStatus,
             supplier: s.supplier,
             weekNumber: s.week_number || s.weekNumber,
+            selectedWeekDate: s.selected_week_date || s.selectedWeekDate,
             productName: s.product_name || s.productName,
             receivingWarehouse: s.receiving_warehouse || s.receivingWarehouse,
             finalPod: s.final_pod || s.finalPod,

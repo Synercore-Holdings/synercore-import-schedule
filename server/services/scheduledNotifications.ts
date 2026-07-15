@@ -284,11 +284,11 @@ export class ScheduledNotifications {
       // Find shipments delayed more than expected
       const delayedResult = await pool.query(
         `SELECT s.*,
-                (CURRENT_TIMESTAMP - s.week_date) as days_delayed
+                (CURRENT_TIMESTAMP - s.selected_week_date) as days_delayed
          FROM shipments s
          WHERE s.latest_status NOT IN ('arrived_pta', 'arrived_klm', 'archived', 'stored')
-         AND s.week_date < CURRENT_TIMESTAMP - INTERVAL '1 day'
-         AND s.week_date IS NOT NULL
+         AND s.selected_week_date < CURRENT_TIMESTAMP - INTERVAL '1 day'
+         AND s.selected_week_date IS NOT NULL
          AND NOT EXISTS (
            SELECT 1 FROM notification_log nl
            WHERE nl.related_shipment_id = s.id
@@ -313,7 +313,7 @@ export class ScheduledNotifications {
           );
 
           const daysDelayed = Math.floor(
-            (Date.now() - new Date(shipment.week_date as any).getTime()) / (1000 * 60 * 60 * 24)
+            (Date.now() - new Date(shipment.selected_week_date as any).getTime()) / (1000 * 60 * 60 * 24)
           );
 
           for (const { user_id } of usersResult.rows as UserRow[]) {

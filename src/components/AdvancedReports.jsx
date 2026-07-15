@@ -78,6 +78,7 @@ function AdvancedReports() {
         productName: s.product_name || s.productName,
         latestStatus: s.latest_status || s.latestStatus,
         weekNumber: Number(s.week_number || s.weekNumber) || 0,
+        selectedWeekDate: s.selected_week_date || s.selectedWeekDate,
         receivingWarehouse: s.receiving_warehouse || s.receivingWarehouse,
         forwardingAgent: s.forwarding_agent || s.forwardingAgent,
         vesselName: s.vessel_name || s.vesselName,
@@ -322,6 +323,7 @@ function AdvancedReports() {
         'Order Ref': s.orderRef || '',
         'Product': s.productName || '',
         'Week': s.weekNumber || '',
+        'Expected Delivery Date': s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
         'Quantity': s.quantity || 0,
         'Pallets': s.palletQty || 0,
         'Status': s.latestStatus || '',
@@ -401,12 +403,13 @@ function AdvancedReports() {
       // Detailed shipment list
       doc.autoTable({
         startY: yPos,
-        head: [['Supplier', 'Order Ref', 'Product', 'Week', 'Qty', 'Pallets', 'Status', 'Warehouse']],
+        head: [['Supplier', 'Order Ref', 'Product', 'Week', 'Expected Delivery', 'Qty', 'Pallets', 'Status', 'Warehouse']],
         body: filteredShipments.map(s => [
           s.supplier || '',
           s.orderRef || '',
           s.productName || '',
           s.weekNumber || '-',
+          s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-',
           s.quantity || 0,
           Math.round(s.palletQty || 0) || 1,
           s.latestStatus || '',
@@ -846,6 +849,7 @@ function AdvancedReports() {
                     <th style={{ padding: '12px', textAlign: 'left' }}>Order Ref</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Product</th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>Week</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Expected Delivery</th>
                     <th style={{ padding: '12px', textAlign: 'right' }}>Quantity</th>
                     <th style={{ padding: '12px', textAlign: 'right' }}>Pallets</th>
                     <th style={{ padding: '12px', textAlign: 'left' }}>Status</th>
@@ -871,6 +875,9 @@ function AdvancedReports() {
                       <td style={{ padding: '10px' }}>{shipment.productName || '-'}</td>
                       <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold', color: 'var(--info)' }}>
                         {shipment.weekNumber || '-'}
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        {shipment.selectedWeekDate ? new Date(shipment.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                       </td>
                       <td style={{ padding: '10px', textAlign: 'right' }}>{(shipment.quantity || 0).toLocaleString()}</td>
                       <td style={{ padding: '10px', textAlign: 'right' }}>{(Math.round(shipment.palletQty || 0) || 1).toLocaleString()}</td>

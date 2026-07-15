@@ -265,6 +265,7 @@ export function useShipments() {
           finalPod: s.finalPod,
           latestStatus: shipmentType === 'local' ? (s.latestStatus || 'in_transit_roadway') : s.latestStatus,
           weekNumber: Number(s.weekNumber) || 0,
+          selectedWeekDate: s.selectedWeekDate ?? null,
           productName: s.productName,
           quantity: Number(s.quantity) || 0,
           palletQty: Number(s.palletQty) || 0,

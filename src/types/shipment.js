@@ -226,6 +226,7 @@ export class Shipment {
     finalPod,
     latestStatus = ShipmentStatus.PLANNED_AIRFREIGHT,
     weekNumber,
+    selectedWeekDate = null,
     productName,
     quantity,
     palletQty = 0,
@@ -258,6 +259,7 @@ export class Shipment {
     this.finalPod = finalPod;
     this.latestStatus = latestStatus;
     this.weekNumber = weekNumber;
+    this.selectedWeekDate = selectedWeekDate;
     this.productName = productName;
     this.quantity = quantity;
     this.palletQty = palletQty;

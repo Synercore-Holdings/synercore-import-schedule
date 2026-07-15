@@ -103,7 +103,7 @@ export interface Shipment {
   quantity: number;
   latest_status: ShipmentStatus;
   week_number?: number;
-  week_date?: Date;
+  selected_week_date?: Date;
   notes?: string;
   created_at: Date;
   updated_at: Date;

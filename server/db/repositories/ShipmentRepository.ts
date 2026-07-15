@@ -32,7 +32,7 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'cbm',
     'latest_status',
     'week_number',
-    'selected_week_date as week_date',
+    'selected_week_date',
     'final_pod',
     'receiving_warehouse',
     'forwarding_agent',
