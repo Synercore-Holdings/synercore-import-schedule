@@ -1,6 +1,6 @@
 {
   "name": "synercore-import-schedule",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Import Supply Chain Management system for Synercore",
   "main": "server/index.js",
   "type": "module",
