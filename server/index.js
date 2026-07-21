@@ -411,6 +411,16 @@ async function start() {
       logWarn('IWT columns migration warning', { error: error.message });
     }
 
+    // Add ASO number column to shipments (links sold stock back to a sales order)
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS aso_number VARCHAR(255);
+      `);
+      logger.info('ASO number column ready');
+    } catch (error) {
+      logWarn('ASO number column migration warning', { error: error.message });
+    }
+
     // Add full-text search_vector column + GIN index + trigger to shipments.
     // ShipmentController.searchShipments queries this column; without it every
     // /api/shipments/search request returns 500 with "column does not exist".
