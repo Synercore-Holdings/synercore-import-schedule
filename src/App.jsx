@@ -474,6 +474,7 @@ function App() {
 
   const StoredWrapper = () => {
     const storedShipments = shipments.filter(s => {
+      if (s.latestStatus === 'sold' || s.latestStatus === 'archived') return false;
       const warehouse = (s.receivingWarehouse || '').toUpperCase();
       return s.latestStatus === 'stored' || warehouse === 'OFFSITE' || s.latestStatus === 'arrived_offsite';
     });

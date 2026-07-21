@@ -31,6 +31,7 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
   const [collapsedWarehouses, setCollapsedWarehouses] = useState({});
   const [editingDate, setEditingDate] = useState(null);
   const [moveModal, setMoveModal] = useState(null);
+  const [soldModal, setSoldModal] = useState(null);
   const [editingDateValue, setEditingDateValue] = useState('');
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [editShipment, setEditShipment] = useState(null);
@@ -226,6 +227,38 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
       showError('Failed to move stock');
     }
     setMoveModal(null);
+  };
+
+  const openSoldModal = (shipment) => {
+    setSoldModal({
+      shipment,
+      soldQty: shipment.quantity || 0,
+      soldPallets: Math.round(shipment.palletQty) || 1,
+      notes: '',
+    });
+  };
+
+  const handleSoldSubmit = async () => {
+    if (!soldModal) return;
+    const { shipment, soldQty, soldPallets, notes } = soldModal;
+
+    try {
+      const response = await authFetch(getApiUrl(`/api/shipments/${shipment.id}/sell`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ soldQty, soldPallets, notes }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to mark stock as sold');
+      }
+
+      showSuccess(`Marked ${soldQty} qty / ${soldPallets} pallets as sold`);
+    } catch (err) {
+      showError('Failed to mark stock as sold');
+    }
+    setSoldModal(null);
   };
 
   const openEditModal = (shipment) => {
@@ -751,6 +784,15 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
                             >
                               Move
                             </button>
+                            {isOffsite && (
+                              <button
+                                className="btn btn-ghost"
+                                onClick={() => openSoldModal(shipment)}
+                                style={{ fontSize: 12, padding: '6px 12px' }}
+                              >
+                                Sold
+                              </button>
+                            )}
                             {!isArch && (
                               <button
                                 className="btn btn-ghost"
@@ -926,6 +968,16 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
                               >
                                 Move
                               </button>
+                              {isOffsite && (
+                                <button
+                                  className="btn btn-ghost"
+                                  onClick={() => openSoldModal(shipment)}
+                                  style={{ fontSize: 12, padding: '4px 10px', marginLeft: 4 }}
+                                  title="Mark stock as sold from offsite storage"
+                                >
+                                  Sold
+                                </button>
+                              )}
                               {!isArch && (
                                 <button
                                   className="btn btn-ghost"
@@ -1142,6 +1194,100 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
                 style={{ fontSize: 13, padding: '8px 16px' }}
               >
                 Move Stock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Mark as Sold Modal */}
+      {soldModal && (
+        <div
+          onClick={() => setSoldModal(null)}
+          style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: 12, padding: 24, width: '100%', maxWidth: 420,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--navy-900)' }}>Mark as Sold</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-500)' }}>
+              {soldModal.shipment.orderRef} &mdash; {soldModal.shipment.productName || 'N/A'}
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-500)', marginBottom: 2 }}>Available Qty</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy-900)' }}>{soldModal.shipment.quantity || 0}</div>
+              </div>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-500)', marginBottom: 2 }}>Available Pallets</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy-900)' }}>{Math.round(soldModal.shipment.palletQty) || 1}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-700)' }}>Qty Sold</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={soldModal.shipment.quantity || 1}
+                  value={soldModal.soldQty}
+                  onChange={(e) => setSoldModal(prev => ({ ...prev, soldQty: Math.min(parseInt(e.target.value) || 0, prev.shipment.quantity || 0) }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-700)' }}>Pallets Sold</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.round(soldModal.shipment.palletQty) || 1}
+                  value={soldModal.soldPallets}
+                  onChange={(e) => setSoldModal(prev => ({ ...prev, soldPallets: Math.min(parseInt(e.target.value) || 0, Math.round(prev.shipment.palletQty) || 1) }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
+                />
+              </div>
+            </div>
+
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-700)' }}>
+              Notes (optional)
+            </label>
+            <input
+              type="text"
+              value={soldModal.notes}
+              onChange={(e) => setSoldModal(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="e.g. buyer, reference, invoice #"
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 16 }}
+            />
+
+            {soldModal.soldQty < (soldModal.shipment.quantity || 0) || soldModal.soldPallets < (Math.round(soldModal.shipment.palletQty) || 1) ? (
+              <div style={{
+                background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8,
+                padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#92400E'
+              }}>
+                <strong>Partial sale:</strong> {soldModal.soldQty} qty / {soldModal.soldPallets} pallets will be marked sold.
+                Remaining {(soldModal.shipment.quantity || 0) - soldModal.soldQty} qty / {(Math.round(soldModal.shipment.palletQty) || 1) - soldModal.soldPallets} pallets stays in storage.
+              </div>
+            ) : null}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setSoldModal(null)} style={{ fontSize: 13, padding: '8px 16px' }}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={soldModal.soldQty <= 0 || soldModal.soldPallets <= 0}
+                onClick={handleSoldSubmit}
+                style={{ fontSize: 13, padding: '8px 16px' }}
+              >
+                Confirm Sold
               </button>
             </div>
           </div>

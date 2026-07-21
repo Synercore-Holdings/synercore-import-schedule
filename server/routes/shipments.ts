@@ -867,6 +867,52 @@ router.post(
 );
 
 /**
+ * POST /api/shipments/:id/sell
+ * Mark stored/offsite stock as sold (partial or full).
+ * Body: { soldQty: number, soldPallets: number, notes?: string }
+ */
+router.post(
+  '/:id/sell',
+  body('soldQty').isFloat({ gt: 0 }).withMessage('soldQty must be a positive number'),
+  body('soldPallets').isFloat({ gt: 0 }).withMessage('soldPallets must be a positive number'),
+  body('notes').optional().trim(),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const { soldQty, soldPallets, notes } = req.body as {
+      soldQty: number;
+      soldPallets: number;
+      notes?: string;
+    };
+
+    const result = await ShipmentController.sellShipment(
+      req.params.id!,
+      Number(soldQty),
+      Number(soldPallets),
+      notes
+    );
+
+    const user = (req as any).user;
+    if (user) {
+      AuditRepository.logAudit(
+        user.id,
+        user.username || user.email,
+        'sell',
+        'shipment',
+        req.params.id!,
+        (result.source as any).order_ref || req.params.id!,
+        { soldQty, soldPallets, notes, soldId: result.sold ? (result.sold as any).id : null }
+      );
+    }
+
+    res.status(200).json({
+      data: result,
+      message: `Marked ${soldQty} qty / ${soldPallets} pallets as sold`,
+    });
+  })
+);
+
+/**
  * POST /api/shipments/:id/admin-complete
  * Admin: complete entire workflow in one step
  */

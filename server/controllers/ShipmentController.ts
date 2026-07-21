@@ -861,6 +861,119 @@ export class ShipmentController {
     });
   }
 
+  /**
+   * Mark stored/offsite stock as sold (partial or full).
+   * Removes the sold quantity from active storage; a partial sale
+   * leaves the remainder in place and records the sold portion as
+   * its own 'sold' row for reporting.
+   */
+  static async sellShipment(
+    id: string,
+    soldQty: number,
+    soldPallets: number,
+    notes?: string
+  ): Promise<{ source: Shipment; sold: Shipment }> {
+    if (!(soldQty > 0) || !(soldPallets > 0)) {
+      throw AppError.unprocessable('soldQty and soldPallets must be positive numbers');
+    }
+
+    const source = await this.getShipment(id);
+    const totalQty = Number(source.quantity) || 0;
+    const totalPallets = Math.round(Number(source.pallet_qty) || 0) || 1;
+
+    if (soldQty > totalQty) {
+      throw AppError.unprocessable(`soldQty ${soldQty} exceeds available quantity ${totalQty}`);
+    }
+    if (soldPallets > totalPallets) {
+      throw AppError.unprocessable(`soldPallets ${soldPallets} exceeds available pallet count ${totalPallets}`);
+    }
+
+    const isFullSale = soldQty >= totalQty && soldPallets >= totalPallets;
+    const soldNote = notes ? `Sold: ${notes}` : `Sold from ${source.receiving_warehouse || 'unknown'}`;
+
+    return transaction(async (client) => {
+      const now = new Date();
+
+      if (isFullSale) {
+        const updated = await client.query(
+          `UPDATE shipments
+           SET latest_status = 'sold', notes = $1, updated_at = $2
+           WHERE id = $3
+           RETURNING *`,
+          [soldNote, now, id]
+        );
+        return { source: updated.rows[0] as Shipment, sold: updated.rows[0] as Shipment };
+      }
+
+      // Partial sale — reduce source, insert a sold row recording what left storage.
+      const remainQty = totalQty - soldQty;
+      const remainPallets = Math.max(totalPallets - soldPallets, 1);
+
+      const updatedSource = await client.query(
+        `UPDATE shipments
+         SET quantity = $1, pallet_qty = $2, updated_at = $3
+         WHERE id = $4
+         RETURNING *`,
+        [remainQty, remainPallets, now, id]
+      );
+
+      const soldId = `ship_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      const insertedSold = await client.query(
+        `INSERT INTO shipments (
+          id, supplier, order_ref, final_pod, latest_status, week_number,
+          product_name, quantity, cbm, pallet_qty, receiving_warehouse, notes,
+          forwarding_agent, incoterm, vessel_name, selected_week_date,
+          shipment_type, created_at, updated_at,
+          inspection_date, inspection_status, inspection_notes, inspected_by,
+          receiving_date, receiving_status, receiving_notes, received_by, received_quantity
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6,
+          $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, $16,
+          $17, $18, $19,
+          $20, $21, $22, $23,
+          $24, $25, $26, $27, $28
+        ) RETURNING *`,
+        [
+          soldId,
+          source.supplier,
+          source.order_ref,
+          source.final_pod,
+          'sold',
+          source.week_number,
+          source.product_name,
+          soldQty,
+          source.cbm,
+          soldPallets,
+          source.receiving_warehouse,
+          soldNote,
+          source.forwarding_agent,
+          source.incoterm,
+          source.vessel_name,
+          source.selected_week_date,
+          (source as any).shipment_type || 'international',
+          now,
+          now,
+          source.inspection_date,
+          source.inspection_status,
+          source.inspection_notes,
+          source.inspected_by,
+          source.receiving_date,
+          source.receiving_status,
+          source.receiving_notes,
+          source.received_by,
+          soldQty,
+        ]
+      );
+
+      return {
+        source: updatedSource.rows[0] as Shipment,
+        sold: insertedSold.rows[0] as Shipment,
+      };
+    });
+  }
+
   // ─── File-based archive operations (migrated from shipmentsController.js) ───
 
   /**

@@ -35,7 +35,8 @@ export type ShipmentStatus =
   | 'receiving'
   | 'received'
   | 'stored'
-  | 'archived';
+  | 'archived'
+  | 'sold';
 
 /**
  * Notification types

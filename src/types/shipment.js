@@ -26,7 +26,8 @@ export const ShipmentStatus = {
   RECEIVING: 'receiving',
   RECEIVED: 'received',
   STORED: 'stored',
-  ARCHIVED: 'archived'
+  ARCHIVED: 'archived',
+  SOLD: 'sold'
 };
 
 export const InspectionStatus = {
@@ -135,6 +136,7 @@ export const SHIPPING_EXCLUDED_STATUSES = [
   ...POST_ARRIVAL_STATUSES,
   ShipmentStatus.STORED,
   ShipmentStatus.ARCHIVED,
+  ShipmentStatus.SOLD,
 ];
 
 /** All valid status values (for validation) */
@@ -170,6 +172,7 @@ export const STATUS_LABELS = {
   [ShipmentStatus.RECEIVED]: 'Received',
   [ShipmentStatus.STORED]: 'Stored',
   [ShipmentStatus.ARCHIVED]: 'Archived',
+  [ShipmentStatus.SOLD]: 'Sold',
 };
 
 // ========== Centralized Status Colors ==========
@@ -202,6 +205,7 @@ export const STATUS_COLORS = {
   [ShipmentStatus.RECEIVED]: '#8BC34A',
   [ShipmentStatus.STORED]: '#007bff',
   [ShipmentStatus.ARCHIVED]: '#6c757d',
+  [ShipmentStatus.SOLD]: '#059669',
 };
 
 export const Incoterms = {
