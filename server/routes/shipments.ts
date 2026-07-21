@@ -869,27 +869,30 @@ router.post(
 /**
  * POST /api/shipments/:id/sell
  * Mark stored/offsite stock as sold (partial or full).
- * Body: { soldQty: number, soldPallets: number, notes?: string }
+ * Body: { soldQty: number, soldPallets: number, notes?: string, asoNumber?: string }
  */
 router.post(
   '/:id/sell',
   body('soldQty').isFloat({ gt: 0 }).withMessage('soldQty must be a positive number'),
   body('soldPallets').isFloat({ gt: 0 }).withMessage('soldPallets must be a positive number'),
   body('notes').optional().trim(),
+  body('asoNumber').optional().trim(),
   asyncHandler(async (req: Request, res: Response) => {
     if (!handleValidationErrors(req, res)) return;
 
-    const { soldQty, soldPallets, notes } = req.body as {
+    const { soldQty, soldPallets, notes, asoNumber } = req.body as {
       soldQty: number;
       soldPallets: number;
       notes?: string;
+      asoNumber?: string;
     };
 
     const result = await ShipmentController.sellShipment(
       req.params.id!,
       Number(soldQty),
       Number(soldPallets),
-      notes
+      notes,
+      asoNumber
     );
 
     const user = (req as any).user;
@@ -901,7 +904,7 @@ router.post(
         'shipment',
         req.params.id!,
         (result.source as any).order_ref || req.params.id!,
-        { soldQty, soldPallets, notes, soldId: result.sold ? (result.sold as any).id : null }
+        { soldQty, soldPallets, notes, asoNumber, soldId: result.sold ? (result.sold as any).id : null }
       );
     }
 

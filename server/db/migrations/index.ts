@@ -1311,6 +1311,26 @@ export const migrations: Migration[] = [
     },
   },
 
+  // Phase 15c: ASO (sales order) reference for sold stock
+  {
+    name: 'add-aso-number-column',
+    version: '025',
+    description: 'Add aso_number column to shipments table for linking sold stock to a sales order',
+    depends_on: ['schema.sql'],
+    execute: async () => {
+      const checkResult = await pool.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='shipments' AND column_name='aso_number'`
+      );
+      if (checkResult.rows.length === 0) {
+        await pool.query(`ALTER TABLE shipments ADD COLUMN aso_number VARCHAR(255)`);
+        logInfo('Added column aso_number to shipments');
+      }
+
+      return true;
+    },
+  },
+
   // Phase 15: Additional destination charge columns for clearing agent fees
   {
     name: 'add-destination-charge-columns',

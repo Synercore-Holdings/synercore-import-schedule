@@ -132,6 +132,7 @@ export function useShipments() {
         sourcePalletRef: s.source_pallet_ref || s.sourcePalletRef || '',
         batchLot: s.batch_lot || s.batchLot || '',
         releaseNumber: s.release_number || s.releaseNumber || '',
+        asoNumber: s.aso_number || s.asoNumber || '',
       }));
 
       setShipments(normalized);

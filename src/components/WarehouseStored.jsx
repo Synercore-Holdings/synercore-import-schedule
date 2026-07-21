@@ -235,18 +235,19 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
       soldQty: shipment.quantity || 0,
       soldPallets: Math.round(shipment.palletQty) || 1,
       notes: '',
+      asoNumber: '',
     });
   };
 
   const handleSoldSubmit = async () => {
     if (!soldModal) return;
-    const { shipment, soldQty, soldPallets, notes } = soldModal;
+    const { shipment, soldQty, soldPallets, notes, asoNumber } = soldModal;
 
     try {
       const response = await authFetch(getApiUrl(`/api/shipments/${shipment.id}/sell`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ soldQty, soldPallets, notes }),
+        body: JSON.stringify({ soldQty, soldPallets, notes, asoNumber }),
       });
 
       if (!response.ok) {
@@ -1257,13 +1258,24 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
             </div>
 
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-700)' }}>
+              ASO # (optional)
+            </label>
+            <input
+              type="text"
+              value={soldModal.asoNumber}
+              onChange={(e) => setSoldModal(prev => ({ ...prev, asoNumber: e.target.value }))}
+              placeholder="Sales order number this stock is linked to"
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 12 }}
+            />
+
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-700)' }}>
               Notes (optional)
             </label>
             <input
               type="text"
               value={soldModal.notes}
               onChange={(e) => setSoldModal(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="e.g. buyer, reference, invoice #"
+              placeholder="e.g. buyer, invoice #"
               style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 16 }}
             />
 

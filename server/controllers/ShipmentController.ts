@@ -871,7 +871,8 @@ export class ShipmentController {
     id: string,
     soldQty: number,
     soldPallets: number,
-    notes?: string
+    notes?: string,
+    asoNumber?: string
   ): Promise<{ source: Shipment; sold: Shipment }> {
     if (!(soldQty > 0) || !(soldPallets > 0)) {
       throw AppError.unprocessable('soldQty and soldPallets must be positive numbers');
@@ -897,10 +898,10 @@ export class ShipmentController {
       if (isFullSale) {
         const updated = await client.query(
           `UPDATE shipments
-           SET latest_status = 'sold', notes = $1, updated_at = $2
-           WHERE id = $3
+           SET latest_status = 'sold', notes = $1, aso_number = $2, updated_at = $3
+           WHERE id = $4
            RETURNING *`,
-          [soldNote, now, id]
+          [soldNote, asoNumber || null, now, id]
         );
         return { source: updated.rows[0] as Shipment, sold: updated.rows[0] as Shipment };
       }
@@ -926,14 +927,16 @@ export class ShipmentController {
           forwarding_agent, incoterm, vessel_name, selected_week_date,
           shipment_type, created_at, updated_at,
           inspection_date, inspection_status, inspection_notes, inspected_by,
-          receiving_date, receiving_status, receiving_notes, received_by, received_quantity
+          receiving_date, receiving_status, receiving_notes, received_by, received_quantity,
+          aso_number
         ) VALUES (
           $1, $2, $3, $4, $5, $6,
           $7, $8, $9, $10, $11, $12,
           $13, $14, $15, $16,
           $17, $18, $19,
           $20, $21, $22, $23,
-          $24, $25, $26, $27, $28
+          $24, $25, $26, $27, $28,
+          $29
         ) RETURNING *`,
         [
           soldId,
@@ -964,6 +967,7 @@ export class ShipmentController {
           source.receiving_notes,
           source.received_by,
           soldQty,
+          asoNumber || null,
         ]
       );
 
