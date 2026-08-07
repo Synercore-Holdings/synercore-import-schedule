@@ -496,7 +496,7 @@ function ImportCosting() {
   const fetchEstimates = async () => {
     try {
       setLoading(true);
-      const response = await authFetch(getApiUrl('/api/costing?direction=import'));
+      const response = await authFetch(getApiUrl('/api/costing?direction=import&limit=5000'));
       if (response.ok) {
         const result = await response.json();
         setEstimates(result.data || []);

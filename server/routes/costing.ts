@@ -70,7 +70,7 @@ router.get(
     query('shipmentId').optional().isString(),
     query('direction').optional().isIn(['import', 'export']),
     query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('limit').optional().isInt({ min: 1, max: 5000 }),
   ],
   validate,
   asyncHandler(async (req: Request, res: Response) => {

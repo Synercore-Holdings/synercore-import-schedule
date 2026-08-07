@@ -227,7 +227,7 @@ function ExportCosting() {
   const fetchEstimates = async () => {
     try {
       setLoading(true);
-      const response = await authFetch(getApiUrl('/api/costing?direction=export'));
+      const response = await authFetch(getApiUrl('/api/costing?direction=export&limit=5000'));
       if (response.ok) {
         const result = await response.json();
         setEstimates(result.data || []);
