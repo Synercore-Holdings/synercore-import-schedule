@@ -181,6 +181,9 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       totalCostedValue: 0,
       seaTotalCost: 0,
       airTotalCost: 0,
+      monthlyStats: [],
+      avgMonthlyCostedValue: 0,
+      avgMonthlyEstimateCount: 0,
     };
 
     let seaTotalLandedPerKg = 0;
@@ -192,6 +195,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
     let totalCostedValue = 0;
     let seaTotalCost = 0;
     let airTotalCost = 0;
+    const monthlyMap = new Map();
 
     active.forEach(est => {
       const totals = calculateAllTotals(est);
@@ -216,7 +220,25 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
           seaLandedPerKgCount++;
         }
       }
+
+      const dateStr = est.costing_date || est.created_at;
+      const d = dateStr ? new Date(dateStr) : null;
+      if (d && !isNaN(d.getTime())) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const entry = monthlyMap.get(key) || { key, year: d.getFullYear(), month: d.getMonth(), total: 0, count: 0 };
+        entry.total += landedCost;
+        entry.count += 1;
+        monthlyMap.set(key, entry);
+      }
     });
+
+    const monthlyStats = Array.from(monthlyMap.values())
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map(entry => ({
+        ...entry,
+        label: new Date(entry.year, entry.month, 1).toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' }),
+      }));
+    const monthsCount = monthlyStats.length || 1;
 
     return {
       seaAvgLandedPerKg: seaLandedPerKgCount > 0 ? seaTotalLandedPerKg / seaLandedPerKgCount : 0,
@@ -226,6 +248,9 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       totalCostedValue,
       seaTotalCost,
       airTotalCost,
+      monthlyStats,
+      avgMonthlyCostedValue: totalCostedValue / monthsCount,
+      avgMonthlyEstimateCount: active.length / monthsCount,
     };
   }, [costingEstimates]);
 
@@ -1356,6 +1381,32 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
                 Total Costed Value
               </p>
             </div>
+            <div className="stat-card ring-success" style={{ cursor: 'pointer' }} onClick={() => navigate('/costing')}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                backgroundColor: 'rgba(16,185,129,0.1)', marginBottom: 6,
+              }}>M</div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
+                {formatCurrency(costingKpis.avgMonthlyCostedValue)}
+              </h3>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
+                Avg Costed Value / Month
+              </p>
+            </div>
+            <div className="stat-card ring-success" style={{ cursor: 'pointer' }} onClick={() => navigate('/costing')}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                backgroundColor: 'rgba(16,185,129,0.1)', marginBottom: 6,
+              }}>M</div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
+                {costingKpis.avgMonthlyEstimateCount.toFixed(1)}
+              </h3>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
+                Avg Estimates / Month
+              </p>
+            </div>
           </div>
 
           {/* Sea vs Air Cost Split Chart */}
@@ -1429,6 +1480,45 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
                       },
                       scales: {
                         x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 12, weight: 600 } } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { font: { size: 11 }, callback: (v) => `R${(v / 1000).toFixed(0)}k` } },
+                      },
+                    }}
+                  />
+                </div>
+              </ChartCard>
+            </div>
+          )}
+
+          {/* Monthly Costing Trend */}
+          {costingKpis.monthlyStats.length > 1 && (
+            <div style={{ marginTop: '1.25rem' }}>
+              <ChartCard title="Monthly Costing Trend" subtitle="Total costed value by month">
+                <div style={{ height: 200 }}>
+                  <BarChart
+                    data={{
+                      labels: costingKpis.monthlyStats.map(m => m.label),
+                      datasets: [{
+                        data: costingKpis.monthlyStats.map(m => m.total),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6,
+                        barThickness: 28,
+                      }],
+                    }}
+                    options={{
+                      responsive: true, maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => {
+                              const m = costingKpis.monthlyStats[ctx.dataIndex];
+                              return [`${formatCurrency(ctx.raw)}`, `${m.count} estimate${m.count !== 1 ? 's' : ''}`];
+                            },
+                          },
+                        },
+                      },
+                      scales: {
+                        x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11 } } },
                         y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { font: { size: 11 }, callback: (v) => `R${(v / 1000).toFixed(0)}k` } },
                       },
                     }}
