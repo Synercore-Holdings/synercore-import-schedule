@@ -145,7 +145,7 @@ function SupplierManagement({ suppliers = [], shipments = [], onAddSupplier, onU
 
       try {
         setLoadingArchived(true);
-        const response = await authFetch(getApiUrl('/api/costing?status=archived'));
+        const response = await authFetch(getApiUrl('/api/costing?status=archived&limit=5000'));
         if (response.ok) {
           const result = await response.json();
           // Filter by supplier name
