@@ -421,6 +421,21 @@ async function start() {
       logWarn('ASO number column migration warning', { error: error.message });
     }
 
+    // Add original_week_number/original_selected_week_date to shipments.
+    // Week/selectedWeekDate get overwritten whenever a shipment is rescheduled,
+    // so on-time/lead-time metrics were measuring drift from the latest edit
+    // instead of the original commitment. These are set once at creation and
+    // never touched again, giving supplier performance metrics a stable baseline.
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS original_week_number VARCHAR(10);
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS original_selected_week_date TIMESTAMP;
+      `);
+      logger.info('Original week columns ready');
+    } catch (error) {
+      logWarn('Original week columns migration warning', { error: error.message });
+    }
+
     // Add full-text search_vector column + GIN index + trigger to shipments.
     // ShipmentController.searchShipments queries this column; without it every
     // /api/shipments/search request returns 500 with "column does not exist".

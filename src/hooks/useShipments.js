@@ -102,6 +102,8 @@ export function useShipments() {
         weekNumber: Number(s.week_number || s.weekNumber) || 0,
         weekDate: s.week_date || s.weekDate,
         selectedWeekDate: s.selected_week_date || s.selectedWeekDate,
+        originalWeekNumber: s.original_week_number || s.originalWeekNumber || null,
+        originalSelectedWeekDate: s.original_selected_week_date || s.originalSelectedWeekDate || null,
         finalPod: s.final_pod || s.finalPod,
         receivingWarehouse: s.receiving_warehouse || s.receivingWarehouse,
         forwardingAgent: s.forwarding_agent || s.forwardingAgent,

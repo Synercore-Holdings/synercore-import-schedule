@@ -7,17 +7,46 @@ import { ShipmentStatus, InspectionStatus } from '../types/shipment';
 
 export class SupplierMetrics {
   /**
-   * Helper: Filter shipments by supplier name
-   * Handles case-insensitive matching
+   * Helper: Filter shipments by supplier name (case-insensitive), then
+   * dedupe by order. The shipments table stores one row per product line,
+   * so a single multi-line order appears as many rows sharing the same
+   * orderRef — without this, a 50-line order would be counted as 50
+   * shipments instead of 1.
    */
   static getSupplierShipments(shipments, supplierName) {
     if (!supplierName) return [];
 
     const normalizedName = supplierName.toLowerCase().trim();
-    return shipments.filter(s => {
+    const matched = shipments.filter(s => {
       const shipmentSupplier = s.supplier?.toLowerCase().trim();
       return shipmentSupplier === normalizedName;
     });
+
+    const seen = new Set();
+    const deduped = [];
+    for (const s of matched) {
+      const key = s.orderRef || s.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(s);
+    }
+    return deduped;
+  }
+
+  /**
+   * Helper: Resolve the scheduled date to benchmark on-time/lead-time
+   * against. Prefers the immutable original_week_number/
+   * original_selected_week_date (set once at creation), falling back to
+   * the live weekNumber/selectedWeekDate for shipments created before
+   * those columns existed — which get overwritten on every reschedule, so
+   * they only approximate the original commitment.
+   */
+  static getScheduledDate(shipment) {
+    const originalDate = shipment.originalSelectedWeekDate
+      || (shipment.originalWeekNumber ? this.estimateDateFromWeek(shipment.originalWeekNumber, shipment.receivingDate) : null);
+    if (originalDate) return originalDate;
+
+    return shipment.selectedWeekDate || this.estimateDateFromWeek(shipment.weekNumber, shipment.receivingDate);
   }
 
   /**
@@ -50,7 +79,7 @@ export class SupplierMetrics {
       const arrivedDate = s.receivingDate || s.updatedAt;
       if (!arrivedDate || !s.weekNumber) return true; // Assume on-time if missing data
 
-      const scheduledDate = s.selectedWeekDate || this.estimateDateFromWeek(s.weekNumber, arrivedDate);
+      const scheduledDate = this.getScheduledDate(s);
       const actualDate = new Date(arrivedDate);
 
       return actualDate <= new Date(scheduledDate);
@@ -158,7 +187,7 @@ export class SupplierMetrics {
     if (warehouseWithDates.length === 0) return null;
 
     const leadTimes = warehouseWithDates.map(s => {
-      const scheduledDate = new Date(s.selectedWeekDate || this.estimateDateFromWeek(s.weekNumber, s.receivingDate));
+      const scheduledDate = new Date(this.getScheduledDate(s));
       const actualDate = new Date(s.receivingDate);
       const diffMs = actualDate - scheduledDate;
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -302,7 +331,7 @@ export class SupplierMetrics {
     const arrivedDate = shipment.receivingDate || shipment.updatedAt;
     if (!arrivedDate || !shipment.weekNumber) return true;
 
-    const scheduledDate = shipment.selectedWeekDate || this.estimateDateFromWeek(shipment.weekNumber, arrivedDate);
+    const scheduledDate = this.getScheduledDate(shipment);
     return new Date(arrivedDate) <= new Date(scheduledDate);
   }
 

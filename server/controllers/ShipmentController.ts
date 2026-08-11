@@ -233,6 +233,11 @@ export class ShipmentController {
       vessel_name: data.vesselName || null,
       incoterm: data.incoterm || null,
       selected_week_date: data.selectedWeekDate ? new Date(data.selectedWeekDate) : null,
+      // Captured once and never updated afterward — supplier performance
+      // metrics benchmark against this instead of week_number/selected_week_date,
+      // which get overwritten whenever the shipment is rescheduled.
+      original_week_number: data.weekNumber || null,
+      original_selected_week_date: data.selectedWeekDate ? new Date(data.selectedWeekDate) : null,
       source_warehouse: data.sourceWarehouse || null,
       source_pallet_ref: data.sourcePalletRef || null,
       batch_lot: data.batchLot || null,
@@ -1069,8 +1074,9 @@ export class ShipmentController {
             id, supplier, order_ref, final_pod, latest_status, week_number,
             product_name, quantity, cbm, pallet_qty, receiving_warehouse, notes, updated_at,
             forwarding_agent, incoterm, vessel_name, selected_week_date,
-            reminder_date, reminder_note, shipment_type
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+            reminder_date, reminder_note, shipment_type,
+            original_week_number, original_selected_week_date
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
           [
             id,
             shipment.supplier,
@@ -1091,7 +1097,11 @@ export class ShipmentController {
             shipment.selectedWeekDate || null,
             shipment.reminderDate || null,
             shipment.reminderNote || null,
-            shipment.shipmentType || 'international'
+            shipment.shipmentType || 'international',
+            // Captured once at import and never updated afterward — see
+            // original_week_number comment in createShipment.
+            shipment.weekNumber || null,
+            shipment.selectedWeekDate || null
           ]
         );
       }

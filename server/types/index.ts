@@ -105,6 +105,8 @@ export interface Shipment {
   latest_status: ShipmentStatus;
   week_number?: number;
   selected_week_date?: Date;
+  original_week_number?: number;
+  original_selected_week_date?: Date;
   notes?: string;
   created_at: Date;
   updated_at: Date;
