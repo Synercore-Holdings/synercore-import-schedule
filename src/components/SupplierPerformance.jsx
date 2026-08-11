@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { SupplierMetrics } from '../utils/supplierMetrics';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
+import { calculateAllTotals } from '../utils/costingCalculations';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -84,7 +85,7 @@ function SupplierPerformance({ shipments }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authFetch(getApiUrl('/api/costing/estimates'));
+        const res = await authFetch(getApiUrl('/api/costing?limit=5000'));
         if (res.ok && !cancelled) {
           const data = await res.json();
           setCostingData(data.data || data);
@@ -250,9 +251,11 @@ function SupplierPerformance({ shipments }) {
     // Group by supplier and compute avg cost per kg
     const supplierCosts = {};
     costingData.forEach(est => {
-      const supplier = est.supplier || est.supplierName;
-      const totalKg = parseFloat(est.totalKg || est.weight || 0);
-      const totalCost = parseFloat(est.totalCost || est.cost || 0);
+      if (est.status === 'archived') return;
+      const supplier = est.supplier_name;
+      const totals = calculateAllTotals(est);
+      const totalKg = parseFloat(est.total_gross_weight_kg || 0);
+      const totalCost = totals.total_landed_cost_zar || 0;
       if (!supplier || !totalKg || !totalCost) return;
       if (!supplierCosts[supplier]) supplierCosts[supplier] = { totalKg: 0, totalCost: 0 };
       supplierCosts[supplier].totalKg += totalKg;

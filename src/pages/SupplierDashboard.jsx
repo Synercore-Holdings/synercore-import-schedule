@@ -42,7 +42,7 @@ function SupplierDashboard({ onLogout }) {
       setLoading(true);
       const [statsRes, shipmentsRes, reportsRes] = await Promise.all([
         supplierFetch(getApiUrl('/api/supplier/stats')).catch(() => null),
-        supplierFetch(getApiUrl('/api/supplier/shipments')),
+        supplierFetch(getApiUrl('/api/supplier/shipments?limit=5000')),
         supplierFetch(getApiUrl('/api/supplier/reports')).catch(() => null)
       ]);
 
@@ -69,7 +69,7 @@ function SupplierDashboard({ onLogout }) {
   const fetchShipments = async () => {
     try {
       setLoading(true);
-      const query = filter ? `?status=${filter}` : '';
+      const query = filter ? `?status=${filter}&limit=5000` : '?limit=5000';
       const res = await supplierFetch(getApiUrl(`/api/supplier/shipments${query}`));
 
       if (!res.ok) throw new Error('Failed to fetch shipments');

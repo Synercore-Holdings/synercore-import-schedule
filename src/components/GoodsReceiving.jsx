@@ -15,6 +15,7 @@ function GoodsReceiving() {
   const [summary, setSummary] = useState({ pendingReceiving: 0, activeReceiving: 0, receivedToday: 0, discrepanciesToday: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [historyDays, setHistoryDays] = useState(7);
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [showReceivingForm, setShowReceivingForm] = useState(false);
   const [formMode, setFormMode] = useState('start'); // 'start' or 'complete'
@@ -53,7 +54,7 @@ function GoodsReceiving() {
       const [queueRes, activeRes, recentRes, summaryRes] = await Promise.all([
         authFetch(getApiUrl('/api/shipments/receiving/queue')),
         authFetch(getApiUrl('/api/shipments/receiving/active')),
-        authFetch(getApiUrl('/api/shipments/receiving/recent?days=7')),
+        authFetch(getApiUrl(`/api/shipments/receiving/recent?days=${historyDays}`)),
         authFetch(getApiUrl('/api/shipments/receiving/summary')),
       ]);
 
@@ -70,7 +71,7 @@ function GoodsReceiving() {
     } finally {
       setLoading(false);
     }
-  }, [fetchTruckInfo]);
+  }, [fetchTruckInfo, historyDays]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -379,14 +380,30 @@ function GoodsReceiving() {
           ))}
         </div>
 
-        <input
-          type="text"
-          placeholder="Search shipments..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          className="input"
-          style={{ width: '240px', fontSize: '0.85rem' }}
-        />
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {activeTab === 'history' && (
+            <select
+              value={historyDays}
+              onChange={e => setHistoryDays(Number(e.target.value))}
+              className="input"
+              style={{ fontSize: '0.85rem' }}
+              aria-label="History range"
+            >
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 90 days</option>
+              <option value={365}>Last 365 days</option>
+            </select>
+          )}
+          <input
+            type="text"
+            placeholder="Search shipments..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="input"
+            style={{ width: '240px', fontSize: '0.85rem' }}
+          />
+        </div>
       </div>
 
       {/* Tab Content */}

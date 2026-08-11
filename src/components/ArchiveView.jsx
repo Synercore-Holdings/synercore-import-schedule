@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { useNotification } from '../contexts/NotificationContext';
 
 function ArchiveView() {
   const { showError, showSuccess, confirm: confirmAction } = useNotification();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const globalSearchTerm = searchParams.get('search') || '';
   const [archives, setArchives] = useState([]);
   const [dbArchived, setDbArchived] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedArchive, setSelectedArchive] = useState(null);
   const [archiveData, setArchiveData] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(globalSearchTerm || '');
+  const [dbSearchResults, setDbSearchResults] = useState(null);
+  const [searchingAll, setSearchingAll] = useState(false);
   const [editingArchive, setEditingArchive] = useState(null);
   const [newName, setNewName] = useState('');
   const [editingShipment, setEditingShipment] = useState(null);
@@ -26,6 +31,44 @@ function ArchiveView() {
     fetchArchives();
     fetchDbArchived();
   }, []);
+
+  // Sync global search term from URL (e.g. deep-linked from GlobalSearch)
+  useEffect(() => {
+    if (globalSearchTerm) {
+      setSearchTerm(globalSearchTerm);
+      const params = new URLSearchParams(searchParams);
+      params.delete('search');
+      setSearchParams(params, { replace: true });
+    }
+  }, [globalSearchTerm]);
+
+  // Search reaches the full archived set, not just the currently loaded page
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (term.length < 2) {
+      setDbSearchResults(null);
+      return;
+    }
+    setSearchingAll(true);
+    const timer = setTimeout(async () => {
+      try {
+        const response = await authFetch(getApiUrl(`/api/shipments?search=${encodeURIComponent(term)}&limit=500`));
+        if (response.ok) {
+          const result = await response.json();
+          const rows = result.data || result.shipments || result || [];
+          setDbSearchResults(rows.filter(s => {
+            const status = s.latestStatus || s.latest_status;
+            return status === 'archived' || status === 'sold';
+          }));
+        }
+      } catch (error) {
+        console.error('Error searching archived shipments:', error);
+      } finally {
+        setSearchingAll(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchArchives = async () => {
     try {
@@ -236,17 +279,14 @@ function ArchiveView() {
       );
   }, [archives, searchTerm]);
 
-  // Filter DB-archived shipments by search
+  // Filter DB-archived shipments by search. Below 2 chars, browse the current
+  // page as normal; at 2+ chars, use the full-dataset search results so matches
+  // outside the currently-loaded 50-row page are still reachable.
   const filteredDbArchived = useMemo(() => {
-    if (searchTerm === '') return dbArchived;
-    const q = searchTerm.toLowerCase();
-    return dbArchived.filter(s =>
-      (s.orderRef || s.order_ref || '').toLowerCase().includes(q) ||
-      (s.supplier || '').toLowerCase().includes(q) ||
-      (s.productName || s.product_name || '').toLowerCase().includes(q) ||
-      (s.receivingWarehouse || s.receiving_warehouse || '').toLowerCase().includes(q)
-    );
-  }, [dbArchived, searchTerm]);
+    if (searchTerm.trim().length >= 2) return dbSearchResults || [];
+    return dbArchived;
+  }, [dbArchived, searchTerm, dbSearchResults]);
+  const isSearchingAllArchived = searchTerm.trim().length >= 2;
 
   // --- Detail view for a specific file archive ---
   if (selectedArchive && archiveData) {
@@ -459,7 +499,9 @@ function ArchiveView() {
             Shipment Archives
           </h2>
           <span style={{ fontSize: 12, color: 'var(--text-500)' }}>
-            {dbPagination?.total || filteredDbArchived.length} archived shipment{(dbPagination?.total || filteredDbArchived.length) !== 1 ? 's' : ''}
+            {isSearchingAllArchived
+              ? (searchingAll ? 'Searching all archived shipments...' : `${filteredDbArchived.length} match${filteredDbArchived.length !== 1 ? 'es' : ''} across all archives`)
+              : `${dbPagination?.total || filteredDbArchived.length} archived shipment${(dbPagination?.total || filteredDbArchived.length) !== 1 ? 's' : ''}`}
             {filteredFileArchives.length > 0 && ` · ${filteredFileArchives.length} file archive${filteredFileArchives.length !== 1 ? 's' : ''}`}
           </span>
         </div>
@@ -583,7 +625,7 @@ function ArchiveView() {
         )}
 
         {/* Pagination controls */}
-        {dbPagination && dbPagination.pages > 1 && (
+        {!isSearchingAllArchived && dbPagination && dbPagination.pages > 1 && (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, padding: '12px 0', marginBottom: 16 }}>
             <button
               onClick={() => fetchDbArchived(dbPage - 1)}

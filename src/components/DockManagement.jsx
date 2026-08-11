@@ -32,6 +32,8 @@ const DOCK_STATUS_COLORS = {
 
 const ELIGIBLE_STATUSES = ['arrived_pta', 'arrived_klm', 'arrived_offsite'];
 
+const todayDateStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+
 // ─── Shipment Picker Component ───
 function ShipmentPicker({ shipments = [], selectedIds = [], onChange }) {
   const [search, setSearch] = useState('');
@@ -178,6 +180,7 @@ function DockManagement({ shipments: propShipments = [] }) {
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
   const [activeTab, setActiveTab] = useState('schedule');
   const [selectedWarehouse, setSelectedWarehouse] = useState('All');
+  const [selectedDate, setSelectedDate] = useState(todayDateStr());
   const [docks, setDocks] = useState([]);
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [queue, setQueue] = useState([]);
@@ -206,9 +209,15 @@ function DockManagement({ shipments: propShipments = [] }) {
     try {
       setLoading(true);
       const wq = warehouseParam ? `?warehouse=${warehouseParam}` : '';
+      // /trucks/today also catches ad-hoc trucks with no expected_arrival that
+      // were created today; the generic /trucks?date= endpoint doesn't, so only
+      // switch to it when browsing a day other than today.
+      const scheduleUrl = selectedDate === todayDateStr()
+        ? `/api/docks/trucks/today${wq}`
+        : `/api/docks/trucks?date=${selectedDate}${warehouseParam ? `&warehouse=${warehouseParam}` : ''}`;
       const [docksRes, scheduleRes, queueRes, metricsRes] = await Promise.all([
         authFetch(getApiUrl(`/api/docks${wq}`)),
-        authFetch(getApiUrl(`/api/docks/trucks/today${wq}`)),
+        authFetch(getApiUrl(scheduleUrl)),
         authFetch(getApiUrl(`/api/docks/trucks/queue${wq}`)),
         authFetch(getApiUrl(`/api/docks/metrics${wq}`)),
       ]);
@@ -222,7 +231,7 @@ function DockManagement({ shipments: propShipments = [] }) {
     } finally {
       setLoading(false);
     }
-  }, [warehouseParam]);
+  }, [warehouseParam, selectedDate]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -573,6 +582,36 @@ function DockManagement({ shipments: propShipments = [] }) {
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {activeTab === 'schedule' && (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <button
+                className="btn btn-ghost" style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                onClick={() => setSelectedDate(d => {
+                  const next = new Date(d); next.setDate(next.getDate() - 1);
+                  return next.toLocaleDateString('en-CA');
+                })}
+              >&larr;</button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="input"
+                style={{ fontSize: '0.85rem' }}
+              />
+              <button
+                className="btn btn-ghost" style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+                onClick={() => setSelectedDate(d => {
+                  const next = new Date(d); next.setDate(next.getDate() + 1);
+                  return next.toLocaleDateString('en-CA');
+                })}
+              >&rarr;</button>
+              {selectedDate !== todayDateStr() && (
+                <button className="btn btn-ghost" style={{ fontSize: '0.85rem' }} onClick={() => setSelectedDate(todayDateStr())}>
+                  Today
+                </button>
+              )}
+            </div>
+          )}
           <select
             value={selectedWarehouse}
             onChange={e => setSelectedWarehouse(e.target.value)}
@@ -623,7 +662,9 @@ function DockManagement({ shipments: propShipments = [] }) {
           {loading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-500)' }}>Loading...</div>
           ) : todaySchedule.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-500)' }}>No trucks scheduled for today</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-500)' }}>
+              No trucks scheduled for {selectedDate === todayDateStr() ? 'today' : selectedDate}
+            </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="table" style={{ fontSize: '0.85rem' }}>

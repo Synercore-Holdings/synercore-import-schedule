@@ -271,7 +271,7 @@ function ReportsView({ shipments: propShipments }) {
   const fetchSavedReports = async () => {
     try {
       setLoadingReports(true);
-      const response = await authFetch(getApiUrl('/api/reports'));
+      const response = await authFetch(getApiUrl('/api/reports?limit=1000'));
       if (response.ok) {
         const data = await response.json();
         setSavedReports(data.reports || []);

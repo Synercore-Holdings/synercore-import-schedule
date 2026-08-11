@@ -50,7 +50,10 @@ function UserManagement() {
   const [showLoginActivity, setShowLoginActivity] = useState(false);
   const [loginActivity, setLoginActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [activityLoadingMore, setActivityLoadingMore] = useState(false);
   const [activityUserId, setActivityUserId] = useState(null);
+  const [activityTotal, setActivityTotal] = useState(0);
+  const ACTIVITY_PAGE_SIZE = 100;
 
   const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
@@ -264,23 +267,27 @@ function UserManagement() {
     }
   };
 
-  const fetchLoginActivity = async (userId = null) => {
+  const fetchLoginActivity = async (userId = null, append = false) => {
     try {
-      setActivityLoading(true);
-      const url = userId
+      if (append) setActivityLoadingMore(true); else setActivityLoading(true);
+      const offset = append ? loginActivity.length : 0;
+      const base = userId
         ? `${apiUrl}/api/auth/admin/login-activity/${userId}`
         : `${apiUrl}/api/auth/admin/login-activity`;
-      const response = await fetch(url, {
+      const response = await fetch(`${base}?limit=${ACTIVITY_PAGE_SIZE}&offset=${offset}`, {
         headers: authUtils.getAuthHeader()
       });
       if (!response.ok) throw new Error('Failed to load login activity');
-      const data = await response.json();
-      setLoginActivity(Array.isArray(data) ? data.slice(0, 100) : []);
+      const result = await response.json();
+      const rows = Array.isArray(result) ? result : (result.data || []);
+      setActivityTotal(Array.isArray(result) ? rows.length : (result.total || 0));
+      setLoginActivity(append ? [...loginActivity, ...rows] : rows);
     } catch (error) {
       console.error('Error loading login activity:', error);
-      setLoginActivity([]);
+      if (!append) setLoginActivity([]);
     } finally {
       setActivityLoading(false);
+      setActivityLoadingMore(false);
     }
   };
 
@@ -791,6 +798,26 @@ function UserManagement() {
                   })()}
                 </tbody>
               </table>
+              {loginActivity.length < activityTotal && (
+                <div style={{ textAlign: 'center', padding: '16px' }}>
+                  <button
+                    onClick={() => fetchLoginActivity(activityUserId, true)}
+                    disabled={activityLoadingMore}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: activityLoadingMore ? 'not-allowed' : 'pointer',
+                      opacity: activityLoadingMore ? 0.6 : 1
+                    }}
+                  >
+                    {activityLoadingMore ? 'Loading...' : `Load More (${loginActivity.length} of ${activityTotal})`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

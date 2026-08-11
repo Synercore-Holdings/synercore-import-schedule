@@ -2,6 +2,16 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
+import { POST_ARRIVAL_STATUSES } from '../types/shipment';
+
+// Route a shipment to wherever its status is actually visible, so a search
+// result never lands on a page whose own status filter hides it again.
+const targetPathForStatus = (status) => {
+  if (status === 'stored' || status === 'arrived_offsite') return '/stored';
+  if (status === 'archived' || status === 'sold') return '/archives';
+  if (POST_ARRIVAL_STATUSES.includes(status)) return '/workflow';
+  return '/shipping';
+};
 
 function GlobalSearch({ shipments }) {
   const navigate = useNavigate();
@@ -124,7 +134,7 @@ function GlobalSearch({ shipments }) {
     setOpen(false);
     setQuery('');
     const searchValue = shipment.orderRef || query;
-    const targetPath = shipment.latestStatus === 'stored' ? '/stored' : '/shipping';
+    const targetPath = targetPathForStatus(shipment.latestStatus);
     navigate(`${targetPath}?search=${encodeURIComponent(searchValue)}`);
   };
 

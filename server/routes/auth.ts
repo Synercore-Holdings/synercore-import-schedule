@@ -553,22 +553,32 @@ router.get('/password-status', authenticateToken, async (req: Request, res: Resp
 // GET /api/auth/admin/login-activity - Get recent login activity (admin only)
 router.get('/admin/login-activity', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      `SELECT id, user_id, username, ip_address, user_agent, login_at, success
-       FROM login_activity
-       ORDER BY login_at DESC
-       LIMIT 100`
-    );
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 1000);
+    const offset = parseInt(req.query.offset as string, 10) || 0;
 
-    res.json(result.rows.map((row: any) => ({
-      id: row.id,
-      userId: row.user_id,
-      username: row.username,
-      ipAddress: row.ip_address,
-      userAgent: row.user_agent,
-      loginAt: row.login_at,
-      success: row.success
-    })));
+    const [result, countResult] = await Promise.all([
+      pool.query(
+        `SELECT id, user_id, username, ip_address, user_agent, login_at, success
+         FROM login_activity
+         ORDER BY login_at DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      ),
+      pool.query('SELECT COUNT(*) FROM login_activity'),
+    ]);
+
+    res.json({
+      data: result.rows.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        username: row.username,
+        ipAddress: row.ip_address,
+        userAgent: row.user_agent,
+        loginAt: row.login_at,
+        success: row.success
+      })),
+      total: parseInt(countResult.rows[0].count, 10),
+    });
   } catch (error: unknown) {
     console.error('Error fetching login activity:', error);
     res.status(500).json({ error: 'Failed to fetch login activity' });
@@ -579,25 +589,33 @@ router.get('/admin/login-activity', authenticateToken, requireAdmin, async (req:
 router.get('/admin/login-activity/:userId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 1000);
+    const offset = parseInt(req.query.offset as string, 10) || 0;
 
-    const result = await pool.query(
-      `SELECT id, user_id, username, ip_address, user_agent, login_at, success
-       FROM login_activity
-       WHERE user_id = $1
-       ORDER BY login_at DESC
-       LIMIT 100`,
-      [userId]
-    );
+    const [result, countResult] = await Promise.all([
+      pool.query(
+        `SELECT id, user_id, username, ip_address, user_agent, login_at, success
+         FROM login_activity
+         WHERE user_id = $1
+         ORDER BY login_at DESC
+         LIMIT $2 OFFSET $3`,
+        [userId, limit, offset]
+      ),
+      pool.query('SELECT COUNT(*) FROM login_activity WHERE user_id = $1', [userId]),
+    ]);
 
-    res.json(result.rows.map((row: any) => ({
-      id: row.id,
-      userId: row.user_id,
-      username: row.username,
-      ipAddress: row.ip_address,
-      userAgent: row.user_agent,
-      loginAt: row.login_at,
-      success: row.success
-    })));
+    res.json({
+      data: result.rows.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        username: row.username,
+        ipAddress: row.ip_address,
+        userAgent: row.user_agent,
+        loginAt: row.login_at,
+        success: row.success
+      })),
+      total: parseInt(countResult.rows[0].count, 10),
+    });
   } catch (error: unknown) {
     console.error('Error fetching user login activity:', error);
     res.status(500).json({ error: 'Failed to fetch user login activity' });
