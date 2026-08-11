@@ -160,7 +160,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
   useEffect(() => {
     const fetchCosting = async () => {
       try {
-        const res = await authFetch(getApiUrl('/api/costing'));
+        const res = await authFetch(getApiUrl('/api/costing?limit=5000'));
         if (res.ok) {
           const json = await res.json();
           setCostingEstimates(Array.isArray(json) ? json : (json.data || []));
