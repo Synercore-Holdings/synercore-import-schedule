@@ -248,22 +248,25 @@ function SupplierPerformance({ shipments }) {
   const costChartData = useMemo(() => {
     if (!costingData || !Array.isArray(costingData) || costingData.length === 0) return null;
 
-    // Group by supplier and compute avg cost per kg
+    // Group by supplier (case/whitespace-insensitive, since supplier_name is
+    // free text and the same supplier can be entered with different casing)
+    // and compute avg cost per kg.
     const supplierCosts = {};
     costingData.forEach(est => {
       if (est.status === 'archived') return;
-      const supplier = est.supplier_name;
+      const supplier = est.supplier_name?.trim();
       const totals = calculateAllTotals(est);
       const totalKg = parseFloat(est.total_gross_weight_kg || 0);
       const totalCost = totals.total_landed_cost_zar || 0;
       if (!supplier || !totalKg || !totalCost) return;
-      if (!supplierCosts[supplier]) supplierCosts[supplier] = { totalKg: 0, totalCost: 0 };
-      supplierCosts[supplier].totalKg += totalKg;
-      supplierCosts[supplier].totalCost += totalCost;
+      const key = supplier.toLowerCase();
+      if (!supplierCosts[key]) supplierCosts[key] = { displayName: supplier, totalKg: 0, totalCost: 0 };
+      supplierCosts[key].totalKg += totalKg;
+      supplierCosts[key].totalCost += totalCost;
     });
 
-    const entries = Object.entries(supplierCosts)
-      .map(([name, d]) => ({ name, costPerKg: +(d.totalCost / d.totalKg).toFixed(2) }))
+    const entries = Object.values(supplierCosts)
+      .map(d => ({ name: d.displayName, costPerKg: +(d.totalCost / d.totalKg).toFixed(2) }))
       .sort((a, b) => b.costPerKg - a.costPerKg);
 
     if (entries.length === 0) return null;

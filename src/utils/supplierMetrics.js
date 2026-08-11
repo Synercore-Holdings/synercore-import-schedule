@@ -50,7 +50,7 @@ export class SupplierMetrics {
       const arrivedDate = s.receivingDate || s.updatedAt;
       if (!arrivedDate || !s.weekNumber) return true; // Assume on-time if missing data
 
-      const scheduledDate = s.selectedWeekDate || this.estimateDateFromWeek(s.weekNumber);
+      const scheduledDate = s.selectedWeekDate || this.estimateDateFromWeek(s.weekNumber, arrivedDate);
       const actualDate = new Date(arrivedDate);
 
       return actualDate <= new Date(scheduledDate);
@@ -158,7 +158,7 @@ export class SupplierMetrics {
     if (warehouseWithDates.length === 0) return null;
 
     const leadTimes = warehouseWithDates.map(s => {
-      const scheduledDate = new Date(s.selectedWeekDate || this.estimateDateFromWeek(s.weekNumber));
+      const scheduledDate = new Date(s.selectedWeekDate || this.estimateDateFromWeek(s.weekNumber, s.receivingDate));
       const actualDate = new Date(s.receivingDate);
       const diffMs = actualDate - scheduledDate;
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -302,15 +302,18 @@ export class SupplierMetrics {
     const arrivedDate = shipment.receivingDate || shipment.updatedAt;
     if (!arrivedDate || !shipment.weekNumber) return true;
 
-    const scheduledDate = shipment.selectedWeekDate || this.estimateDateFromWeek(shipment.weekNumber);
+    const scheduledDate = shipment.selectedWeekDate || this.estimateDateFromWeek(shipment.weekNumber, arrivedDate);
     return new Date(arrivedDate) <= new Date(scheduledDate);
   }
 
   /**
-   * Helper: Estimate date from week number
+   * Helper: Estimate date from week number.
+   * Anchors to referenceDate's year (defaulting to now) rather than always
+   * using the current year, so old shipments don't get mapped to a
+   * scheduled date in the wrong year once viewed in a later calendar year.
    */
-  static estimateDateFromWeek(weekNumber) {
-    const year = new Date().getFullYear();
+  static estimateDateFromWeek(weekNumber, referenceDate) {
+    const year = (referenceDate ? new Date(referenceDate) : new Date()).getFullYear();
     const simple = new Date(year, 0, 1 + (weekNumber - 1) * 7);
     return simple.toISOString().split('T')[0];
   }
