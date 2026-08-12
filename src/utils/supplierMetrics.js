@@ -210,6 +210,46 @@ export class SupplierMetrics {
   }
 
   /**
+   * Build a per-shipment audit trail for a supplier: original scheduled
+   * date vs actual receiving date, and whether it graded on-time. Lets
+   * users verify the OTD/lead-time numbers against individual shipments
+   * instead of trusting the aggregate blindly.
+   * Only includes warehouse shipments (stored/received/inspection_passed)
+   * with a receivingDate, matching the population used by the KPIs above.
+   */
+  static getShipmentAudit(shipments, supplierName) {
+    const supplierShipments = this.getSupplierShipments(shipments, supplierName);
+
+    return supplierShipments
+      .filter(s => {
+        const isInWarehouse = [
+          ShipmentStatus.STORED,
+          ShipmentStatus.RECEIVED,
+          ShipmentStatus.INSPECTION_PASSED,
+          'stored',
+          'received',
+          'inspection_passed'
+        ].includes(s.latestStatus);
+        return isInWarehouse && s.receivingDate;
+      })
+      .map(s => {
+        const scheduledDate = this.getScheduledDate(s);
+        const actualDate = s.receivingDate;
+        const diffDays = Math.ceil((new Date(actualDate) - new Date(scheduledDate)) / (1000 * 60 * 60 * 24));
+        return {
+          orderRef: s.orderRef || s.id,
+          productName: s.productName,
+          scheduledDate,
+          actualDate,
+          diffDays,
+          onTime: new Date(actualDate) <= new Date(scheduledDate),
+          usedFallbackBenchmark: !(s.originalSelectedWeekDate || s.originalWeekNumber),
+        };
+      })
+      .sort((a, b) => new Date(b.actualDate) - new Date(a.actualDate));
+  }
+
+  /**
    * Get 90-day trend for a metric
    * Returns array of values over last 90 days
    * Only includes warehouse stored shipments (stored/received/inspection_passed)

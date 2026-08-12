@@ -320,6 +320,12 @@ function SupplierPerformance({ shipments }) {
 
   const sortIcon = (col) => sortCol === col ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
 
+  // ---- Shipment-level audit trail (only when a single supplier is selected) ----
+  const shipmentAudit = useMemo(() => {
+    if (selectedSupplier === 'all') return [];
+    return SupplierMetrics.getShipmentAudit(shipments, selectedSupplier);
+  }, [shipments, selectedSupplier]);
+
   // ---- Render ----
   return (
     <div style={{ padding: '0 8px 32px' }}>
@@ -468,6 +474,65 @@ function SupplierPerformance({ shipments }) {
           </table>
         </div>
       </ChartCard>
+
+      {/* Shipment Audit Trail — only when a single supplier is selected */}
+      {selectedSupplier !== 'all' && (
+        <ChartCard
+          title="Shipment Audit Trail"
+          subtitle={`${shipmentAudit.length} warehouse-confirmed shipment${shipmentAudit.length !== 1 ? 's' : ''} for ${selectedSupplier}`}
+          style={{ marginTop: 16 }}
+        >
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  {['Order Ref', 'Product', 'Originally Scheduled', 'Actual Received', 'Lead Time', 'Status'].map(label => (
+                    <th key={label} style={{
+                      padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                      fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                      letterSpacing: 0.5, whiteSpace: 'nowrap',
+                    }}>
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {shipmentAudit.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No warehouse-confirmed shipments yet</td></tr>
+                )}
+                {shipmentAudit.map((a, idx) => (
+                  <tr
+                    key={a.orderRef}
+                    style={{
+                      borderBottom: '1px solid var(--border)',
+                      backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{a.orderRef}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{a.productName || '--'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {a.scheduledDate}
+                      {a.usedFallbackBenchmark && (
+                        <span title="No original-schedule baseline stored for this shipment — using its current/live scheduled week instead, which may have moved since creation." style={{ marginLeft: 6, color: 'var(--text-500)', cursor: 'help' }}>*</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{a.actualDate}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {a.diffDays > 0 ? `+${a.diffDays}d` : `${a.diffDays}d`}
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ fontWeight: 700, color: a.onTime ? '#28a745' : '#dc3545' }}>
+                        {a.onTime ? 'On-Time' : 'Late'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ChartCard>
+      )}
     </div>
   );
 }
