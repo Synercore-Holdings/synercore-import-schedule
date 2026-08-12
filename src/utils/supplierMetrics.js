@@ -260,6 +260,9 @@ export class SupplierMetrics {
           // True when actualDate came from the manually-entered arrival date
           // rather than falling back to the receiving-workflow timestamp
           isVerifiedArrival: !!s.actualArrivalDate,
+          // Full shipment, so callers can open it for editing (e.g. to
+          // enter the actual arrival date) straight from the audit row
+          shipment: s,
         };
       })
       .sort((a, b) => new Date(b.actualDate) - new Date(a.actualDate));

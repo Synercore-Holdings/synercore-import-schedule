@@ -1019,7 +1019,7 @@ function App() {
               <Suspense fallback={<PageLoader />}><ErrorBoundary>{isAdmin ? <UserManagement /> : <AccessDenied />}</ErrorBoundary></Suspense>
             } />
             <Route path="/supplier-performance" element={
-              <Suspense fallback={<PageLoader />}><ErrorBoundary><SupplierPerformance shipments={shipments} /></ErrorBoundary></Suspense>
+              <Suspense fallback={<PageLoader />}><ErrorBoundary><SupplierPerformance shipments={shipments} onUpdateShipment={handleUpdateShipment} /></ErrorBoundary></Suspense>
             } />
             <Route path="/bol-audit" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><BolAudit /></ErrorBoundary></Suspense>

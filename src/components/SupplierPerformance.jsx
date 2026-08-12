@@ -3,6 +3,7 @@ import { SupplierMetrics } from '../utils/supplierMetrics';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { calculateAllTotals } from '../utils/costingCalculations';
+import ShipmentFormModal from './ShipmentFormModal';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -74,11 +75,12 @@ const TrendArrow = ({ trend }) => {
 // ---- Line colors for top suppliers ----
 const LINE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-function SupplierPerformance({ shipments }) {
+function SupplierPerformance({ shipments, onUpdateShipment }) {
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [sortCol, setSortCol] = useState('onTimePercent');
   const [sortDir, setSortDir] = useState('desc');
   const [costingData, setCostingData] = useState(null);
+  const [editingShipment, setEditingShipment] = useState(null);
 
   // Fetch costing estimates (optional — non-blocking)
   useEffect(() => {
@@ -320,6 +322,13 @@ function SupplierPerformance({ shipments }) {
 
   const sortIcon = (col) => sortCol === col ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
 
+  // ---- Edit a shipment directly from the audit trail ----
+  const handleSaveShipmentEdit = async (shipmentData) => {
+    if (!onUpdateShipment || !editingShipment) return;
+    await onUpdateShipment(editingShipment.id, shipmentData);
+    setEditingShipment(null);
+  };
+
   // ---- Shipment-level audit trail (only when a single supplier is selected) ----
   const shipmentAudit = useMemo(() => {
     if (selectedSupplier === 'all') return [];
@@ -509,7 +518,23 @@ function SupplierPerformance({ shipments }) {
                       backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
                     }}
                   >
-                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{a.orderRef}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                      {onUpdateShipment ? (
+                        <button
+                          onClick={() => setEditingShipment(a.shipment)}
+                          title="Edit this shipment"
+                          style={{
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            fontWeight: 600, fontSize: 13, color: 'var(--accent-600, #3b82f6)',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          {a.orderRef}
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--text-900)' }}>{a.orderRef}</span>
+                      )}
+                    </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{a.productName || '--'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
                       {a.scheduledDate}
@@ -539,6 +564,16 @@ function SupplierPerformance({ shipments }) {
             </table>
           </div>
         </ChartCard>
+      )}
+
+      {onUpdateShipment && (
+        <ShipmentFormModal
+          isOpen={!!editingShipment}
+          onClose={() => setEditingShipment(null)}
+          onSubmit={handleSaveShipmentEdit}
+          initialData={editingShipment}
+          uniqueSuppliers={supplierNames}
+        />
       )}
     </div>
   );
