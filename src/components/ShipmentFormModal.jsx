@@ -22,6 +22,7 @@ const EMPTY_FORM = {
   notes: '',
   reminderDate: '',
   reminderNote: '',
+  actualArrivalDate: '',
 };
 
 function validateShipmentForm(data) {
@@ -586,6 +587,25 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
             placeholder="Additional notes or comments"
           />
+        </div>
+
+        {/* Actual Arrival Date */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            Actual Arrival Date
+          </label>
+          <input
+            type="date"
+            value={formData.actualArrivalDate ? formData.actualArrivalDate.split('T')[0] : ''}
+            onChange={(e) => handleInputChange('actualArrivalDate', e.target.value)}
+            className="input"
+            style={{ width: '100%' }}
+          />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '0.25rem' }}>
+            When the consignment actually arrived — set this as soon as you know,
+            regardless of when it gets processed through receiving. Used for
+            on-time delivery / lead-time tracking.
+          </div>
         </div>
 
         {/* Reminder Date */}

@@ -517,7 +517,12 @@ function SupplierPerformance({ shipments }) {
                         <span title="No original-schedule baseline stored for this shipment — using its current/live scheduled week instead, which may have moved since creation." style={{ marginLeft: 6, color: 'var(--text-500)', cursor: 'help' }}>*</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{a.actualDate}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {a.actualDate}
+                      {!a.isVerifiedArrival && (
+                        <span title="No manually-entered arrival date for this shipment — using the receiving-workflow timestamp instead, which reflects when staff processed it, not necessarily when it physically arrived." style={{ marginLeft: 6, color: 'var(--text-500)', cursor: 'help' }}>*</span>
+                      )}
+                    </td>
                     <td style={{ padding: '10px 12px', color: a.diffDays > 0 ? '#dc3545' : a.diffDays < 0 ? '#28a745' : 'var(--text-700)' }}>
                       {a.diffDays > 0 ? `${a.diffDays} day${a.diffDays !== 1 ? 's' : ''} late`
                         : a.diffDays < 0 ? `${Math.abs(a.diffDays)} day${Math.abs(a.diffDays) !== 1 ? 's' : ''} early`

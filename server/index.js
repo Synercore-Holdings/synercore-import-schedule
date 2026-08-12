@@ -436,6 +436,18 @@ async function start() {
       logWarn('Original week columns migration warning', { error: error.message });
     }
 
+    // Add actual_arrival_date to shipments: manually entered by a user once
+    // they learn the consignment physically arrived, independent of
+    // receiving_date (stamped only when the receiving workflow is run,
+    // which can lag well behind actual arrival) so OTD/lead-time metrics
+    // can benchmark against a true arrival date instead of processing lag.
+    try {
+      await getPool().query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS actual_arrival_date TIMESTAMP`);
+      logger.info('Actual arrival date column ready');
+    } catch (error) {
+      logWarn('Actual arrival date column migration warning', { error: error.message });
+    }
+
     // Add full-text search_vector column + GIN index + trigger to shipments.
     // ShipmentController.searchShipments queries this column; without it every
     // /api/shipments/search request returns 500 with "column does not exist".

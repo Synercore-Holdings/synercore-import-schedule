@@ -50,6 +50,18 @@ export class SupplierMetrics {
   }
 
   /**
+   * Helper: Resolve the date a shipment actually arrived, for benchmarking
+   * against the scheduled date. Prefers actualArrivalDate — manually
+   * entered by a user as soon as they learn the consignment physically
+   * arrived — over receivingDate, which is only stamped when someone runs
+   * the receiving workflow in the app and can lag well behind the real
+   * arrival if that gets delayed (e.g. staff unavailable).
+   */
+  static getActualArrivalDate(shipment) {
+    return shipment.actualArrivalDate || shipment.receivingDate;
+  }
+
+  /**
    * Calculate on-time delivery percentage for a supplier
    * On-time = shipments received/stored in or before their scheduled week
    * Uses warehouse storage data for metrics
@@ -75,8 +87,9 @@ export class SupplierMetrics {
       if (!isInWarehouse) return false;
 
       // Check if arrived on time
-      // Use receivingDate (when physically received) or updatedAt as arrival date
-      const arrivedDate = s.receivingDate || s.updatedAt;
+      // Prefer the manually-entered actual arrival date; fall back to
+      // receivingDate/updatedAt when it hasn't been captured yet
+      const arrivedDate = this.getActualArrivalDate(s) || s.updatedAt;
       if (!arrivedDate || !s.weekNumber) return true; // Assume on-time if missing data
 
       const scheduledDate = this.getScheduledDate(s);
@@ -181,14 +194,14 @@ export class SupplierMetrics {
         'inspection_passed'
       ].includes(s.latestStatus);
 
-      return isInWarehouse && s.receivingDate && s.weekNumber;
+      return isInWarehouse && this.getActualArrivalDate(s) && s.weekNumber;
     });
 
     if (warehouseWithDates.length === 0) return null;
 
     const leadTimes = warehouseWithDates.map(s => {
       const scheduledDate = new Date(this.getScheduledDate(s));
-      const actualDate = new Date(s.receivingDate);
+      const actualDate = new Date(this.getActualArrivalDate(s));
       const diffMs = actualDate - scheduledDate;
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
       return diffDays;
@@ -230,11 +243,11 @@ export class SupplierMetrics {
           'received',
           'inspection_passed'
         ].includes(s.latestStatus);
-        return isInWarehouse && s.receivingDate;
+        return isInWarehouse && this.getActualArrivalDate(s);
       })
       .map(s => {
         const scheduledDate = this.getScheduledDate(s);
-        const actualDate = s.receivingDate;
+        const actualDate = this.getActualArrivalDate(s);
         const diffDays = Math.ceil((new Date(actualDate) - new Date(scheduledDate)) / (1000 * 60 * 60 * 24));
         return {
           orderRef: s.orderRef || s.id,
@@ -244,6 +257,9 @@ export class SupplierMetrics {
           diffDays,
           onTime: new Date(actualDate) <= new Date(scheduledDate),
           usedFallbackBenchmark: !(s.originalSelectedWeekDate || s.originalWeekNumber),
+          // True when actualDate came from the manually-entered arrival date
+          // rather than falling back to the receiving-workflow timestamp
+          isVerifiedArrival: !!s.actualArrivalDate,
         };
       })
       .sort((a, b) => new Date(b.actualDate) - new Date(a.actualDate));
@@ -275,7 +291,7 @@ export class SupplierMetrics {
 
       if (!isInWarehouse) return;
 
-      const shipmentDate = new Date(s.receivingDate || s.updatedAt || s.createdAt);
+      const shipmentDate = new Date(this.getActualArrivalDate(s) || s.updatedAt || s.createdAt);
       if (shipmentDate < startDate) return;
 
       const weekKey = this.getWeekKey(shipmentDate);
@@ -368,7 +384,7 @@ export class SupplierMetrics {
 
     if (!isInWarehouse) return false;
 
-    const arrivedDate = shipment.receivingDate || shipment.updatedAt;
+    const arrivedDate = this.getActualArrivalDate(shipment) || shipment.updatedAt;
     if (!arrivedDate || !shipment.weekNumber) return true;
 
     const scheduledDate = this.getScheduledDate(shipment);

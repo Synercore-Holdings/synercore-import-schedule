@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS shipments (
   inspection_notes TEXT,
   inspected_by VARCHAR(255),
   receiving_date TIMESTAMP,
+  -- Manually entered by a user once they learn the consignment physically
+  -- arrived, independent of when the receiving workflow is run in the app.
+  actual_arrival_date TIMESTAMP,
   receiving_status VARCHAR(50),
   receiving_notes TEXT,
   received_by VARCHAR(255),

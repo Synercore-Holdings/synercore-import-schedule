@@ -44,7 +44,8 @@ const validateCreateShipment = [
   body('sourceWarehouse').optional().trim(),
   body('sourcePalletRef').optional().trim(),
   body('batchLot').optional().trim(),
-  body('releaseNumber').optional().trim()
+  body('releaseNumber').optional().trim(),
+  body('actualArrivalDate').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('Invalid actual arrival date')
 ];
 
 /**
@@ -111,7 +112,8 @@ const validateUpdateShipment = [
   body('sourceWarehouse').optional().trim(),
   body('sourcePalletRef').optional().trim(),
   body('batchLot').optional().trim(),
-  body('releaseNumber').optional().trim()
+  body('releaseNumber').optional().trim(),
+  body('actualArrivalDate').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('Invalid actual arrival date')
 ];
 
 /**

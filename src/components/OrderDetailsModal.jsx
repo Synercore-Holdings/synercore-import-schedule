@@ -106,6 +106,10 @@ const OrderDetailsModal = ({ isOpen, shipment, onClose }) => {
           <label style={labelStyle}>Created</label>
           <span style={valueStyle}>{shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString() : '—'}</span>
         </div>
+        <div>
+          <label style={labelStyle}>Actual Arrival Date</label>
+          <span style={valueStyle}>{shipment.actualArrivalDate ? new Date(shipment.actualArrivalDate).toLocaleDateString() : '—'}</span>
+        </div>
         {shipment.notes && (
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Notes</label>
