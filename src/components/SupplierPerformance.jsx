@@ -486,7 +486,7 @@ function SupplierPerformance({ shipments }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                  {['Order Ref', 'Product', 'Originally Scheduled', 'Actual Received', 'Lead Time', 'Status'].map(label => (
+                  {['Order Ref', 'Product', 'Originally Scheduled', 'Actual Received', 'Days Late/Early', 'Status'].map(label => (
                     <th key={label} style={{
                       padding: '10px 12px', textAlign: 'left', fontSize: 11,
                       fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
@@ -518,8 +518,10 @@ function SupplierPerformance({ shipments }) {
                       )}
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{a.actualDate}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
-                      {a.diffDays > 0 ? `+${a.diffDays}d` : `${a.diffDays}d`}
+                    <td style={{ padding: '10px 12px', color: a.diffDays > 0 ? '#dc3545' : a.diffDays < 0 ? '#28a745' : 'var(--text-700)' }}>
+                      {a.diffDays > 0 ? `${a.diffDays} day${a.diffDays !== 1 ? 's' : ''} late`
+                        : a.diffDays < 0 ? `${Math.abs(a.diffDays)} day${Math.abs(a.diffDays) !== 1 ? 's' : ''} early`
+                        : 'On time'}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ fontWeight: 700, color: a.onTime ? '#28a745' : '#dc3545' }}>
