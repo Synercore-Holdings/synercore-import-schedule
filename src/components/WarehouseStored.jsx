@@ -19,7 +19,7 @@ const getWarehouseName = (shipment) => {
 
 const isOffsiteShipment = (shipment) => getWarehouseName(shipment).toUpperCase() === 'OFFSITE';
 
-function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCreateShipment, loading }) {
+function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteShipment, onCreateShipment, loading }) {
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
   const [searchParamsObj, setSearchParamsObj] = useSearchParams();
   const globalSearchTerm = searchParamsObj.get('search') || '';
@@ -151,7 +151,7 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
   // Average qty & pallets stored per warehouse per month (based on full history, not the 90-day/search filter)
   const monthlyWarehouseAverages = useMemo(() => {
     const byWarehouse = {};
-    for (const s of shipments) {
+    for (const s of (allShipments || shipments)) {
       const dateVal = s.receivingDate || s.updatedAt || s.createdAt;
       if (!dateVal) continue;
       const d = new Date(dateVal);
@@ -181,7 +181,7 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
       if (b.name === 'Unassigned') return -1;
       return a.name.localeCompare(b.name);
     });
-  }, [shipments]);
+  }, [allShipments, shipments]);
   const handleSort = (key) => {
     setSortConfig(current => ({
       key,
