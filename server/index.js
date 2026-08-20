@@ -448,6 +448,23 @@ async function start() {
       logWarn('Actual arrival date column migration warning', { error: error.message });
     }
 
+    // Add warehouse_since to shipments: the date this record started sitting
+    // at its *current* receiving_warehouse. Distinct from receiving_date
+    // (the original goods-receipt date, left untouched so supplier lead-time/
+    // OTD metrics and the receiving timeline keep working) which used to get
+    // silently carried over to whichever warehouse stock was later moved
+    // into, inflating that warehouse's historical "stored per month" figures
+    // and overstating its offsite storage-cost days. Backfilled from
+    // receiving_date for existing rows since, until moved, a shipment's
+    // current warehouse is also its original one.
+    try {
+      await getPool().query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS warehouse_since TIMESTAMP`);
+      await getPool().query(`UPDATE shipments SET warehouse_since = receiving_date WHERE warehouse_since IS NULL`);
+      logger.info('Warehouse since column ready');
+    } catch (error) {
+      logWarn('Warehouse since column migration warning', { error: error.message });
+    }
+
     // Add full-text search_vector column + GIN index + trigger to shipments.
     // ShipmentController.searchShipments queries this column; without it every
     // /api/shipments/search request returns 500 with "column does not exist".

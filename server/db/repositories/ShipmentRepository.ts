@@ -52,6 +52,7 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'inspected_by',
     'receiving_date',
     'actual_arrival_date',
+    'warehouse_since',
     'receiving_status',
     'receiving_notes',
     'received_by',

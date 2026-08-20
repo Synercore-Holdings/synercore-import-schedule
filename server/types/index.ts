@@ -120,6 +120,7 @@ export interface Shipment {
   inspected_by?: string;
   receiving_date?: Date;
   actual_arrival_date?: Date;
+  warehouse_since?: Date;
   receiving_status?: string;
   receiving_notes?: string;
   received_by?: string;

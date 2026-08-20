@@ -95,7 +95,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
 
       // 90-day filter (unless Show All toggled)
       if (!showAll && !hasSearch && !isOffsite) {
-        const storedDate = new Date(shipment.receivingDate || shipment.updatedAt || shipment.createdAt);
+        const storedDate = new Date(shipment.warehouseSince || shipment.receivingDate || shipment.updatedAt || shipment.createdAt);
         if (storedDate < ninetyDaysAgo) return false;
       }
 
@@ -117,8 +117,8 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
         let bValue = b[sortConfig.key];
 
         if (sortConfig.key === 'storedDate') {
-          aValue = new Date(a.receivingDate || a.updatedAt || a.estimatedArrival);
-          bValue = new Date(b.receivingDate || b.updatedAt || b.estimatedArrival);
+          aValue = new Date(a.warehouseSince || a.receivingDate || a.updatedAt || a.estimatedArrival);
+          bValue = new Date(b.warehouseSince || b.receivingDate || b.updatedAt || b.estimatedArrival);
         }
 
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -152,7 +152,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const monthlyWarehouseAverages = useMemo(() => {
     const byWarehouse = {};
     for (const s of (allShipments || shipments)) {
-      const dateVal = s.receivingDate || s.updatedAt || s.createdAt;
+      const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
       if (!dateVal) continue;
       const d = new Date(dateVal);
       if (isNaN(d)) continue;
@@ -213,7 +213,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const olderCount = useMemo(() => {
     return shipments.filter(s => {
       if (isOffsiteShipment(s)) return false;
-      const storedDate = new Date(s.receivingDate || s.updatedAt || s.createdAt);
+      const storedDate = new Date(s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt);
       return storedDate < ninetyDaysAgo;
     }).length;
   }, [shipments, ninetyDaysAgo]);
@@ -346,7 +346,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     setEditingDate(null);
     if (!newDate) return;
     try {
-      await onUpdateShipment(shipmentId, { receivingDate: newDate });
+      await onUpdateShipment(shipmentId, { warehouseSince: newDate });
       if (showSuccess) showSuccess('Stored date updated');
     } catch (err) {
       if (showError) showError('Failed to update stored date');
@@ -386,7 +386,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       'Week': s.weekNumber || '',
       'Warehouse': getWarehouseName(s),
       'Final POD': s.finalPod || '',
-      'Stored Date': formatDate(s.receivingDate || s.updatedAt || s.estimatedArrival),
+      'Stored Date': formatDate(s.warehouseSince || s.receivingDate || s.updatedAt || s.estimatedArrival),
       'Days in Storage': isOffsiteShipment(s) ? getDaysInStorage(s) : '-',
       'Storage Cost (ZAR)': isOffsiteShipment(s) ? getStorageCost(s) : '-'
     }));
@@ -476,7 +476,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
             s.quantity || 0,
             Math.round(s.palletQty || 0) || 1,
             getWarehouseName(s),
-            formatDate(s.receivingDate || s.updatedAt || s.estimatedArrival),
+            formatDate(s.warehouseSince || s.receivingDate || s.updatedAt || s.estimatedArrival),
             isOffsite ? getDaysInStorage(s) : '-',
             isOffsite ? `R ${getStorageCost(s).toLocaleString()}` : '-'
           ];
@@ -576,7 +576,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   ];
 
   const getDaysInStorage = (shipment) => {
-    const storedDate = shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival;
+    const storedDate = shipment.warehouseSince || shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival;
     if (!storedDate) return '-';
     const diff = Math.floor((new Date() - new Date(storedDate)) / (1000 * 60 * 60 * 24));
     return diff >= 0 ? diff : 0;
@@ -813,7 +813,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                             <dt>Product</dt><dd>{shipment.productName || 'N/A'}</dd>
                             <dt>Quantity</dt><dd>{shipment.quantity || 'N/A'}</dd>
                             <dt>Pallets</dt><dd>{shipment.palletQty ? Math.round(shipment.palletQty) : '-'}</dd>
-                            <dt>Stored</dt><dd>{formatDate(shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival)}</dd>
+                            <dt>Stored</dt><dd>{formatDate(shipment.warehouseSince || shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival)}</dd>
                             {isOffsite && (() => {
                               const days = getDaysInStorage(shipment);
                               const isLong = typeof days === 'number' && days > 30;
@@ -987,14 +987,14 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                               ) : (
                                 <span
                                   onClick={() => {
-                                    const d = shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival;
+                                    const d = shipment.warehouseSince || shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival;
                                     setEditingDateValue(d ? new Date(d).toISOString().split('T')[0] : '');
                                     setEditingDate(shipment.id);
                                   }}
                                   style={{ cursor: 'pointer', borderBottom: '1px dashed var(--text-500)' }}
                                   title="Click to edit date"
                                 >
-                                  {formatDate(shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival)}
+                                  {formatDate(shipment.warehouseSince || shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival)}
                                 </span>
                               )}
                             </td>
@@ -1133,7 +1133,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                 ['Warehouse', getWarehouseName(s)],
                 ['Freight Type', s.freightType || '-'],
                 ['Final POD', s.finalPod || '-'],
-                ['Stored Date', formatDate(s.receivingDate || s.updatedAt || s.estimatedArrival)],
+                ['Stored Date', formatDate(s.warehouseSince || s.receivingDate || s.updatedAt || s.estimatedArrival)],
                 ['Inspection Status', s.inspectionStatus || s.inspection_status || '-'],
                 ['Inspected By', s.inspectedBy || s.inspected_by || '-'],
                 ['Inspection Notes', s.inspectionNotes || s.inspection_notes || '-'],

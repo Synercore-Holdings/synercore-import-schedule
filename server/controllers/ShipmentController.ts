@@ -63,6 +63,7 @@ export interface UpdateShipmentRequest {
   batchLot?: string;
   releaseNumber?: string;
   actualArrivalDate?: string | null;
+  warehouseSince?: string | null;
 }
 
 /**
@@ -257,7 +258,7 @@ export class ShipmentController {
    */
   static async updateShipment(id: string, data: UpdateShipmentRequest): Promise<Shipment> {
     // Verify shipment exists
-    await this.getShipment(id);
+    const existing = await this.getShipment(id);
 
     // Convert camelCase to snake_case for database
     const dbData: Record<string, any> = {
@@ -296,6 +297,13 @@ export class ShipmentController {
     }
     if (data.receivingWarehouse !== undefined) {
       dbData.receiving_warehouse = data.receivingWarehouse;
+      // Warehouse reassigned via manual edit — track when it started sitting
+      // here, distinct from receiving_date (kept as the original goods-receipt
+      // date for supplier lead-time metrics). Skipped if the caller already
+      // sent an explicit warehouseSince below.
+      if (data.receivingWarehouse !== (existing as any).receiving_warehouse && data.warehouseSince === undefined) {
+        dbData.warehouse_since = new Date();
+      }
     }
     if (data.forwardingAgent !== undefined) {
       dbData.forwarding_agent = data.forwardingAgent;
@@ -311,6 +319,9 @@ export class ShipmentController {
     }
     if ((data as any).receivingDate !== undefined) {
       dbData.receiving_date = (data as any).receivingDate;
+    }
+    if (data.warehouseSince !== undefined) {
+      dbData.warehouse_since = data.warehouseSince;
     }
     if (data.actualArrivalDate !== undefined) {
       dbData.actual_arrival_date = data.actualArrivalDate || null;
@@ -794,7 +805,7 @@ export class ShipmentController {
         // Whole shipment moves — just update the receiving_warehouse on the source.
         const updated = await client.query(
           `UPDATE shipments
-           SET receiving_warehouse = $1, updated_at = $2
+           SET receiving_warehouse = $1, updated_at = $2, warehouse_since = $2
            WHERE id = $3
            RETURNING *`,
           [destination, now, id]
@@ -824,14 +835,16 @@ export class ShipmentController {
           forwarding_agent, incoterm, vessel_name, selected_week_date,
           shipment_type, created_at, updated_at,
           inspection_date, inspection_status, inspection_notes, inspected_by,
-          receiving_date, receiving_status, receiving_notes, received_by, received_quantity
+          receiving_date, receiving_status, receiving_notes, received_by, received_quantity,
+          warehouse_since
         ) VALUES (
           $1, $2, $3, $4, $5, $6,
           $7, $8, $9, $10, $11, $12,
           $13, $14, $15, $16,
           $17, $18, $19,
           $20, $21, $22, $23,
-          $24, $25, $26, $27, $28
+          $24, $25, $26, $27, $28,
+          $29
         ) RETURNING *`,
         [
           splitId,
@@ -862,6 +875,7 @@ export class ShipmentController {
           source.receiving_notes,
           source.received_by,
           moveQty,
+          now,
         ]
       );
 
