@@ -147,6 +147,41 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
     return keys.map(k => ({ name: k, shipments: groups[k] }));
   }, [filteredAndSortedShipments]);
 
+
+  // Average qty & pallets stored per warehouse per month (based on full history, not the 90-day/search filter)
+  const monthlyWarehouseAverages = useMemo(() => {
+    const byWarehouse = {};
+    for (const s of shipments) {
+      const dateVal = s.receivingDate || s.updatedAt || s.createdAt;
+      if (!dateVal) continue;
+      const d = new Date(dateVal);
+      if (isNaN(d)) continue;
+      const wh = getWarehouseName(s);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!byWarehouse[wh]) byWarehouse[wh] = {};
+      if (!byWarehouse[wh][monthKey]) byWarehouse[wh][monthKey] = { qty: 0, pallets: 0 };
+      byWarehouse[wh][monthKey].qty += Number(s.quantity) || 0;
+      byWarehouse[wh][monthKey].pallets += Number(s.palletQty) || 0;
+    }
+
+    return Object.entries(byWarehouse).map(([name, months]) => {
+      const monthKeys = Object.keys(months);
+      const monthCount = monthKeys.length || 1;
+      const totalQty = monthKeys.reduce((sum, m) => sum + months[m].qty, 0);
+      const totalPallets = monthKeys.reduce((sum, m) => sum + months[m].pallets, 0);
+      return {
+        name,
+        avgQty: Math.round(totalQty / monthCount),
+        avgPallets: Math.round(totalPallets / monthCount),
+        monthCount: monthKeys.length,
+      };
+    }).sort((a, b) => {
+      if (a.name === 'Unassigned') return 1;
+      if (b.name === 'Unassigned') return -1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [shipments]);
   const handleSort = (key) => {
     setSortConfig(current => ({
       key,
@@ -654,6 +689,33 @@ function WarehouseStored({ shipments, onUpdateShipment, onDeleteShipment, onCrea
           </button>
         </div>
       </div>
+
+      {/* Average qty & pallets stored per warehouse per month */}
+      {monthlyWarehouseAverages.length > 0 && (
+        <div className="dash-panel" style={{ padding: '12px 16px', marginBottom: '0.75rem' }}>
+          <h3 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            Average Stored per Warehouse per Month
+          </h3>
+          <div className="stats-grid">
+            {monthlyWarehouseAverages.map((wh, i) => {
+              const rings = ['ring-info', 'ring-success', 'ring-warning', 'ring-danger'];
+              return (
+                <div key={wh.name} className={`stat-card ${rings[i % rings.length]}`}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
+                    {wh.avgQty.toLocaleString('en-ZA')} qty
+                  </h3>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px', color: 'var(--text-700)' }}>
+                    {wh.avgPallets.toLocaleString('en-ZA')} pallets
+                  </p>
+                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
+                    {wh.name} &middot; avg / month ({wh.monthCount} mo{wh.monthCount !== 1 ? 's' : ''})
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <FilterPresetBar
         viewName="warehouse-stored"
