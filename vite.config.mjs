@@ -57,9 +57,10 @@ export default defineConfig({
             if (id.includes('chart.js') || id.includes('react-chartjs') || id.includes('jspdf')) {
               return 'chart-vendor';
             }
-            if (id.includes('zustand') || id.includes('socket.io')) {
-              return 'state-vendor';
-            }
+            // zustand/socket.io share transitive deps (e.g. `debug`) that don't match
+            // these filters — splitting them into their own chunk breaks their
+            // cross-chunk init order (circular chunk import). Let them fall into
+            // the general vendor chunk with their dependencies instead.
             return 'vendor';
           }
           // Let React.lazy() handle component code-splitting automatically
