@@ -186,6 +186,27 @@ body { margin: 0; font-family: 'Poppins', ui-sans-serif, system-ui, -apple-syste
   color: rgba(255,255,255,0.9);
 }
 
+/* Mobile hamburger menu button (hidden on desktop) */
+.mobile-menu-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-900);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* Mobile sidebar overlay (behind the off-canvas drawer) */
+.sidebar-mobile-overlay {
+  display: none;
+}
+
 /* Sidebar search */
 .sidebar-search {
   padding: 10px 12px;
@@ -818,12 +839,42 @@ button:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visi
     grid-template-columns: 1fr;
   }
 
+  /* Sidebar becomes an off-canvas drawer, toggled via the hamburger button */
   .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-collapse-btn {
     display: none;
   }
 
   .container.sidebar-collapsed {
     grid-template-columns: 1fr;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .sidebar-mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
   }
 
   .main-content {

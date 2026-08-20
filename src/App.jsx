@@ -212,6 +212,7 @@ function App() {
   // Sidebar nav search + collapse
   const [navSearch, setNavSearch] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Sidebar calendar filter
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
@@ -472,6 +473,11 @@ function App() {
     openPageTab(activeView, route);
   }, [location.pathname, activeView]);
 
+  // Close the mobile off-canvas sidebar whenever the route changes
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
   const StoredWrapper = () => {
     const storedShipments = shipments.filter(s => {
       if (s.latestStatus === 'sold' || s.latestStatus === 'archived') return false;
@@ -520,7 +526,7 @@ function App() {
       <OfflineIndicator />
       <ConnectionOverlay />
       {/* ===== SIDEBAR ===== */}
-      <div className="sidebar">
+      <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
         {/* Header */}
         <div className="sidebar-header">
           <div className="sidebar-title">
@@ -823,6 +829,15 @@ function App() {
         </div>
       </div>
 
+      {/* Mobile sidebar overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className="sidebar-mobile-overlay"
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* main panel */}
       <div className="main-content">
         <div style={{
@@ -832,6 +847,13 @@ function App() {
           borderBottom: '1px solid var(--border)', marginBottom: '1rem',
           background: 'var(--surface)', width: '100%'
         }}>
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setMobileSidebarOpen(o => !o)}
+            aria-label="Toggle navigation menu"
+          >
+            {'☰'}
+          </button>
           <SynercoreLogo size="medium" />
           <GlobalSearch shipments={shipments} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
