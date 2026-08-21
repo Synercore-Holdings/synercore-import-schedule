@@ -23,6 +23,10 @@ const isOffsiteShipment = (shipment) => getWarehouseName(shipment).toUpperCase()
 // point (including stock later sold/archived), excluding anything still in
 // the planned/in-transit/inspection pipeline, which has no real storage
 // footprint yet even though it may already carry a destination warehouse.
+// Suppliers excluded from the monthly average by request, not representative
+// of normal warehouse throughput for this metric.
+const EXCLUDED_AVERAGE_SUPPLIERS = ['SACCO', 'AROMSA'];
+
 const hasBeenStored = (shipment) => {
   const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
   return shipment.latestStatus === 'stored'
@@ -166,7 +170,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     const byWarehouse = {};
     for (const s of (allShipments || shipments)) {
       if (!hasBeenStored(s)) continue;
-      if ((s.supplier || '').toUpperCase().includes('SACCO')) continue;
+      if (EXCLUDED_AVERAGE_SUPPLIERS.some(name => (s.supplier || '').toUpperCase().includes(name))) continue;
       const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
       if (!dateVal) continue;
       const d = new Date(dateVal);
