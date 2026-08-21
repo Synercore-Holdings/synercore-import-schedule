@@ -19,6 +19,19 @@ const getWarehouseName = (shipment) => {
 
 const isOffsiteShipment = (shipment) => getWarehouseName(shipment).toUpperCase() === 'OFFSITE';
 
+// Statuses that mean the shipment has actually reached a warehouse at some
+// point (including stock later sold/archived), excluding anything still in
+// the planned/in-transit/inspection pipeline, which has no real storage
+// footprint yet even though it may already carry a destination warehouse.
+const hasBeenStored = (shipment) => {
+  const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
+  return shipment.latestStatus === 'stored'
+    || shipment.latestStatus === 'arrived_offsite'
+    || shipment.latestStatus === 'sold'
+    || shipment.latestStatus === 'archived'
+    || warehouse === 'OFFSITE';
+};
+
 function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteShipment, onCreateShipment, loading }) {
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
   const [searchParamsObj, setSearchParamsObj] = useSearchParams();
@@ -152,6 +165,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const monthlyWarehouseAverages = useMemo(() => {
     const byWarehouse = {};
     for (const s of (allShipments || shipments)) {
+      if (!hasBeenStored(s)) continue;
       const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
       if (!dateVal) continue;
       const d = new Date(dateVal);
