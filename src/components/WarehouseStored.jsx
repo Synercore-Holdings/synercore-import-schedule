@@ -39,6 +39,32 @@ const PRETORIA_FREIGHT_RATES = {
   cartage40ft: 22900, // Tautliner Option B
 };
 const CONTAINER_20FT_PALLET_THRESHOLD = 21;
+// Klapmuts uses a single CPT Port -> Klapmuts cartage leg (no separate
+// port-to-WHS/unpack-reload stages like Pretoria's DBN route).
+const KLAPMUTS_FREIGHT_RATES = {
+  cartage20ft: 7286, // Per Container < 20 Ton
+  cartage40ft: 7990, // Per Container 21-28 Ton
+};
+
+// Groups ever-stored shipments for one warehouse into order-level pallet
+// totals bucketed by month; shared by every per-warehouse freight estimate.
+function buildFreightOrderGroups(shipmentList, warehouseName) {
+  const orders = {};
+  for (const s of shipmentList) {
+    if (!hasBeenStored(s)) continue;
+    if (EXCLUDED_AVERAGE_SUPPLIERS.some(name => (s.supplier || '').toUpperCase().includes(name))) continue;
+    if (getWarehouseName(s) !== warehouseName) continue;
+    const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
+    if (!dateVal) continue;
+    const d = new Date(dateVal);
+    if (isNaN(d)) continue;
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const orderKey = s.orderRef || s.id;
+    if (!orders[orderKey]) orders[orderKey] = { pallets: 0, monthKey };
+    orders[orderKey].pallets += Number(s.palletQty) || 0;
+  }
+  return Object.values(orders);
+}
 
 const hasBeenStored = (shipment) => {
   const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
@@ -230,22 +256,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const [freightMonthFilter, setFreightMonthFilter] = useState('');
 
   const pretoriaFreightData = useMemo(() => {
-    const orders = {};
-    for (const s of (allShipments || shipments)) {
-      if (!hasBeenStored(s)) continue;
-      if (EXCLUDED_AVERAGE_SUPPLIERS.some(name => (s.supplier || '').toUpperCase().includes(name))) continue;
-      if (getWarehouseName(s) !== 'PRETORIA') continue;
-      const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
-      if (!dateVal) continue;
-      const d = new Date(dateVal);
-      if (isNaN(d)) continue;
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const orderKey = s.orderRef || s.id;
-      if (!orders[orderKey]) orders[orderKey] = { pallets: 0, monthKey };
-      orders[orderKey].pallets += Number(s.palletQty) || 0;
-    }
-
-    const orderList = Object.values(orders);
+    const orderList = buildFreightOrderGroups(allShipments || shipments, 'PRETORIA');
     const months = [...new Set(orderList.map(o => o.monthKey))].sort();
     const monthCount = months.length || 1;
 
@@ -266,6 +277,36 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
 
   const pretoriaFreightEstimate = (freightMonthFilter && pretoriaFreightData.byMonth[freightMonthFilter])
     || pretoriaFreightData.average;
+  const computeKlapmutsFreightCost = (containers20, containers40) => {
+    const cartage20 = KLAPMUTS_FREIGHT_RATES.cartage20ft * containers20;
+    const cartage40 = KLAPMUTS_FREIGHT_RATES.cartage40ft * containers40;
+    return { containers20, containers40, cartage20, cartage40, total: cartage20 + cartage40 };
+  };
+
+  const [klapmutsFreightMonthFilter, setKlapmutsFreightMonthFilter] = useState('');
+
+  const klapmutsFreightData = useMemo(() => {
+    const orderList = buildFreightOrderGroups(allShipments || shipments, 'KLAPMUTS');
+    const months = [...new Set(orderList.map(o => o.monthKey))].sort();
+    const monthCount = months.length || 1;
+
+    const byMonth = {};
+    for (const month of months) {
+      const inMonth = orderList.filter(o => o.monthKey === month);
+      const c20 = inMonth.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
+      const c40 = inMonth.length - c20;
+      byMonth[month] = computeKlapmutsFreightCost(c20, c40);
+    }
+
+    const totalCount20 = orderList.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
+    const totalCount40 = orderList.length - totalCount20;
+    const average = computeKlapmutsFreightCost(totalCount20 / monthCount, totalCount40 / monthCount);
+
+    return { months, byMonth, average };
+  }, [allShipments, shipments]);
+
+  const klapmutsFreightEstimate = (klapmutsFreightMonthFilter && klapmutsFreightData.byMonth[klapmutsFreightMonthFilter])
+    || klapmutsFreightData.average;
 
   const handleSort = (key) => {
     setSortConfig(current => ({
@@ -845,6 +886,45 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
             <div>
               <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Total{freightMonthFilter ? '' : ' / month'}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent, #3b82f6)' }}>R{Math.round(pretoriaFreightEstimate.total).toLocaleString('en-ZA')}</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Estimated monthly freight spend: CPT -> Klapmuts */}
+      {klapmutsFreightData.months.length > 0 && (
+        <div className="dash-panel" style={{ padding: '12px 16px', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              Estimated Freight Spend - KLAPMUTS (CPT Route)
+            </h3>
+            <select
+              value={klapmutsFreightMonthFilter}
+              onChange={(e) => setKlapmutsFreightMonthFilter(e.target.value)}
+              style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, background: 'var(--surface)' }}
+            >
+              <option value="">All months (average)</option>
+              {klapmutsFreightData.months.map(m => (
+                <option key={m} value={m}>
+                  {new Date(`${m}-01`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-500)' }}>
+            CPT Port to Klapmuts cartage, based on {klapmutsFreightEstimate.containers20.toFixed(2)} 20ft + {klapmutsFreightEstimate.containers40.toFixed(2)} 40ft containers{klapmutsFreightMonthFilter ? '' : '/month'} (order-level pallet count, {CONTAINER_20FT_PALLET_THRESHOLD}-pallet threshold). Excludes storage, SACCO, AROMSA. Rates are manually maintained.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Cartage (&lt;20 ton)</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(klapmutsFreightEstimate.cartage20).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Cartage (21-28 ton)</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(klapmutsFreightEstimate.cartage40).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Total{klapmutsFreightMonthFilter ? '' : ' / month'}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent, #3b82f6)' }}>R{Math.round(klapmutsFreightEstimate.total).toLocaleString('en-ZA')}</div>
             </div>
           </div>
         </div>
