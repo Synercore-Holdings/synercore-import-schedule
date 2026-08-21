@@ -27,6 +27,19 @@ const isOffsiteShipment = (shipment) => getWarehouseName(shipment).toUpperCase()
 // of normal warehouse throughput for this metric.
 const EXCLUDED_AVERAGE_SUPPLIERS = ['SACCO', 'AROMSA'];
 
+// Estimated monthly DBN -> WHS -> Pretoria freight spend, using current
+// rate-card rates and an inferred 20ft/40ft split (containers grouped by
+// order_ref, classified by the 21-pallet threshold since the app has no
+// real container-type field). Rates are hardcoded snapshots -- update
+// here if the rate card changes.
+const PRETORIA_FREIGHT_RATES = {
+  portToWhs: 5890,
+  unpackReload: 5663,
+  cartage20ft: 19050, // Tautliner Option A
+  cartage40ft: 22900, // Tautliner Option B
+};
+const CONTAINER_20FT_PALLET_THRESHOLD = 21;
+
 const hasBeenStored = (shipment) => {
   const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
   return shipment.latestStatus === 'stored'
@@ -201,6 +214,49 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       return a.name.localeCompare(b.name);
     });
   }, [allShipments, shipments]);
+
+  const pretoriaFreightEstimate = useMemo(() => {
+    const orders = {};
+    for (const s of (allShipments || shipments)) {
+      if (!hasBeenStored(s)) continue;
+      if (EXCLUDED_AVERAGE_SUPPLIERS.some(name => (s.supplier || '').toUpperCase().includes(name))) continue;
+      if (getWarehouseName(s) !== 'PRETORIA') continue;
+      const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
+      if (!dateVal) continue;
+      const d = new Date(dateVal);
+      if (isNaN(d)) continue;
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const orderKey = s.orderRef || s.id;
+      if (!orders[orderKey]) orders[orderKey] = { pallets: 0, monthKey };
+      orders[orderKey].pallets += Number(s.palletQty) || 0;
+    }
+
+    const orderList = Object.values(orders);
+    const monthCount = new Set(orderList.map(o => o.monthKey)).size || 1;
+    const count20ft = orderList.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
+    const count40ft = orderList.length - count20ft;
+
+    const containers20PerMonth = count20ft / monthCount;
+    const containers40PerMonth = count40ft / monthCount;
+    const totalContainersPerMonth = containers20PerMonth + containers40PerMonth;
+
+    const portToWhs = PRETORIA_FREIGHT_RATES.portToWhs * totalContainersPerMonth;
+    const unpackReload = PRETORIA_FREIGHT_RATES.unpackReload * totalContainersPerMonth;
+    const cartage20 = PRETORIA_FREIGHT_RATES.cartage20ft * containers20PerMonth;
+    const cartage40 = PRETORIA_FREIGHT_RATES.cartage40ft * containers40PerMonth;
+
+    return {
+      monthCount,
+      containers20PerMonth,
+      containers40PerMonth,
+      portToWhs,
+      unpackReload,
+      cartage20,
+      cartage40,
+      total: portToWhs + unpackReload + cartage20 + cartage40,
+    };
+  }, [allShipments, shipments]);
+
   const handleSort = (key) => {
     setSortConfig(current => ({
       key,
@@ -732,6 +788,40 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Estimated monthly freight spend: DBN -> WHS -> Pretoria */}
+      {pretoriaFreightEstimate.total > 0 && (
+        <div className="dash-panel" style={{ padding: '12px 16px', marginBottom: '0.75rem' }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            Estimated Monthly Freight Spend - PRETORIA (DBN Route)
+          </h3>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-500)' }}>
+            Port to WHS + unpack/reload + cartage, based on {pretoriaFreightEstimate.containers20PerMonth.toFixed(2)} 20ft + {pretoriaFreightEstimate.containers40PerMonth.toFixed(2)} 40ft containers/month (order-level pallet count, {CONTAINER_20FT_PALLET_THRESHOLD}-pallet threshold). Excludes storage, SACCO, AROMSA. Rates are manually maintained.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>DBN Port to WHS</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(pretoriaFreightEstimate.portToWhs).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Unpack / Reload</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(pretoriaFreightEstimate.unpackReload).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Cartage (20ft, Opt A)</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(pretoriaFreightEstimate.cartage20).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Cartage (40ft, Opt B)</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(pretoriaFreightEstimate.cartage40).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Total / month</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent, #3b82f6)' }}>R{Math.round(pretoriaFreightEstimate.total).toLocaleString('en-ZA')}</div>
+            </div>
           </div>
         </div>
       )}
