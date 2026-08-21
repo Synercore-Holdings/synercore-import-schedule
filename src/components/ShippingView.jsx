@@ -1,7 +1,7 @@
 import React, { useMemo, lazy } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ShipmentTable from './ShipmentTable';
-import { SHIPPING_EXCLUDED_STATUSES, DELAYED_STATUSES, isDelayedStatus, PRE_ARRIVAL_STATUSES, getCurrentWeek } from '../types/shipment';
+import { SHIPPING_EXCLUDED_STATUSES, DELAYED_STATUSES, isDelayedStatus, isOverdue, getCurrentWeek } from '../types/shipment';
 
 const FileUpload = lazy(() => import('./FileUpload'));
 
@@ -101,7 +101,7 @@ function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipmen
       const currentWeek = getCurrentWeek();
       shippingShipments = shippingShipments.filter(s =>
         DELAYED_STATUSES.includes(s.latestStatus) ||
-        (s.weekNumber > 0 && s.weekNumber < currentWeek && PRE_ARRIVAL_STATUSES.includes(s.latestStatus))
+        isOverdue(s, currentWeek)
       );
     } else {
       const matchStatuses = META_FILTERS[statusFilter] || [statusFilter];

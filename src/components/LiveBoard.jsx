@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ShipmentStatus, PRE_ARRIVAL_STATUSES, getCurrentWeek, isDelayedStatus } from '../types/shipment';
+import { ShipmentStatus, getCurrentWeek, isDelayedStatus, isOverdue } from '../types/shipment';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { authUtils } from '../utils/auth';
@@ -130,18 +130,17 @@ function LiveBoard({ shipments, onClose, onRefresh }) {
 
     let planned = 0, inTransit = 0, arrived = 0, delayed = 0, port = 0, processing = 0;
     unique.forEach(s => {
-      const wk = parseInt(s.weekNumber) || 0;
-      const isOverdue = wk > 0 && wk < currentWeek && PRE_ARRIVAL_STATUSES.includes(s.latestStatus);
+      const shipmentOverdue = isOverdue(s, currentWeek);
 
       switch (s.latestStatus) {
         case ShipmentStatus.PLANNED_AIRFREIGHT:
         case ShipmentStatus.PLANNED_SEAFREIGHT:
-          if (isOverdue) { delayed++; } else { planned++; } break;
+          if (shipmentOverdue) { delayed++; } else { planned++; } break;
         case ShipmentStatus.IN_TRANSIT_AIRFREIGHT:
         case ShipmentStatus.IN_TRANSIT_ROADWAY:
         case ShipmentStatus.IN_TRANSIT_SEAWAY:
         case ShipmentStatus.AIR_CUSTOMS_CLEARANCE:
-          if (isOverdue) { delayed++; } else { inTransit++; } break;
+          if (shipmentOverdue) { delayed++; } else { inTransit++; } break;
         case ShipmentStatus.MOORED:
         case ShipmentStatus.BERTH_WORKING:
         case ShipmentStatus.BERTH_COMPLETE:
@@ -202,7 +201,7 @@ function LiveBoard({ shipments, onClose, onRefresh }) {
 
     // Priority: 0 = delayed/overdue, 1 = in-transit/port/arrived, 2 = planned
     const getPriority = (s) => {
-      const sDelayed = isDelayedStatus(s.latestStatus) || (parseInt(s.weekNumber) > 0 && parseInt(s.weekNumber) < currentWeek && PRE_ARRIVAL_STATUSES.includes(s.latestStatus));
+      const sDelayed = isDelayedStatus(s.latestStatus) || isOverdue(s, currentWeek);
       if (sDelayed) return 0;
       if (plannedStatuses.includes(s.latestStatus)) return 2;
       return 1;
@@ -415,7 +414,7 @@ function LiveBoard({ shipments, onClose, onRefresh }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
             {recentActivity.map(s => {
               const currentWeek = getCurrentWeek();
-              const sIsDelayed = isDelayedStatus(s.latestStatus) || (parseInt(s.weekNumber) > 0 && parseInt(s.weekNumber) < currentWeek && PRE_ARRIVAL_STATUSES.includes(s.latestStatus));
+              const sIsDelayed = isDelayedStatus(s.latestStatus) || isOverdue(s, currentWeek);
               const isPlanned = s.latestStatus === ShipmentStatus.PLANNED_AIRFREIGHT || s.latestStatus === ShipmentStatus.PLANNED_SEAFREIGHT;
               const borderColor = sIsDelayed ? '#ef4444' : s.latestStatus?.startsWith('in_transit') ? '#3b82f6' : s.latestStatus?.startsWith('arrived') ? '#10b981' : isPlanned ? '#f59e0b' : 'rgba(5,150,105,0.5)';
               const badgeBg = sIsDelayed ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.08)';

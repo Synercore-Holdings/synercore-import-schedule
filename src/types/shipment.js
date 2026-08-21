@@ -124,11 +124,30 @@ export const getCurrentWeek = () => {
   return Math.ceil((((now - yearStart) / 86400000) + yearStart.getDay() + 1) / 7);
 };
 
-/** Check if a shipment is overdue (pre-arrival + past its scheduled week) */
+/**
+ * Check if a shipment is overdue (pre-arrival + past its scheduled week).
+ * Prefers selectedWeekDate (a real date) over comparing raw week numbers,
+ * since a week number alone can't tell week 1 of next year apart from week 1
+ * of the current year — a bare `weekNumber < currentWeek` check flags a
+ * shipment planned for early next year as already overdue.
+ */
 export const isOverdue = (shipment, currentWeek) => {
-  const wk = parseInt(shipment.weekNumber) || 0;
   const status = shipment.latestStatus || shipment.latest_status;
-  return wk > 0 && wk < currentWeek && PRE_ARRIVAL_STATUSES.includes(status);
+  if (!PRE_ARRIVAL_STATUSES.includes(status)) return false;
+
+  const weekDate = shipment.selectedWeekDate || shipment.selected_week_date;
+  if (weekDate) {
+    const d = new Date(weekDate);
+    if (!isNaN(d)) {
+      const weekEnd = new Date(d);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      return weekEnd < new Date();
+    }
+  }
+
+  // Fallback when no selectedWeekDate is set — still year-ambiguous.
+  const wk = parseInt(shipment.weekNumber || shipment.week_number) || 0;
+  return wk > 0 && currentWeek != null && wk < currentWeek;
 };
 
 /** Statuses hidden from the shipping schedule */

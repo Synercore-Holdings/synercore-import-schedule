@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShipmentStatus, DELAYED_STATUSES, isDelayedStatus, PRE_ARRIVAL_STATUSES, getCurrentWeek } from '../types/shipment';
+import { ShipmentStatus, DELAYED_STATUSES, isDelayedStatus, isOverdue, getCurrentWeek } from '../types/shipment';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { authUtils } from '../utils/auth';
@@ -395,13 +395,13 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       const weekBucket = wk === currentWeek ? 'curr' : wk === currentWeek - 1 ? 'prev' : null;
 
       // Check if shipment is overdue: still pre-arrival but past its scheduled week
-      const isOverdue = wk > 0 && wk < currentWeek && PRE_ARRIVAL_STATUSES.includes(shipment.latestStatus);
+      const shipmentOverdue = isOverdue(shipment, currentWeek);
 
       let statusKey = null;
       switch (shipment.latestStatus) {
         case ShipmentStatus.PLANNED_AIRFREIGHT:
         case ShipmentStatus.PLANNED_SEAFREIGHT:
-          if (isOverdue) {
+          if (shipmentOverdue) {
             statusOrderRefs.delayed.add(orderRef); statusKey = 'delayed';
           } else {
             statusOrderRefs.planned.add(orderRef); statusKey = 'planned';
@@ -415,7 +415,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
         case ShipmentStatus.BERTH_WORKING:
         case ShipmentStatus.BERTH_COMPLETE:
         case ShipmentStatus.GATED_IN_PORT:
-          if (isOverdue) {
+          if (shipmentOverdue) {
             statusOrderRefs.delayed.add(orderRef); statusKey = 'delayed';
           } else {
             statusOrderRefs.inTransit.add(orderRef); statusKey = 'inTransit';
@@ -468,8 +468,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
 
       // Date-based week-over-week counting for pctDeltas
       const d = new Date(shipment.updatedAt || shipment.createdAt);
-      const shipmentIsDelayed = isDelayedStatus(shipment.latestStatus) ||
-        (shipment.weekNumber > 0 && shipment.weekNumber < currentWeek && PRE_ARRIVAL_STATUSES.includes(shipment.latestStatus));
+      const shipmentIsDelayed = isDelayedStatus(shipment.latestStatus) || isOverdue(shipment, currentWeek);
       let dateBucket = null;
       if (d >= oneWeekAgo) dateBucket = 'thisWeek';
       else if (d >= twoWeeksAgo) dateBucket = 'lastWeek';
