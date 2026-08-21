@@ -166,6 +166,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     const byWarehouse = {};
     for (const s of (allShipments || shipments)) {
       if (!hasBeenStored(s)) continue;
+      if ((s.supplier || '').toUpperCase().includes('SACCO')) continue;
       const dateVal = s.warehouseSince || s.receivingDate || s.updatedAt || s.createdAt;
       if (!dateVal) continue;
       const d = new Date(dateVal);
