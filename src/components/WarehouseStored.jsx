@@ -215,7 +215,21 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     });
   }, [allShipments, shipments]);
 
-  const pretoriaFreightEstimate = useMemo(() => {
+  const computeFreightCost = (containers20, containers40) => {
+    const totalContainers = containers20 + containers40;
+    const portToWhs = PRETORIA_FREIGHT_RATES.portToWhs * totalContainers;
+    const unpackReload = PRETORIA_FREIGHT_RATES.unpackReload * totalContainers;
+    const cartage20 = PRETORIA_FREIGHT_RATES.cartage20ft * containers20;
+    const cartage40 = PRETORIA_FREIGHT_RATES.cartage40ft * containers40;
+    return {
+      containers20, containers40, portToWhs, unpackReload, cartage20, cartage40,
+      total: portToWhs + unpackReload + cartage20 + cartage40,
+    };
+  };
+
+  const [freightMonthFilter, setFreightMonthFilter] = useState('');
+
+  const pretoriaFreightData = useMemo(() => {
     const orders = {};
     for (const s of (allShipments || shipments)) {
       if (!hasBeenStored(s)) continue;
@@ -232,30 +246,26 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     }
 
     const orderList = Object.values(orders);
-    const monthCount = new Set(orderList.map(o => o.monthKey)).size || 1;
-    const count20ft = orderList.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
-    const count40ft = orderList.length - count20ft;
+    const months = [...new Set(orderList.map(o => o.monthKey))].sort();
+    const monthCount = months.length || 1;
 
-    const containers20PerMonth = count20ft / monthCount;
-    const containers40PerMonth = count40ft / monthCount;
-    const totalContainersPerMonth = containers20PerMonth + containers40PerMonth;
+    const byMonth = {};
+    for (const month of months) {
+      const inMonth = orderList.filter(o => o.monthKey === month);
+      const c20 = inMonth.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
+      const c40 = inMonth.length - c20;
+      byMonth[month] = computeFreightCost(c20, c40);
+    }
 
-    const portToWhs = PRETORIA_FREIGHT_RATES.portToWhs * totalContainersPerMonth;
-    const unpackReload = PRETORIA_FREIGHT_RATES.unpackReload * totalContainersPerMonth;
-    const cartage20 = PRETORIA_FREIGHT_RATES.cartage20ft * containers20PerMonth;
-    const cartage40 = PRETORIA_FREIGHT_RATES.cartage40ft * containers40PerMonth;
+    const totalCount20 = orderList.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
+    const totalCount40 = orderList.length - totalCount20;
+    const average = computeFreightCost(totalCount20 / monthCount, totalCount40 / monthCount);
 
-    return {
-      monthCount,
-      containers20PerMonth,
-      containers40PerMonth,
-      portToWhs,
-      unpackReload,
-      cartage20,
-      cartage40,
-      total: portToWhs + unpackReload + cartage20 + cartage40,
-    };
+    return { months, byMonth, average };
   }, [allShipments, shipments]);
+
+  const pretoriaFreightEstimate = (freightMonthFilter && pretoriaFreightData.byMonth[freightMonthFilter])
+    || pretoriaFreightData.average;
 
   const handleSort = (key) => {
     setSortConfig(current => ({
@@ -793,13 +803,27 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       )}
 
       {/* Estimated monthly freight spend: DBN -> WHS -> Pretoria */}
-      {pretoriaFreightEstimate.total > 0 && (
+      {pretoriaFreightData.months.length > 0 && (
         <div className="dash-panel" style={{ padding: '12px 16px', marginBottom: '0.75rem' }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-            Estimated Monthly Freight Spend - PRETORIA (DBN Route)
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              Estimated Freight Spend - PRETORIA (DBN Route)
+            </h3>
+            <select
+              value={freightMonthFilter}
+              onChange={(e) => setFreightMonthFilter(e.target.value)}
+              style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, background: 'var(--surface)' }}
+            >
+              <option value="">All months (average)</option>
+              {pretoriaFreightData.months.map(m => (
+                <option key={m} value={m}>
+                  {new Date(`${m}-01`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+                </option>
+              ))}
+            </select>
+          </div>
           <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-500)' }}>
-            Port to WHS + unpack/reload + cartage, based on {pretoriaFreightEstimate.containers20PerMonth.toFixed(2)} 20ft + {pretoriaFreightEstimate.containers40PerMonth.toFixed(2)} 40ft containers/month (order-level pallet count, {CONTAINER_20FT_PALLET_THRESHOLD}-pallet threshold). Excludes storage, SACCO, AROMSA. Rates are manually maintained.
+            Port to WHS + unpack/reload + cartage, based on {pretoriaFreightEstimate.containers20.toFixed(2)} 20ft + {pretoriaFreightEstimate.containers40.toFixed(2)} 40ft containers{freightMonthFilter ? '' : '/month'} (order-level pallet count, {CONTAINER_20FT_PALLET_THRESHOLD}-pallet threshold). Excludes storage, SACCO, AROMSA. Rates are manually maintained.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
             <div>
@@ -819,7 +843,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>R{Math.round(pretoriaFreightEstimate.cartage40).toLocaleString('en-ZA')}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Total / month</div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Total{freightMonthFilter ? '' : ' / month'}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent, #3b82f6)' }}>R{Math.round(pretoriaFreightEstimate.total).toLocaleString('en-ZA')}</div>
             </div>
           </div>
