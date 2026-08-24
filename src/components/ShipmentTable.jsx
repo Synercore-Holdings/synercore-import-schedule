@@ -865,7 +865,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           href={getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber, shipment.shippingLine)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={`Track BOL on ${shipment.shippingLine || shipment.forwardingAgent}`}
+                          title={`Track BOL on ${shipment.forwardingAgent || shipment.shippingLine}`}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',

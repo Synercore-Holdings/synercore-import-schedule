@@ -193,11 +193,13 @@ const BOL_TRACKING_URL_BUILDERS = {
   'ONE': (bol) => `https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=${encodeURIComponent(bol)}`,
 };
 
-// The actual carrier (shippingLine) has the real tracking data — prefer it
-// over forwardingAgent whenever both are known, since a forwarder's own site
-// won't have container-level data for a vessel it doesn't operate.
+// A BOL number is typically the FORWARDER's own reference (a "house" B/L —
+// e.g. DHL's own tracking ID format), distinct from the ocean carrier's
+// master B/L — so forwardingAgent wins here, unlike container tracking
+// below. Confirmed 2026-08-24: BOL "PKGA87084" only tracks correctly via
+// DHL (the forwarding agent), not MSC (the shipping line on that booking).
 export const getBolTrackingUrl = (forwardingAgent, bolNumber, shippingLine) => {
-  const carrier = shippingLine || forwardingAgent;
+  const carrier = forwardingAgent || shippingLine;
   if (carrier && bolNumber && BOL_TRACKING_URL_BUILDERS[carrier]) {
     return BOL_TRACKING_URL_BUILDERS[carrier](bolNumber);
   }

@@ -608,7 +608,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
                 rel="noopener noreferrer"
                 style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
               >
-                Track BOL on {formData.shippingLine || formData.forwardingAgent} →
+                Track BOL on {formData.forwardingAgent || formData.shippingLine} →
               </a>
             )}
           </label>

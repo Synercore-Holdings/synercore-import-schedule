@@ -400,16 +400,28 @@ describe('SHIPPING_LINES', () => {
   });
 });
 
-describe('getBolTrackingUrl / getContainerTrackingUrl with shippingLine', () => {
+describe('getBolTrackingUrl prefers forwardingAgent (BOL is typically the forwarder\'s house reference)', () => {
+  it('uses forwardingAgent even when shippingLine is also set', () => {
+    // Confirmed 2026-08-24: booked through DHL, carried by MSC — BOL
+    // "PKGA87084" is DHL's own reference format and only tracks via DHL.
+    expect(getBolTrackingUrl('DHL', 'PKGA87084', 'MSC')).toBe('https://www.dhl.com/za-en/home/tracking.html?tracking-id=PKGA87084&submit=1');
+  });
+
+  it('falls back to shippingLine only when forwardingAgent is not set', () => {
+    expect(getBolTrackingUrl('', 'ABC123', 'Maersk')).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getBolTrackingUrl(undefined, 'ABC123', 'Maersk')).toBe('https://www.maersk.com/tracking/ABC123');
+  });
+});
+
+describe('getContainerTrackingUrl prefers shippingLine (a container is a universal, carrier-assigned ID)', () => {
   it('prefers shippingLine over forwardingAgent when both are set', () => {
-    // Booked through DHL (forwarder) but actually carried by ONE — ONE has
-    // the real tracking data, not DHL.
-    expect(getBolTrackingUrl('DHL', 'ABC123', 'Maersk')).toBe('https://www.maersk.com/tracking/ABC123');
+    // Booked through DHL (forwarder) but actually carried by CMA CGM — the
+    // container itself is CMA CGM's, regardless of who booked the space.
     expect(getContainerTrackingUrl('DHL', 'MSCU1234567', 'CMA CGM')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=MSCU1234567');
   });
 
   it('falls back to forwardingAgent when shippingLine is not set', () => {
-    expect(getBolTrackingUrl('Maersk', 'ABC123', '')).toBe('https://www.maersk.com/tracking/ABC123');
-    expect(getBolTrackingUrl('Maersk', 'ABC123', undefined)).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getContainerTrackingUrl('Maersk', 'ABC123', '')).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getContainerTrackingUrl('Maersk', 'ABC123', undefined)).toBe('https://www.maersk.com/tracking/ABC123');
   });
 });
