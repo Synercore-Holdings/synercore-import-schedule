@@ -116,7 +116,11 @@ export const AGENT_TRACKING_URLS = {
   'Air France-KLM Cargo': 'https://www.afklcargo.com/track',
   'Ethiopian Airlines Cargo': 'https://cargo.ethiopianairlines.com/tracking',
   // Seafreight / forwarders
-  'DHL': 'https://www.dhl.com/za-en/home/tracking.html',
+  // DHL here means DHL Global Forwarding (freight), not DHL Express (parcels)
+  // — their tracking tools are entirely separate. Global Forwarding's
+  // customer portal is MyDHLi (also linked directly elsewhere in this app),
+  // which requires login, so no prefilled deep link is possible.
+  'DHL': 'https://www.mydhli.com/',
   'DSV': 'https://www.dsv.com/en/our-solutions/track-and-trace',
   'MSC': 'https://www.msc.com/en/track-a-shipment',
   'COSCO': 'https://elines.coscoshipping.com/ebusiness/cargoTracking',
@@ -152,9 +156,11 @@ const BOL_TRACKING_URL_BUILDERS = {
   // 2026-08-24 that MSC's search is client-side state, not URL-driven (the
   // address bar stayed on the plain tracking page after a manual search).
   // Falls back to the bare page; don't re-attempt a query-param guess here.
-  // DHL: confirmed working by user testing on 2026-08-24 — exact URL captured
-  // from a manual search: https://www.dhl.com/za-en/home/tracking.html?tracking-id=PKGA86211&submit=1
-  'DHL': (bol) => `https://www.dhl.com/za-en/home/tracking.html?tracking-id=${encodeURIComponent(bol)}&submit=1`,
+  // DHL: the tracking-id URL confirmed working on 2026-08-24 was DHL EXPRESS
+  // (parcels) — the wrong division. This user's "DHL" agent is DHL Global
+  // Forwarding (freight), whose portal (MyDHLi) requires login — see
+  // AGENT_TRACKING_URLS above. No deep link here; don't reintroduce the
+  // Express one even though it does technically work as a URL.
   'CMA CGM': (bol) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(bol)}`,
   // Hapag-Lloyd: confirmed working by user testing on 2026-08-24 — BOL and
   // container use DIFFERENT pages, see CONTAINER_TRACKING_URL_BUILDERS below.
