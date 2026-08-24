@@ -20,6 +20,7 @@ export const VIEW_ROUTES = {
   audit:             '/audit',
   'bol-audit':       '/bol-audit',
   'supplier-performance': '/supplier-performance',
+  'forwarder-carrier':    '/forwarder-carrier',
   receiving:             '/receiving',
   'dock-management':     '/dock-management',
   'local-receiving':     '/local-receiving',
