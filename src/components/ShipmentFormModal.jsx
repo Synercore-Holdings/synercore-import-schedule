@@ -520,18 +520,8 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
 
         {/* Forwarding Agent */}
         <div>
-          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
-            <span>Forwarding Agent</span>
-            {getAgentTrackingUrl(formData.forwardingAgent) && (
-              <a
-                href={getAgentTrackingUrl(formData.forwardingAgent)}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
-              >
-                Track on {formData.forwardingAgent} →
-              </a>
-            )}
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            Forwarding Agent
           </label>
           <select
             value={formData.forwardingAgent || ''}
@@ -548,8 +538,18 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
 
         {/* Vessel / AWB */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
-            {isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB Number' : 'Vessel Name'}
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            <span>{isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB Number' : 'Vessel Name'}</span>
+            {isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getAgentTrackingUrl(formData.forwardingAgent) && (
+              <a
+                href={getAgentTrackingUrl(formData.forwardingAgent)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
+              >
+                Track AWB on {formData.forwardingAgent} →
+              </a>
+            )}
           </label>
           <input
             type="text"
@@ -563,8 +563,18 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
 
         {/* BOL Number */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
-            BOL Number
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            <span>BOL Number</span>
+            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getAgentTrackingUrl(formData.forwardingAgent) && (
+              <a
+                href={getAgentTrackingUrl(formData.forwardingAgent)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
+              >
+                Track BOL on {formData.forwardingAgent} →
+              </a>
+            )}
           </label>
           <input
             type="text"
