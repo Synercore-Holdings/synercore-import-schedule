@@ -1,0 +1,307 @@
+import React, { useMemo, useState } from 'react';
+import { isAirfreight } from '../utils/shipmentConstants';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, BarElement,
+  Title, Tooltip, Legend,
+} from 'chart.js';
+import { Bar as BarChart } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
+const NOT_RECORDED = '(Not recorded)';
+
+// ---- Reusable wrappers (same pattern as SupplierPerformance) ----
+const ChartCard = ({ title, subtitle, children, style }) => (
+  <div className="dash-panel" style={style}>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
+      <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-900)' }}>{title}</h4>
+      {subtitle && <span style={{ fontSize: 11, color: 'var(--text-500)' }}>{subtitle}</span>}
+    </div>
+    {children}
+  </div>
+);
+
+const ChartEmpty = ({ label }) => (
+  <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)', fontSize: 13 }}>{label}</div>
+);
+
+const KpiCard = ({ label, value, suffix, color, subtext }) => (
+  <div className="dash-panel" style={{ flex: '1 1 200px', minWidth: 180, textAlign: 'center', padding: '20px 16px' }}>
+    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>{label}</div>
+    <div style={{ fontSize: 32, fontWeight: 800, color: color || 'var(--text-900)', lineHeight: 1.1 }}>
+      {value}{suffix && <span style={{ fontSize: 16, fontWeight: 600 }}>{suffix}</span>}
+    </div>
+    {subtext && <div style={{ fontSize: 11, color: 'var(--text-500)', marginTop: 6 }}>{subtext}</div>}
+  </div>
+);
+
+const CARRIER_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#ec4899'];
+
+function ForwarderCarrierReport({ shipments, suppliers }) {
+  const [selectedAgent, setSelectedAgent] = useState('all');
+
+  // Sea-freight shipments with a forwarding agent — shippingLine is a
+  // sea-only concept, and there's nothing to analyze without an agent.
+  const seaShipments = useMemo(() => {
+    return (shipments || []).filter(s =>
+      s.forwardingAgent && !isAirfreight(s.latestStatus, s.forwardingAgent, s.vesselName)
+    );
+  }, [shipments]);
+
+  // Supplier name -> country, for origin lookup. Falls back to the raw
+  // supplier name when there's no match (free-text field, may not match
+  // exactly) or no country recorded on the supplier.
+  const supplierCountryMap = useMemo(() => {
+    const map = {};
+    (suppliers || []).forEach(s => {
+      if (s.name && s.country) map[s.name.trim().toLowerCase()] = s.country;
+    });
+    return map;
+  }, [suppliers]);
+
+  const getOrigin = (shipment) => {
+    const name = (shipment.supplier || '').trim();
+    return supplierCountryMap[name.toLowerCase()] || name || 'Unknown';
+  };
+
+  const forwardingAgentNames = useMemo(() => {
+    const names = new Set();
+    seaShipments.forEach(s => names.add(s.forwardingAgent));
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [seaShipments]);
+
+  // agent -> { carrier: count }
+  const agentCarrierCounts = useMemo(() => {
+    const counts = {};
+    seaShipments.forEach(s => {
+      const agent = s.forwardingAgent;
+      const carrier = s.shippingLine || NOT_RECORDED;
+      counts[agent] = counts[agent] || {};
+      counts[agent][carrier] = (counts[agent][carrier] || 0) + 1;
+    });
+    return counts;
+  }, [seaShipments]);
+
+  // ---- KPIs ----
+  const kpis = useMemo(() => {
+    const total = seaShipments.length;
+    const withLine = seaShipments.filter(s => s.shippingLine).length;
+    const distinctAgents = forwardingAgentNames.length;
+    const distinctCarriers = new Set(seaShipments.filter(s => s.shippingLine).map(s => s.shippingLine)).size;
+    return {
+      total,
+      completionPct: total > 0 ? Math.round((withLine / total) * 100) : 0,
+      distinctAgents,
+      distinctCarriers,
+    };
+  }, [seaShipments, forwardingAgentNames]);
+
+  const completionColor = (pct) => pct >= 85 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
+
+  // ---- Chart: stacked bar, one segment per shipping line, per agent ----
+  const chartData = useMemo(() => {
+    const carriersSeen = new Set();
+    forwardingAgentNames.forEach(a => Object.keys(agentCarrierCounts[a] || {}).forEach(c => carriersSeen.add(c)));
+    const carriers = [...carriersSeen].sort((a, b) => {
+      if (a === NOT_RECORDED) return 1;
+      if (b === NOT_RECORDED) return -1;
+      return a.localeCompare(b);
+    });
+
+    const datasets = carriers.map((carrier, idx) => ({
+      label: carrier,
+      data: forwardingAgentNames.map(a => (agentCarrierCounts[a] || {})[carrier] || 0),
+      backgroundColor: carrier === NOT_RECORDED ? '#9ca3af' : CARRIER_PALETTE[idx % CARRIER_PALETTE.length],
+      borderRadius: 4,
+    }));
+
+    return { labels: forwardingAgentNames, datasets };
+  }, [forwardingAgentNames, agentCarrierCounts]);
+
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: { mode: 'index', intersect: false },
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false } },
+      y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,0.06)' } },
+    },
+  }), []);
+
+  // ---- Data completeness by agent ----
+  const completeness = useMemo(() => {
+    const byAgent = {};
+    seaShipments.forEach(s => {
+      const agent = s.forwardingAgent;
+      byAgent[agent] = byAgent[agent] || { agent, total: 0, missing: 0 };
+      byAgent[agent].total++;
+      if (!s.shippingLine) byAgent[agent].missing++;
+    });
+    return Object.values(byAgent)
+      .map(d => ({ ...d, pct: d.total > 0 ? Math.round(((d.total - d.missing) / d.total) * 100) : 0 }))
+      .sort((a, b) => a.pct - b.pct);
+  }, [seaShipments]);
+
+  // ---- Drill-down: origin x carrier, for selected agent (or all) ----
+  const drillDownRows = useMemo(() => {
+    const relevant = selectedAgent === 'all'
+      ? seaShipments
+      : seaShipments.filter(s => s.forwardingAgent === selectedAgent);
+
+    const rows = {};
+    relevant.forEach(s => {
+      const agent = s.forwardingAgent;
+      const origin = getOrigin(s);
+      const carrier = s.shippingLine || NOT_RECORDED;
+      const key = `${agent}|||${origin}|||${carrier}`;
+      if (!rows[key]) rows[key] = { agent, origin, carrier, count: 0 };
+      rows[key].count++;
+    });
+    return Object.values(rows).sort((a, b) => b.count - a.count);
+  }, [seaShipments, selectedAgent, supplierCountryMap]);
+
+  return (
+    <div style={{ padding: '0 8px 32px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text-900)' }}>Forwarder vs Carrier</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-500)' }}>
+            Which shipping line each forwarding agent actually uses, by origin — sea freight only
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>Forwarding Agent:</label>
+          <select
+            value={selectedAgent}
+            onChange={e => setSelectedAgent(e.target.value)}
+            style={{
+              padding: '6px 12px', fontSize: 13, borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text-900)', minWidth: 180,
+            }}
+          >
+            <option value="all">All Forwarding Agents</option>
+            {forwardingAgentNames.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+        <KpiCard
+          label="Sea Shipments with Agent"
+          value={kpis.total}
+          color="var(--text-900)"
+          subtext="Airfreight excluded — no shipping line applies"
+        />
+        <KpiCard
+          label="Shipping Line Recorded"
+          value={kpis.completionPct}
+          suffix="%"
+          color={completionColor(kpis.completionPct)}
+          subtext="Of sea shipments with a forwarding agent"
+        />
+        <KpiCard
+          label="Distinct Forwarding Agents"
+          value={kpis.distinctAgents}
+          color="var(--text-900)"
+        />
+        <KpiCard
+          label="Distinct Shipping Lines"
+          value={kpis.distinctCarriers}
+          color="var(--text-900)"
+          subtext="Actually recorded, excludes gaps"
+        />
+      </div>
+
+      {/* Chart */}
+      <div style={{ marginBottom: 24 }}>
+        <ChartCard title="Shipping Line used per Forwarding Agent" subtitle="Stacked by carrier, grey = not recorded">
+          {chartData.labels.length > 0
+            ? <div style={{ height: Math.max(260, chartData.labels.length * 40) }}><BarChart data={chartData} options={chartOptions} /></div>
+            : <ChartEmpty label="No sea-freight shipments with a forwarding agent yet" />}
+        </ChartCard>
+      </div>
+
+      {/* Data completeness */}
+      <ChartCard title="Shipping Line Data Completeness" subtitle="Lowest first — where to focus data entry" style={{ marginBottom: 24 }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['Forwarding Agent', 'Total Shipments', 'Missing Shipping Line', 'Completion'].map(label => (
+                  <th key={label} style={{
+                    padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                    fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                    letterSpacing: 0.5, whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {completeness.length === 0 && (
+                <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No data available</td></tr>
+              )}
+              {completeness.map((c, idx) => (
+                <tr key={c.agent} style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{c.agent}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{c.total}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{c.missing}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontWeight: 700, color: completionColor(c.pct) }}>{c.pct}%</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+
+      {/* Drill-down: origin x carrier */}
+      <ChartCard title="Origin / Carrier Breakdown" subtitle={selectedAgent === 'all' ? 'All forwarding agents' : selectedAgent}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['Forwarding Agent', 'Origin', 'Shipping Line', 'Shipments'].map(label => (
+                  <th key={label} style={{
+                    padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                    fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                    letterSpacing: 0.5, whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {drillDownRows.length === 0 && (
+                <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No shipments for this selection</td></tr>
+              )}
+              {drillDownRows.map((r, idx) => (
+                <tr
+                  key={`${r.agent}|||${r.origin}|||${r.carrier}`}
+                  style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}
+                >
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{r.agent}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{r.origin}</td>
+                  <td style={{ padding: '10px 12px', color: r.carrier === NOT_RECORDED ? 'var(--text-500)' : 'var(--text-700)' }}>{r.carrier}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{r.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+    </div>
+  );
+}
+
+export default ForwarderCarrierReport;

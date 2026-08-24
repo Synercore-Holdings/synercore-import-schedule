@@ -36,6 +36,7 @@ const VIEW_TO_SECTION = {
   reports: 'reports',
   'advanced-reports': 'reports',
   'supplier-performance': 'reports',
+  'forwarder-carrier': 'reports',
   audit: 'reports',
 };
 
@@ -61,6 +62,7 @@ const VIEW_TITLES = {
   reports: 'Reports',
   'advanced-reports': 'Advanced Reports',
   'supplier-performance': 'Supplier Performance',
+  'forwarder-carrier': 'Forwarder vs Carrier',
   'costing-requests': 'Cost Requests',
   users: 'User Management',
   audit: 'Activity Log',
@@ -90,6 +92,7 @@ const LiveBoard = lazy(() => import('./components/LiveBoard'));
 const AuditLog = lazy(() => import('./components/AuditLog'));
 const BolAudit = lazy(() => import('./components/BolAudit'));
 const SupplierPerformance = lazy(() => import('./components/SupplierPerformance'));
+const ForwarderCarrierReport = lazy(() => import('./components/ForwarderCarrierReport'));
 const GoodsReceiving = lazy(() => import('./components/GoodsReceiving'));
 const DockManagement = lazy(() => import('./components/DockManagement'));
 const LocalReceivingSchedule = lazy(() => import('./components/LocalReceivingSchedule'));
@@ -445,6 +448,7 @@ function App() {
     if (path === '/reports') return 'reports';
     if (path === '/advanced-reports') return 'advanced-reports';
     if (path === '/supplier-performance') return 'supplier-performance';
+    if (path === '/forwarder-carrier') return 'forwarder-carrier';
     if (path === '/users') return 'users';
     if (path === '/audit') return 'audit';
     if (path === '/receiving') return 'receiving';
@@ -608,6 +612,7 @@ function App() {
             reports: { label: 'Reports', icon: BarChart3, view: 'reports' },
             advancedReports: { label: 'Advanced Reports', icon: TrendingUp, view: 'advanced-reports' },
             supplierPerformance: { label: 'Supplier Performance', icon: Target, view: 'supplier-performance' },
+            forwarderCarrier: { label: 'Forwarder vs Carrier', icon: Waves, view: 'forwarder-carrier' },
             receiving: { label: 'Goods Receiving', icon: Inbox, view: 'receiving' },
             dockManagement: { label: 'Dock Management', icon: Truck, view: 'dock-management' },
             bolAudit: { label: 'BOL Audit', icon: ScrollText, view: 'bol-audit' },
@@ -719,7 +724,7 @@ function App() {
               {renderSection('Warehouse', 'warehouse', ['receiving', 'dockManagement', 'stored'])}
               {renderSection('Warehouse Capacity per site', 'warehouseCapacitySites', ['capacityPretoria', 'capacityKlapmuts', 'capacityOffsite'])}
               {renderSection('Finance', 'finance', ['rates', 'costing', 'exportCosting', 'costingRequests'])}
-              {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'audit'])}
+              {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'forwarderCarrier', 'audit'])}
 
               {!sidebarCollapsed && (!q || resourcesVisible.length > 0) && (
                 <div className="sidebar-resources">
@@ -1044,6 +1049,9 @@ function App() {
             } />
             <Route path="/supplier-performance" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><SupplierPerformance shipments={shipments} onUpdateShipment={handleUpdateShipment} /></ErrorBoundary></Suspense>
+            } />
+            <Route path="/forwarder-carrier" element={
+              <Suspense fallback={<PageLoader />}><ErrorBoundary><ForwarderCarrierReport shipments={shipments} suppliers={suppliers} /></ErrorBoundary></Suspense>
             } />
             <Route path="/bol-audit" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><BolAudit /></ErrorBoundary></Suspense>
