@@ -39,6 +39,7 @@ const KpiCard = ({ label, value, suffix, color, subtext }) => (
 const CARRIER_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#ec4899'];
 
 function ForwarderCarrierReport({ shipments, suppliers }) {
+  const [mode, setMode] = useState('sea');
   const [selectedAgent, setSelectedAgent] = useState('all');
 
   // Sea-freight shipments with a forwarding agent — shippingLine is a
@@ -65,6 +66,25 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     });
     return [...byOrder.values()];
   }, [seaShipments]);
+
+  // Airfreight shipments with a forwarding agent — for air, the agent IS the
+  // airline directly (no DHL/DSV-style forwarder layer modeled for air), so
+  // there's no separate carrier field or completeness-gap concept to track.
+  const airShipments = useMemo(() => {
+    return (shipments || []).filter(s =>
+      s.forwardingAgent && isAirfreight(s.latestStatus, s.forwardingAgent, s.vesselName)
+    );
+  }, [shipments]);
+
+  // Same one-row-per-order dedup as sea, no shippingLine preference needed.
+  const airOrders = useMemo(() => {
+    const byOrder = new Map();
+    airShipments.forEach(s => {
+      const key = s.orderRef || s.id;
+      if (!byOrder.has(key)) byOrder.set(key, s);
+    });
+    return [...byOrder.values()];
+  }, [airShipments]);
 
   // Supplier name -> country, for origin lookup. Falls back to the raw
   // supplier name when there's no match (free-text field, may not match
@@ -198,6 +218,78 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     return Object.values(rows).sort((a, b) => b.count - a.count);
   }, [seaOrders, selectedAgent, getOrigin, resolveCarrier]);
 
+  // ==================== AIRFREIGHT ====================
+  // The agent IS the airline for air — no forwarder layer, no completeness
+  // gap, no separate carrier field. Just usage by origin.
+
+  const airlineNames = useMemo(() => {
+    const names = new Set();
+    airOrders.forEach(s => names.add(s.forwardingAgent));
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [airOrders]);
+
+  const airKpis = useMemo(() => {
+    const distinctOrigins = new Set(airOrders.map(s => getOrigin(s))).size;
+    return {
+      total: airOrders.length,
+      distinctAirlines: airlineNames.length,
+      distinctOrigins,
+    };
+  }, [airOrders, airlineNames, getOrigin]);
+
+  // airline -> { origin: count }
+  const airlineOriginCounts = useMemo(() => {
+    const counts = {};
+    airOrders.forEach(s => {
+      const agent = s.forwardingAgent;
+      const origin = getOrigin(s);
+      counts[agent] = counts[agent] || {};
+      counts[agent][origin] = (counts[agent][origin] || 0) + 1;
+    });
+    return counts;
+  }, [airOrders, getOrigin]);
+
+  // ---- Chart: stacked bar, one segment per origin, per airline ----
+  const airChartData = useMemo(() => {
+    const originsSeen = new Set();
+    airlineNames.forEach(a => Object.keys(airlineOriginCounts[a] || {}).forEach(o => originsSeen.add(o)));
+    const origins = [...originsSeen].sort((a, b) => a.localeCompare(b));
+
+    const datasets = origins.map((origin, idx) => ({
+      label: origin,
+      data: airlineNames.map(a => (airlineOriginCounts[a] || {})[origin] || 0),
+      backgroundColor: CARRIER_PALETTE[idx % CARRIER_PALETTE.length],
+      borderRadius: 4,
+    }));
+
+    return { labels: airlineNames, datasets };
+  }, [airlineNames, airlineOriginCounts]);
+
+  // ---- Drill-down: airline x origin, for selected airline (or all) ----
+  const airDrillDownRows = useMemo(() => {
+    const relevant = selectedAgent === 'all'
+      ? airOrders
+      : airOrders.filter(s => s.forwardingAgent === selectedAgent);
+
+    const rows = {};
+    relevant.forEach(s => {
+      const agent = s.forwardingAgent;
+      const origin = getOrigin(s);
+      const key = `${agent}|||${origin}`;
+      if (!rows[key]) rows[key] = { agent, origin, count: 0 };
+      rows[key].count++;
+    });
+    return Object.values(rows).sort((a, b) => b.count - a.count);
+  }, [airOrders, selectedAgent, getOrigin]);
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    setSelectedAgent('all');
+  };
+
+  const agentFilterOptions = mode === 'sea' ? forwardingAgentNames : airlineNames;
+  const agentFilterLabel = mode === 'sea' ? 'Forwarding Agent' : 'Airline';
+
   return (
     <div style={{ padding: '0 8px 32px' }}>
       {/* Header */}
@@ -205,11 +297,28 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text-900)' }}>Forwarder vs Carrier</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-500)' }}>
-            Which shipping line each forwarding agent actually uses, by origin — sea freight only
+            {mode === 'sea'
+              ? 'Which shipping line each forwarding agent actually uses, by origin'
+              : 'Which airline handles each origin — air has no separate forwarder/carrier split'}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>Forwarding Agent:</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+            {[{ key: 'sea', label: 'Sea Freight' }, { key: 'air', label: 'Air Freight' }].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => handleModeChange(opt.key)}
+                style={{
+                  padding: '6px 14px', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  background: mode === opt.key ? 'var(--accent)' : 'var(--surface)',
+                  color: mode === opt.key ? '#fff' : 'var(--text-700)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>{agentFilterLabel}:</label>
           <select
             value={selectedAgent}
             onChange={e => setSelectedAgent(e.target.value)}
@@ -219,11 +328,14 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
               color: 'var(--text-900)', minWidth: 180,
             }}
           >
-            <option value="all">All Forwarding Agents</option>
-            {forwardingAgentNames.map(name => <option key={name} value={name}>{name}</option>)}
+            <option value="all">All {mode === 'sea' ? 'Forwarding Agents' : 'Airlines'}</option>
+            {agentFilterOptions.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
       </div>
+
+      {mode === 'sea' ? (
+      <>{/* ==================== SEA FREIGHT ==================== */}
 
       {/* KPI Cards */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -334,6 +446,76 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
           </table>
         </div>
       </ChartCard>
+      </>
+      ) : (
+      <>{/* ==================== AIR FREIGHT ==================== */}
+
+      {/* KPI Cards */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+        <KpiCard
+          label="Air Orders with Agent"
+          value={airKpis.total}
+          color="var(--text-900)"
+          subtext="Distinct APOs — seafreight excluded"
+        />
+        <KpiCard
+          label="Distinct Airlines"
+          value={airKpis.distinctAirlines}
+          color="var(--text-900)"
+        />
+        <KpiCard
+          label="Distinct Origins"
+          value={airKpis.distinctOrigins}
+          color="var(--text-900)"
+        />
+      </div>
+
+      {/* Chart */}
+      <div style={{ marginBottom: 24 }}>
+        <ChartCard title="Origin handled per Airline" subtitle="Stacked by origin">
+          {airChartData.labels.length > 0
+            ? <div style={{ height: Math.max(260, airChartData.labels.length * 40) }}><BarChart data={airChartData} options={chartOptions} /></div>
+            : <ChartEmpty label="No air-freight shipments with a forwarding agent yet" />}
+        </ChartCard>
+      </div>
+
+      {/* Drill-down: airline x origin */}
+      <ChartCard title="Origin Breakdown" subtitle={selectedAgent === 'all' ? 'All airlines' : selectedAgent}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['Airline', 'Origin', 'Orders'].map(label => (
+                  <th key={label} style={{
+                    padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                    fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                    letterSpacing: 0.5, whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {airDrillDownRows.length === 0 && (
+                <tr><td colSpan={3} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No shipments for this selection</td></tr>
+              )}
+              {airDrillDownRows.map((r, idx) => (
+                <tr
+                  key={`${r.agent}|||${r.origin}`}
+                  style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}
+                >
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{r.agent}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{r.origin}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{r.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+      </>
+      )}
     </div>
   );
 }
