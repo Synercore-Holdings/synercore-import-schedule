@@ -49,6 +49,23 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     );
   }, [shipments]);
 
+  // One APO/order can have many product-line rows (each its own `shipments`
+  // record) — count actual orders, not lines, or a single 17-line order
+  // inflates its agent's numbers 17x over a genuinely single-line one. Picks
+  // one representative row per orderRef, preferring a row with shippingLine
+  // set (in case lines within the same order were entered inconsistently).
+  const seaOrders = useMemo(() => {
+    const byOrder = new Map();
+    seaShipments.forEach(s => {
+      const key = s.orderRef || s.id;
+      const existing = byOrder.get(key);
+      if (!existing || (!existing.shippingLine && s.shippingLine)) {
+        byOrder.set(key, s);
+      }
+    });
+    return [...byOrder.values()];
+  }, [seaShipments]);
+
   // Supplier name -> country, for origin lookup. Falls back to the raw
   // supplier name when there's no match (free-text field, may not match
   // exactly) or no country recorded on the supplier.
@@ -76,42 +93,42 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
 
   const forwardingAgentNames = useMemo(() => {
     const names = new Set();
-    seaShipments.forEach(s => names.add(s.forwardingAgent));
+    seaOrders.forEach(s => names.add(s.forwardingAgent));
     return [...names].sort((a, b) => a.localeCompare(b));
-  }, [seaShipments]);
+  }, [seaOrders]);
 
-  // agent -> { carrier: count }
+  // agent -> { carrier: count } — counted in distinct orders (seaOrders)
   const agentCarrierCounts = useMemo(() => {
     const counts = {};
-    seaShipments.forEach(s => {
+    seaOrders.forEach(s => {
       const agent = s.forwardingAgent;
       const carrier = resolveCarrier(s);
       counts[agent] = counts[agent] || {};
       counts[agent][carrier] = (counts[agent][carrier] || 0) + 1;
     });
     return counts;
-  }, [seaShipments, resolveCarrier]);
+  }, [seaOrders, resolveCarrier]);
 
   // Only pure forwarders can have a "missing" shipping line — a direct
   // carrier booking is never missing one, its agent already is the carrier.
   const forwarderOnlyShipments = useMemo(
-    () => seaShipments.filter(s => isPureSeaForwarder(s.forwardingAgent)),
-    [seaShipments]
+    () => seaOrders.filter(s => isPureSeaForwarder(s.forwardingAgent)),
+    [seaOrders]
   );
 
   // ---- KPIs ----
   const kpis = useMemo(() => {
-    const total = seaShipments.length;
+    const total = seaOrders.length;
     const withLine = forwarderOnlyShipments.filter(s => s.shippingLine).length;
     const distinctAgents = forwardingAgentNames.length;
-    const distinctCarriers = new Set(seaShipments.map(s => resolveCarrier(s)).filter(c => c !== NOT_RECORDED)).size;
+    const distinctCarriers = new Set(seaOrders.map(s => resolveCarrier(s)).filter(c => c !== NOT_RECORDED)).size;
     return {
       total,
       completionPct: forwarderOnlyShipments.length > 0 ? Math.round((withLine / forwarderOnlyShipments.length) * 100) : 100,
       distinctAgents,
       distinctCarriers,
     };
-  }, [seaShipments, forwardingAgentNames, forwarderOnlyShipments, resolveCarrier]);
+  }, [seaOrders, forwardingAgentNames, forwarderOnlyShipments, resolveCarrier]);
 
   const completionColor = (pct) => pct >= 85 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
 
@@ -163,10 +180,11 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
   }, [forwarderOnlyShipments]);
 
   // ---- Drill-down: origin x carrier, for selected agent (or all) ----
+  // Counted in distinct orders (seaOrders), same as everything else here.
   const drillDownRows = useMemo(() => {
     const relevant = selectedAgent === 'all'
-      ? seaShipments
-      : seaShipments.filter(s => s.forwardingAgent === selectedAgent);
+      ? seaOrders
+      : seaOrders.filter(s => s.forwardingAgent === selectedAgent);
 
     const rows = {};
     relevant.forEach(s => {
@@ -178,7 +196,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
       rows[key].count++;
     });
     return Object.values(rows).sort((a, b) => b.count - a.count);
-  }, [seaShipments, selectedAgent, getOrigin, resolveCarrier]);
+  }, [seaOrders, selectedAgent, getOrigin, resolveCarrier]);
 
   return (
     <div style={{ padding: '0 8px 32px' }}>
@@ -210,10 +228,10 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
       {/* KPI Cards */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
         <KpiCard
-          label="Sea Shipments with Agent"
+          label="Sea Orders with Agent"
           value={kpis.total}
           color="var(--text-900)"
-          subtext="Airfreight excluded — no shipping line applies"
+          subtext="Distinct APOs — airfreight excluded, one order can have many product lines"
         />
         <KpiCard
           label="Shipping Line Recorded"
@@ -250,7 +268,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                {['Forwarding Agent', 'Total Shipments', 'Missing Shipping Line', 'Completion'].map(label => (
+                {['Forwarding Agent', 'Total Orders', 'Missing Shipping Line', 'Completion'].map(label => (
                   <th key={label} style={{
                     padding: '10px 12px', textAlign: 'left', fontSize: 11,
                     fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
@@ -286,7 +304,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                {['Forwarding Agent', 'Origin', 'Shipping Line', 'Shipments'].map(label => (
+                {['Forwarding Agent', 'Origin', 'Shipping Line', 'Orders'].map(label => (
                   <th key={label} style={{
                     padding: '10px 12px', textAlign: 'left', fontSize: 11,
                     fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
