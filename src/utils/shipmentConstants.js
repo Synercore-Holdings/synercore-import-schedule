@@ -156,6 +156,8 @@ const BOL_TRACKING_URL_BUILDERS = {
   // from a manual search: https://www.dhl.com/za-en/home/tracking.html?tracking-id=PKGA86211&submit=1
   'DHL': (bol) => `https://www.dhl.com/za-en/home/tracking.html?tracking-id=${encodeURIComponent(bol)}&submit=1`,
   'CMA CGM': (bol) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(bol)}`,
+  // Hapag-Lloyd: confirmed working by user testing on 2026-08-24 — BOL and
+  // container use DIFFERENT pages, see CONTAINER_TRACKING_URL_BUILDERS below.
   'Hapag-Lloyd': (bol) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=${encodeURIComponent(bol)}`,
   // ONE: confirmed working by user testing on 2026-08-24 — exact URL captured
   // from a manual container search: https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=ONEU6950434
@@ -177,15 +179,19 @@ export const getBolTrackingUrl = (forwardingAgent, bolNumber, shippingLine) => {
 
 // Container-number deep links — deliberately a SEPARATE, smaller list from
 // BOL_TRACKING_URL_BUILDERS above. A carrier's BOL query format isn't
-// guaranteed to also accept a container number (different tools, different
-// pages, on many carrier sites) — only listing agents whose tracking search
-// is a generic "any reference" box confirmed to work for both.
+// guaranteed to also accept a container number — some carriers share one
+// generic "any reference" box for both (Maersk, CMA CGM, ONE); others use a
+// completely different page/param for containers vs. BOL (Hapag-Lloyd).
 const CONTAINER_TRACKING_URL_BUILDERS = {
   'Maersk': (container) => `https://www.maersk.com/tracking/${encodeURIComponent(container)}`,
   'CMA CGM': (container) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(container)}`,
   // ONE: confirmed working by user testing on 2026-08-24 — see
   // BOL_TRACKING_URL_BUILDERS above for the exact captured URL.
   'ONE': (container) => `https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=${encodeURIComponent(container)}`,
+  // Hapag-Lloyd: confirmed working by user testing on 2026-08-24 — a
+  // DIFFERENT page from BOL tracking, exact URL captured from a manual
+  // container search: https://www.hapag-lloyd.com/en/online-business/track/track-by-container-solution.html?container=GVTU++2637330
+  'Hapag-Lloyd': (container) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-container-solution.html?container=${encodeURIComponent(container)}`,
 };
 
 export const getContainerTrackingUrl = (forwardingAgent, containerNumber, shippingLine) => {

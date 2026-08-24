@@ -326,11 +326,11 @@ describe('getContainerTrackingUrl', () => {
     expect(getContainerTrackingUrl('Maersk', 'MSCU1234567')).toBe('https://www.maersk.com/tracking/MSCU1234567');
     expect(getContainerTrackingUrl('CMA CGM', 'MSCU1234567')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=MSCU1234567');
     expect(getContainerTrackingUrl('ONE', 'ONEU6950434')).toBe('https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=ONEU6950434');
+    expect(getContainerTrackingUrl('Hapag-Lloyd', 'GVTU2637330')).toBe('https://www.hapag-lloyd.com/en/online-business/track/track-by-container-solution.html?container=GVTU2637330');
   });
 
-  it('falls back to the bare agent tracking page for a BOL-only carrier (DHL, Hapag-Lloyd not confirmed for containers)', () => {
+  it('falls back to the bare agent tracking page for a BOL-only carrier not confirmed for containers', () => {
     expect(getContainerTrackingUrl('DHL', 'MSCU1234567')).toBe(AGENT_TRACKING_URLS['DHL']);
-    expect(getContainerTrackingUrl('Hapag-Lloyd', 'MSCU1234567')).toBe(AGENT_TRACKING_URLS['Hapag-Lloyd']);
   });
 
   it('falls back to the bare agent tracking page when the container number is missing', () => {
