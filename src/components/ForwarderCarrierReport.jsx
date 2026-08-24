@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { isAirfreight } from '../utils/shipmentConstants';
 import {
   Chart as ChartJS,
@@ -60,10 +60,10 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     return map;
   }, [suppliers]);
 
-  const getOrigin = (shipment) => {
+  const getOrigin = useCallback((shipment) => {
     const name = (shipment.supplier || '').trim();
     return supplierCountryMap[name.toLowerCase()] || name || 'Unknown';
-  };
+  }, [supplierCountryMap]);
 
   const forwardingAgentNames = useMemo(() => {
     const names = new Set();
@@ -162,7 +162,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
       rows[key].count++;
     });
     return Object.values(rows).sort((a, b) => b.count - a.count);
-  }, [seaShipments, selectedAgent, supplierCountryMap]);
+  }, [seaShipments, selectedAgent, getOrigin]);
 
   return (
     <div style={{ padding: '0 8px 32px' }}>
