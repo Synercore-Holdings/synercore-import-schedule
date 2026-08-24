@@ -18,6 +18,7 @@ export type ShipmentStatus =
   | 'air_customs_clearance'
   | 'in_transit_roadway'
   | 'in_transit_seaway'
+  | 'in_transit_last_mile'
   | 'moored'
   | 'berth_working'
   | 'berth_complete'

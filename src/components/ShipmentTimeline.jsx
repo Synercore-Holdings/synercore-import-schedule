@@ -20,6 +20,7 @@ const MILESTONES = [
       'air_customs_clearance',
       'in_transit_roadway',
       'in_transit_seaway',
+      'in_transit_last_mile',
     ],
     dateKey: 'estimatedArrival',
   },

@@ -35,7 +35,7 @@ export class CapacityForecast {
         const shipmentWeek = parseInt(s.weekNumber) || 0;
         const isForThisWeek = shipmentWeek === weekNumber;
         const isForThisWarehouse = s.receivingWarehouse === warehouse;
-        const isPlanned = ['planned_airfreight', 'planned_seafreight', 'in_transit_airfreight', 'in_transit_seaway', 'in_transit_roadway', 'moored', 'berth_working', 'berth_complete', 'gated_in_port'].includes(s.latestStatus);
+        const isPlanned = ['planned_airfreight', 'planned_seafreight', 'in_transit_airfreight', 'in_transit_seaway', 'in_transit_roadway', 'in_transit_last_mile', 'moored', 'berth_working', 'berth_complete', 'gated_in_port'].includes(s.latestStatus);
 
         return isForThisWeek && isForThisWarehouse && isPlanned;
       })

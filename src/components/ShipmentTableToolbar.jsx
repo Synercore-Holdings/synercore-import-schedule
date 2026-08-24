@@ -106,6 +106,7 @@ function ShipmentTableToolbar({
           <option value={ShipmentStatus.AIR_CUSTOMS_CLEARANCE}>Air Customs Clearance</option>
           <option value={ShipmentStatus.IN_TRANSIT_ROADWAY}>In Transit Roadway</option>
           <option value={ShipmentStatus.IN_TRANSIT_SEAWAY}>In Transit Seaway</option>
+          <option value={ShipmentStatus.IN_TRANSIT_LAST_MILE}>In Transit Last Mile</option>
           <option value={ShipmentStatus.MOORED}>Moored</option>
           <option value={ShipmentStatus.BERTH_WORKING}>Berth Working</option>
           <option value={ShipmentStatus.BERTH_COMPLETE}>Berth Complete</option>

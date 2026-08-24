@@ -44,7 +44,7 @@ export const isAirfreight = (status) => AIRFREIGHT_STATUSES.includes(status);
 export const getShippingProgress = (status) => {
   const stages = {
     planned_airfreight: 1, planned_seafreight: 1,
-    in_transit_airfreight: 2, in_transit_roadway: 2, in_transit_seaway: 2, air_customs_clearance: 2,
+    in_transit_airfreight: 2, in_transit_roadway: 2, in_transit_seaway: 2, in_transit_last_mile: 2, air_customs_clearance: 2,
     moored: 3, berth_working: 3, berth_complete: 3, gated_in_port: 3,
     arrived_pta: 4, arrived_klm: 4, arrived_offsite: 4,
     received: 5, stored: 5, archived: 5,

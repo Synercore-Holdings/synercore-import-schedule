@@ -141,6 +141,7 @@ function SupplierDashboard({ onLogout }) {
       'in_transit_airfreight': 'In Transit - Air',
       'in_transit_seaway': 'In Transit - Sea',
       'in_transit_roadway': 'In Transit - Road',
+      'in_transit_last_mile': 'In Transit - Last Mile',
       'moored': 'Moored',
       'berth_working': 'Berth - Working',
       'berth_complete': 'Berth - Complete',
@@ -495,6 +496,7 @@ function SupplierDashboard({ onLogout }) {
                     <option value="">All Statuses</option>
                     <option value="in_transit_airfreight">In Transit - Air</option>
                     <option value="in_transit_seaway">In Transit - Sea</option>
+                    <option value="in_transit_last_mile">In Transit - Last Mile</option>
                     <option value="arrived_pta">Arrived - PTA</option>
                     <option value="stored">Stored</option>
                     <option value="received">Received</option>

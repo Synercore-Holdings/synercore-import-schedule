@@ -783,7 +783,8 @@ function App() {
                   calendarFilteredShipments.filter(
                     s =>
                       s.latestStatus === 'in_transit_roadway' ||
-                      s.latestStatus === 'in_transit_seaway'
+                      s.latestStatus === 'in_transit_seaway' ||
+                      s.latestStatus === 'in_transit_last_mile'
                   ).length
                 }
               </strong>

@@ -14,6 +14,7 @@ const STAT_CARD_DEFS = [
   { key: 'in_transit_airfreight', status: 'in_transit_airfreight', label: 'In Transit Air', icon: '\u2708\uFE0F', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
   { key: 'in_transit_roadway', status: 'in_transit_roadway', label: 'In Transit Road', icon: '\u{1F69B}', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
   { key: 'in_transit_seaway', status: 'in_transit_seaway', label: 'In Transit Sea', icon: '\u{1F30A}', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
+  { key: 'in_transit_last_mile', status: 'in_transit_last_mile', label: 'In Transit Last Mile', icon: '\u{1F69B}', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
   { key: 'moored', status: 'moored', label: 'Moored', icon: '\u2693', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
   { key: 'berth_working', status: 'berth_working', label: 'Berth Working', icon: '\u{1F3D7}\uFE0F', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
   { key: 'berth_complete', status: 'berth_complete', label: 'Berth Complete', icon: '\u2705', ring: 'ring-info', tint: 'rgba(59,130,246,0.1)' },
@@ -88,7 +89,7 @@ function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipmen
 
   if (statusFilter) {
     const META_FILTERS = {
-      in_transit: ['in_transit_airfreight', 'in_transit_roadway', 'in_transit_seaway'],
+      in_transit: ['in_transit_airfreight', 'in_transit_roadway', 'in_transit_seaway', 'in_transit_last_mile'],
       arrived: ['arrived_pta', 'arrived_klm', 'arrived_offsite'],
       planned: ['planned_airfreight', 'planned_seafreight'],
       delayed: ['delayed_port', 'delayed_customs', 'delayed_documents', 'delayed_supplier'],
@@ -132,7 +133,7 @@ function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipmen
       total: uniqueOrderRefs.size,
       tbc: 0,
       planned_airfreight: 0, planned_seafreight: 0,
-      in_transit_airfreight: 0, in_transit_roadway: 0, in_transit_seaway: 0,
+      in_transit_airfreight: 0, in_transit_roadway: 0, in_transit_seaway: 0, in_transit_last_mile: 0,
       moored: 0, berth_working: 0, berth_complete: 0, gated_in_port: 0,
       arrived_pta: 0, arrived_klm: 0, arrived_offsite: 0,
       unloading: 0, inspection_pending: 0, inspecting: 0,
@@ -195,7 +196,7 @@ function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipmen
       {/* summary info pills */}
       {(() => {
         const delayedTotal = (stats.delayed_port || 0) + (stats.delayed_customs || 0) + (stats.delayed_documents || 0) + (stats.delayed_supplier || 0);
-        const inTransitTotal = (stats.in_transit_airfreight || 0) + (stats.in_transit_roadway || 0) + (stats.in_transit_seaway || 0);
+        const inTransitTotal = (stats.in_transit_airfreight || 0) + (stats.in_transit_roadway || 0) + (stats.in_transit_seaway || 0) + (stats.in_transit_last_mile || 0);
         const arrivedTotal = (stats.arrived_pta || 0) + (stats.arrived_klm || 0);
         const inspectionPending = stats.inspection_pending || 0;
         return (delayedTotal > 0 || inTransitTotal > 0 || arrivedTotal > 0 || inspectionPending > 0) ? (

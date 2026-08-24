@@ -109,6 +109,7 @@ export function StatusUpdateForm({
     { id: 'in_transit_airfreight', label: '✈️ In Transit - Air' },
     { id: 'in_transit_seaway', label: '🚢 In Transit - Sea' },
     { id: 'in_transit_roadway', label: '🚚 In Transit - Road' },
+    { id: 'in_transit_last_mile', label: '🚛 In Transit - Last Mile' },
     { id: 'arrived_pta', label: '📦 Arrived - PTA' },
     { id: 'arrived_klm', label: '📦 Arrived - KLM' },
     { id: 'arrived_offsite', label: '📦 Arrived - Offsite' },

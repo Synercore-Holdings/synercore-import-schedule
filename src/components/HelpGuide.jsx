@@ -148,7 +148,7 @@ function HelpGuide({ onClose }) {
             <h3>Shipment Status Flow</h3>
             <ol>
               <li><strong>Planned</strong> — Airfreight or Seafreight shipments in planning</li>
-              <li><strong>In Transit</strong> — Currently being transported (Airfreight, Roadway, Seaway)</li>
+              <li><strong>In Transit</strong> — Currently being transported (Airfreight, Roadway, Seaway, Last Mile)</li>
               <li><strong>Air Customs Clearance</strong> — Airfreight clearing customs</li>
               <li><strong>Moored / Berth Working / Berth Complete</strong> — At port stages</li>
               <li><strong>Arrived</strong> — Reached destination (PTA, KLM, or Offsite)</li>

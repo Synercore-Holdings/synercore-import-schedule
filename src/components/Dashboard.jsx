@@ -352,7 +352,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
     const plannedStatuses = [ShipmentStatus.PLANNED_AIRFREIGHT, ShipmentStatus.PLANNED_SEAFREIGHT];
     const transitStatuses = [
       ShipmentStatus.IN_TRANSIT_AIRFREIGHT, ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
-      ShipmentStatus.IN_TRANSIT_ROADWAY, ShipmentStatus.IN_TRANSIT_SEAWAY,
+      ShipmentStatus.IN_TRANSIT_ROADWAY, ShipmentStatus.IN_TRANSIT_SEAWAY, ShipmentStatus.IN_TRANSIT_LAST_MILE,
       ShipmentStatus.MOORED, ShipmentStatus.BERTH_WORKING, ShipmentStatus.BERTH_COMPLETE, ShipmentStatus.GATED_IN_PORT,
     ];
     const storedStatuses = [
@@ -411,6 +411,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
         case ShipmentStatus.AIR_CUSTOMS_CLEARANCE:
         case ShipmentStatus.IN_TRANSIT_ROADWAY:
         case ShipmentStatus.IN_TRANSIT_SEAWAY:
+        case ShipmentStatus.IN_TRANSIT_LAST_MILE:
         case ShipmentStatus.MOORED:
         case ShipmentStatus.BERTH_WORKING:
         case ShipmentStatus.BERTH_COMPLETE:
@@ -698,7 +699,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
     const activeStatuses = [
       ShipmentStatus.PLANNED_AIRFREIGHT, ShipmentStatus.PLANNED_SEAFREIGHT,
       ShipmentStatus.IN_TRANSIT_AIRFREIGHT, ShipmentStatus.IN_TRANSIT_SEAWAY,
-      ShipmentStatus.IN_TRANSIT_ROADWAY, ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
+      ShipmentStatus.IN_TRANSIT_ROADWAY, ShipmentStatus.IN_TRANSIT_LAST_MILE, ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
       ShipmentStatus.MOORED, ShipmentStatus.BERTH_WORKING, ShipmentStatus.BERTH_COMPLETE, ShipmentStatus.GATED_IN_PORT,
       ...DELAYED_STATUSES,
     ];

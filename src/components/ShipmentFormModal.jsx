@@ -334,6 +334,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             <option value="air_customs_clearance">Air Customs Clearance Event</option>
             <option value="in_transit_roadway">In Transit Roadway</option>
             <option value="in_transit_seaway">In Transit Seaway</option>
+            <option value="in_transit_last_mile">In Transit Last Mile</option>
             <option value="moored">Moored</option>
             <option value="berth_working">Berth Working</option>
             <option value="berth_complete">Berth Complete</option>

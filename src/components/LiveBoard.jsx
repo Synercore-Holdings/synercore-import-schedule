@@ -139,6 +139,7 @@ function LiveBoard({ shipments, onClose, onRefresh }) {
         case ShipmentStatus.IN_TRANSIT_AIRFREIGHT:
         case ShipmentStatus.IN_TRANSIT_ROADWAY:
         case ShipmentStatus.IN_TRANSIT_SEAWAY:
+        case ShipmentStatus.IN_TRANSIT_LAST_MILE:
         case ShipmentStatus.AIR_CUSTOMS_CLEARANCE:
           if (shipmentOverdue) { delayed++; } else { inTransit++; } break;
         case ShipmentStatus.MOORED:
