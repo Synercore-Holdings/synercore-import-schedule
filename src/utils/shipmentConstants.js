@@ -157,6 +157,11 @@ const BOL_TRACKING_URL_BUILDERS = {
   'DHL': (bol) => `https://www.dhl.com/za-en/home/tracking.html?tracking-id=${encodeURIComponent(bol)}&submit=1`,
   'CMA CGM': (bol) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(bol)}`,
   'Hapag-Lloyd': (bol) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=${encodeURIComponent(bol)}`,
+  // ONE: confirmed working by user testing on 2026-08-24 — exact URL captured
+  // from a manual container search: https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=ONEU6950434
+  // Param name ("trakNoParam" — generic "tracking number", not container-
+  // specific) suggests it's a general reference box, so also used for BOL.
+  'ONE': (bol) => `https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=${encodeURIComponent(bol)}`,
 };
 
 // The actual carrier (shippingLine) has the real tracking data — prefer it
@@ -178,6 +183,9 @@ export const getBolTrackingUrl = (forwardingAgent, bolNumber, shippingLine) => {
 const CONTAINER_TRACKING_URL_BUILDERS = {
   'Maersk': (container) => `https://www.maersk.com/tracking/${encodeURIComponent(container)}`,
   'CMA CGM': (container) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(container)}`,
+  // ONE: confirmed working by user testing on 2026-08-24 — see
+  // BOL_TRACKING_URL_BUILDERS above for the exact captured URL.
+  'ONE': (container) => `https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=${encodeURIComponent(container)}`,
 };
 
 export const getContainerTrackingUrl = (forwardingAgent, containerNumber, shippingLine) => {

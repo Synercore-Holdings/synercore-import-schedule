@@ -304,6 +304,7 @@ describe('getBolTrackingUrl', () => {
     expect(getBolTrackingUrl('DHL', 'ABC123')).toBe('https://www.dhl.com/za-en/home/tracking.html?tracking-id=ABC123&submit=1');
     expect(getBolTrackingUrl('CMA CGM', 'ABC123')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=ABC123');
     expect(getBolTrackingUrl('Hapag-Lloyd', 'ABC123')).toBe('https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=ABC123');
+    expect(getBolTrackingUrl('ONE', 'ABC123')).toBe('https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=ABC123');
   });
 
   it('falls back to the bare agent tracking page when the BOL number is missing', () => {
@@ -324,6 +325,7 @@ describe('getContainerTrackingUrl', () => {
   it('builds a prefilled deep link for a carrier confirmed to accept container numbers', () => {
     expect(getContainerTrackingUrl('Maersk', 'MSCU1234567')).toBe('https://www.maersk.com/tracking/MSCU1234567');
     expect(getContainerTrackingUrl('CMA CGM', 'MSCU1234567')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=MSCU1234567');
+    expect(getContainerTrackingUrl('ONE', 'ONEU6950434')).toBe('https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking?trakNoParam=ONEU6950434');
   });
 
   it('falls back to the bare agent tracking page for a BOL-only carrier (DHL, Hapag-Lloyd not confirmed for containers)', () => {
