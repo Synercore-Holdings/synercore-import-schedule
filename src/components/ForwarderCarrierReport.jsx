@@ -11,6 +11,17 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const NOT_RECORDED = '(Not recorded)';
 
+// Same month-bucketing convention as the Pretoria/Klapmuts freight-spend
+// cards in WarehouseStored.jsx — "YYYY-MM", scheduled date preferred over
+// creation date since that's when the shipment actually happened/will happen.
+const getMonthKey = (s) => {
+  const dateVal = s.selectedWeekDate || s.createdAt;
+  if (!dateVal) return null;
+  const d = new Date(dateVal);
+  if (isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 // ---- Reusable wrappers (same pattern as SupplierPerformance) ----
 const ChartCard = ({ title, subtitle, children, style }) => (
   <div className="dash-panel" style={style}>
@@ -41,6 +52,7 @@ const CARRIER_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
 function ForwarderCarrierReport({ shipments, suppliers }) {
   const [mode, setMode] = useState('sea');
   const [selectedAgent, setSelectedAgent] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('');
 
   // Sea-freight shipments with a forwarding agent — shippingLine is a
   // sea-only concept, and there's nothing to analyze without an agent.
@@ -55,7 +67,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
   // inflates its agent's numbers 17x over a genuinely single-line one. Picks
   // one representative row per orderRef, preferring a row with shippingLine
   // set (in case lines within the same order were entered inconsistently).
-  const seaOrders = useMemo(() => {
+  const seaOrdersAll = useMemo(() => {
     const byOrder = new Map();
     seaShipments.forEach(s => {
       const key = s.orderRef || s.id;
@@ -77,7 +89,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
   }, [shipments]);
 
   // Same one-row-per-order dedup as sea, no shippingLine preference needed.
-  const airOrders = useMemo(() => {
+  const airOrdersAll = useMemo(() => {
     const byOrder = new Map();
     airShipments.forEach(s => {
       const key = s.orderRef || s.id;
@@ -85,6 +97,26 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     });
     return [...byOrder.values()];
   }, [airShipments]);
+
+  // ---- Month filter, same convention as WarehouseStored's freight cards ----
+  const availableMonths = useMemo(() => {
+    const months = new Set();
+    [...seaOrdersAll, ...airOrdersAll].forEach(s => {
+      const m = getMonthKey(s);
+      if (m) months.add(m);
+    });
+    return [...months].sort();
+  }, [seaOrdersAll, airOrdersAll]);
+
+  const seaOrders = useMemo(() => {
+    if (!monthFilter) return seaOrdersAll;
+    return seaOrdersAll.filter(s => getMonthKey(s) === monthFilter);
+  }, [seaOrdersAll, monthFilter]);
+
+  const airOrders = useMemo(() => {
+    if (!monthFilter) return airOrdersAll;
+    return airOrdersAll.filter(s => getMonthKey(s) === monthFilter);
+  }, [airOrdersAll, monthFilter]);
 
   // Supplier name -> country, for origin lookup. Falls back to the raw
   // supplier name when there's no match (free-text field, may not match
@@ -330,6 +362,23 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
           >
             <option value="all">All {mode === 'sea' ? 'Forwarding Agents' : 'Airlines'}</option>
             {agentFilterOptions.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>Period:</label>
+          <select
+            value={monthFilter}
+            onChange={e => setMonthFilter(e.target.value)}
+            style={{
+              padding: '6px 12px', fontSize: 13, borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: 'var(--text-900)', minWidth: 140,
+            }}
+          >
+            <option value="">All Time</option>
+            {availableMonths.map(m => (
+              <option key={m} value={m}>
+                {new Date(`${m}-01`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+              </option>
+            ))}
           </select>
         </div>
       </div>
