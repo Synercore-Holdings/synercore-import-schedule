@@ -421,6 +421,16 @@ async function start() {
       logWarn('ASO number column migration warning', { error: error.message });
     }
 
+    // Add BOL (Bill of Lading) number column to shipments
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS bol_number VARCHAR(255);
+      `);
+      logger.info('BOL number column ready');
+    } catch (error) {
+      logWarn('BOL number column migration warning', { error: error.message });
+    }
+
     // Add original_week_number/original_selected_week_date to shipments.
     // Week/selectedWeekDate get overwritten whenever a shipment is rescheduled,
     // so on-time/lead-time metrics were measuring drift from the latest edit

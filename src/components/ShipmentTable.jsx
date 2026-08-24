@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { ShipmentStatus, isDelayedStatus, SHIPPING_EXCLUDED_STATUSES } from '../types/shipment';
 import { getCurrentWeekNumber } from '../utils/dateUtils';
-import { isAirfreight, getShippingProgress, getForwardingAgents } from '../utils/shipmentConstants';
+import { isAirfreight, getShippingProgress, getForwardingAgents, getAgentTrackingUrl } from '../utils/shipmentConstants';
 import { generatePDF as generateShipmentPDF, generateExcel as generateShipmentExcel } from '../utils/shipmentExport';
 import WeekCalendar from './WeekCalendar';
 import BulkStatusUpdate from './BulkStatusUpdate';
@@ -830,15 +830,15 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           backgroundColor: edits[shipment.id]?.vesselName !== undefined ? '#fff3e0' : undefined,
                         }}
                       />
-                      {shipment.vesselName && (
+                      {(shipment.vesselName || getAgentTrackingUrl(shipment.forwardingAgent)) && (
                         <a
-                          href={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName)
+                          href={getAgentTrackingUrl(shipment.forwardingAgent) || (isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName)
                             ? `https://www.track-trace.com/aircargo?awb=${encodeURIComponent(shipment.vesselName.replace(/\D/g, ''))}`
-                            : `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(shipment.vesselName)}`
+                            : `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(shipment.vesselName)}`)
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 'Track AWB' : 'Track vessel on VesselFinder'}
+                          title={getAgentTrackingUrl(shipment.forwardingAgent) ? `Track on ${shipment.forwardingAgent}` : (isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 'Track AWB' : 'Track vessel on VesselFinder')}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',

@@ -7,6 +7,8 @@ import {
   getShippingProgress,
   isAirfreightStatus,
   getForwardingAgents,
+  AGENT_TRACKING_URLS,
+  getAgentTrackingUrl,
 } from '../shipmentConstants.js';
 
 describe('AIRFREIGHT_AGENTS', () => {
@@ -256,5 +258,22 @@ describe('getForwardingAgents', () => {
 
   it('returns seafreight agents for unknown status (default)', () => {
     expect(getForwardingAgents('unknown_status')).toBe(SEAFREIGHT_AGENTS);
+  });
+});
+
+describe('getAgentTrackingUrl', () => {
+  it('returns a URL for a known agent', () => {
+    expect(getAgentTrackingUrl('Maersk')).toBe(AGENT_TRACKING_URLS['Maersk']);
+    expect(typeof getAgentTrackingUrl('Maersk')).toBe('string');
+  });
+
+  it('returns null for an agent with no known tracking tool', () => {
+    expect(getAgentTrackingUrl('Afrigistics')).toBe(null);
+  });
+
+  it('returns null for empty/unknown agent', () => {
+    expect(getAgentTrackingUrl('')).toBe(null);
+    expect(getAgentTrackingUrl(undefined)).toBe(null);
+    expect(getAgentTrackingUrl('Some Random Agent')).toBe(null);
   });
 });

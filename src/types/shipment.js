@@ -261,6 +261,7 @@ export class Shipment {
     receivingWarehouse,
     forwardingAgent = '',
     vesselName = '',
+    bolNumber = '',
     incoterm = '',
     priority = ShipmentPriority.MEDIUM,
     notes = '',
@@ -295,6 +296,7 @@ export class Shipment {
     this.receivingWarehouse = receivingWarehouse;
     this.forwardingAgent = forwardingAgent;
     this.vesselName = vesselName;
+    this.bolNumber = bolNumber;
     this.incoterm = incoterm;
     this.priority = priority;
     this.notes = notes;

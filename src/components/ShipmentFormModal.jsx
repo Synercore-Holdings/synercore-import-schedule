@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useFormDraft from '../hooks/useFormDraft';
-import { isAirfreight, getForwardingAgents } from '../utils/shipmentConstants';
+import { isAirfreight, getForwardingAgents, getAgentTrackingUrl } from '../utils/shipmentConstants';
 import WeekCalendar from './WeekCalendar';
 import ResizableModal from './ResizableModal';
 import { useNotification } from '../contexts/NotificationContext';
@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   receivingWarehouse: '',
   forwardingAgent: '',
   vesselName: '',
+  bolNumber: '',
   incoterm: '',
   notes: '',
   reminderDate: '',
@@ -519,8 +520,18 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
 
         {/* Forwarding Agent */}
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
-            Forwarding Agent
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            <span>Forwarding Agent</span>
+            {getAgentTrackingUrl(formData.forwardingAgent) && (
+              <a
+                href={getAgentTrackingUrl(formData.forwardingAgent)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
+              >
+                Track on {formData.forwardingAgent} →
+              </a>
+            )}
           </label>
           <select
             value={formData.forwardingAgent || ''}
@@ -547,6 +558,21 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             className="input"
             style={{ width: '100%' }}
             placeholder={isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB number' : 'Vessel name'}
+          />
+        </div>
+
+        {/* BOL Number */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            BOL Number
+          </label>
+          <input
+            type="text"
+            value={formData.bolNumber || ''}
+            onChange={(e) => handleInputChange('bolNumber', e.target.value)}
+            className="input"
+            style={{ width: '100%' }}
+            placeholder="Bill of Lading number"
           />
         </div>
 

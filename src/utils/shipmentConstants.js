@@ -81,3 +81,38 @@ export const isAirfreightStatus = (status) => {
 export const getForwardingAgents = (status, forwardingAgent, vesselOrAwb) => {
   return isAirfreight(status, forwardingAgent, vesselOrAwb) ? AIRFREIGHT_AGENTS : SEAFREIGHT_AGENTS;
 };
+
+// Each carrier's own tracking tool, keyed by the exact forwarding-agent value
+// used above. These open the carrier's tracking page directly (the user still
+// pastes the AWB/BOL in there) rather than guessing at a query-string format
+// per carrier, since those change without notice and a wrong deep link fails
+// silently. Not every agent has a public self-service tracking tool.
+export const AGENT_TRACKING_URLS = {
+  // Airfreight
+  'Emirates SkyCargo': 'https://www.skycargo.com/track-shipment',
+  'Qatar Airways Cargo': 'https://www.qrcargo.com/tools/track-shipment',
+  'Lufthansa Cargo': 'https://www.lufthansa-cargo.com/tracking',
+  'Singapore Airlines Cargo': 'https://www.siacargo.com/eservices/track-shipment',
+  'Korean Air Cargo': 'https://cargo.koreanair.com/eng/tracking/CargoTracking.do',
+  'Turkish Airlines Cargo': 'https://www.turkishcargo.com.tr/en/online-services/track-your-cargo',
+  'Cathay Pacific Cargo': 'https://www.cathaypacificcargo.com/en/track-shipment.html',
+  'British Airways World Cargo': 'https://www.iagcargo.com/en/tracking',
+  'Air France-KLM Cargo': 'https://www.afklcargo.com/track',
+  'Ethiopian Airlines Cargo': 'https://cargo.ethiopianairlines.com/tracking',
+  // Seafreight / forwarders
+  'DHL': 'https://www.dhl.com/global-en/home/tracking.html',
+  'DSV': 'https://www.dsv.com/en/our-solutions/track-and-trace',
+  'MSC': 'https://www.msc.com/en/track-a-shipment',
+  'COSCO': 'https://elines.coscoshipping.com/ebusiness/cargoTracking',
+  'ONE': 'https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking',
+  'Hapag-Lloyd': 'https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html',
+  'Maersk': 'https://www.maersk.com/tracking',
+  'CMA CGM': 'https://www.cma-cgm.com/ebusiness/tracking',
+  'Yang Ming': 'https://www.yangming.com/e-service/Cargo_Tracking/CargoTracking.aspx',
+  'HMM': 'https://www.hmm21.com/e-service/general/trackNTrace/TrackNTrace.jsp',
+  'OOCL': 'https://www.oocl.com/eng/ourservices/eservices/cargotracking/Pages/cargotracking.aspx',
+};
+
+// Returns the selected forwarding agent's own tracking page, or null if none
+// is known (e.g. SAA Cargo, Kenya Airways Cargo, Afrigistics, Evergreen).
+export const getAgentTrackingUrl = (forwardingAgent) => AGENT_TRACKING_URLS[forwardingAgent] || null;
