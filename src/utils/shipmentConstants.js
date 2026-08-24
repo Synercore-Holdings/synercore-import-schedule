@@ -132,7 +132,10 @@ export const getAwbTrackingUrl = (awbNumber) => {
 // falls back to their bare tracking page from AGENT_TRACKING_URLS.
 const BOL_TRACKING_URL_BUILDERS = {
   'Maersk': (bol) => `https://www.maersk.com/tracking/${encodeURIComponent(bol)}`,
-  'MSC': (bol) => `https://www.msc.com/en/track-a-shipment?trackingNumber=${encodeURIComponent(bol)}`,
+  // MSC: 'trackingNumber' confirmed WRONG by user testing on 2026-08-24 (2 real
+  // orders didn't prefill) — msc.com blocks automated fetches (403) so this
+  // can't be reverse-engineered from here either. Falls back to the bare page
+  // until someone captures the real URL from a manual search on msc.com.
   'CMA CGM': (bol) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(bol)}`,
   'Hapag-Lloyd': (bol) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=${encodeURIComponent(bol)}`,
 };
