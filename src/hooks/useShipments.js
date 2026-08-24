@@ -109,6 +109,7 @@ export function useShipments() {
         forwardingAgent: s.forwarding_agent || s.forwardingAgent,
         vesselName: s.vessel_name || s.vesselName,
         bolNumber: s.bol_number || s.bolNumber || '',
+        containerNumber: s.container_number || s.containerNumber || '',
         incoterm: s.incoterm,
         notes: s.notes,
         createdAt: s.created_at || s.createdAt,

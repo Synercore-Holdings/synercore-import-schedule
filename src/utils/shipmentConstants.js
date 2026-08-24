@@ -149,3 +149,20 @@ export const getBolTrackingUrl = (forwardingAgent, bolNumber) => {
   }
   return getAgentTrackingUrl(forwardingAgent);
 };
+
+// Container-number deep links — deliberately a SEPARATE, smaller list from
+// BOL_TRACKING_URL_BUILDERS above. A carrier's BOL query format isn't
+// guaranteed to also accept a container number (different tools, different
+// pages, on many carrier sites) — only listing agents whose tracking search
+// is a generic "any reference" box confirmed to work for both.
+const CONTAINER_TRACKING_URL_BUILDERS = {
+  'Maersk': (container) => `https://www.maersk.com/tracking/${encodeURIComponent(container)}`,
+  'CMA CGM': (container) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(container)}`,
+};
+
+export const getContainerTrackingUrl = (forwardingAgent, containerNumber) => {
+  if (forwardingAgent && containerNumber && CONTAINER_TRACKING_URL_BUILDERS[forwardingAgent]) {
+    return CONTAINER_TRACKING_URL_BUILDERS[forwardingAgent](containerNumber);
+  }
+  return getAgentTrackingUrl(forwardingAgent);
+};

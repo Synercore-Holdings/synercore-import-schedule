@@ -99,6 +99,10 @@ const OrderDetailsModal = ({ isOpen, shipment, onClose }) => {
           <span style={valueStyle}>{shipment.bolNumber || '—'}</span>
         </div>
         <div>
+          <label style={labelStyle}>Container Number</label>
+          <span style={valueStyle}>{shipment.containerNumber || '—'}</span>
+        </div>
+        <div>
           <label style={labelStyle}>Created</label>
           <span style={valueStyle}>{shipment.createdAt ? new Date(shipment.createdAt).toLocaleDateString() : '—'}</span>
         </div>

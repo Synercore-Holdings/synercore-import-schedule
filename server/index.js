@@ -431,6 +431,16 @@ async function start() {
       logWarn('BOL number column migration warning', { error: error.message });
     }
 
+    // Add container number column to shipments
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS container_number VARCHAR(255);
+      `);
+      logger.info('Container number column ready');
+    } catch (error) {
+      logWarn('Container number column migration warning', { error: error.message });
+    }
+
     // Add original_week_number/original_selected_week_date to shipments.
     // Week/selectedWeekDate get overwritten whenever a shipment is rescheduled,
     // so on-time/lead-time metrics were measuring drift from the latest edit

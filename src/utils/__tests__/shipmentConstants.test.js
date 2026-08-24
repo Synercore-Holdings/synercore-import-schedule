@@ -11,6 +11,7 @@ import {
   getAgentTrackingUrl,
   getAwbTrackingUrl,
   getBolTrackingUrl,
+  getContainerTrackingUrl,
 } from '../shipmentConstants.js';
 
 describe('AIRFREIGHT_AGENTS', () => {
@@ -315,5 +316,25 @@ describe('getBolTrackingUrl', () => {
 
   it('returns null when the agent has no tracking tool at all', () => {
     expect(getBolTrackingUrl('Afrigistics', 'ABC123')).toBe(null);
+  });
+});
+
+describe('getContainerTrackingUrl', () => {
+  it('builds a prefilled deep link for a carrier confirmed to accept container numbers', () => {
+    expect(getContainerTrackingUrl('Maersk', 'MSCU1234567')).toBe('https://www.maersk.com/tracking/MSCU1234567');
+    expect(getContainerTrackingUrl('CMA CGM', 'MSCU1234567')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=MSCU1234567');
+  });
+
+  it('falls back to the bare agent tracking page for a BOL-only carrier (DHL, Hapag-Lloyd not confirmed for containers)', () => {
+    expect(getContainerTrackingUrl('DHL', 'MSCU1234567')).toBe(AGENT_TRACKING_URLS['DHL']);
+    expect(getContainerTrackingUrl('Hapag-Lloyd', 'MSCU1234567')).toBe(AGENT_TRACKING_URLS['Hapag-Lloyd']);
+  });
+
+  it('falls back to the bare agent tracking page when the container number is missing', () => {
+    expect(getContainerTrackingUrl('Maersk', '')).toBe(AGENT_TRACKING_URLS['Maersk']);
+  });
+
+  it('returns null when the agent has no tracking tool at all', () => {
+    expect(getContainerTrackingUrl('Afrigistics', 'MSCU1234567')).toBe(null);
   });
 });

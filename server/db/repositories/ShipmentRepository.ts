@@ -40,6 +40,7 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'forwarding_agent',
     'vessel_name',
     'bol_number',
+    'container_number',
     'incoterm',
     'notes',
     'created_at',

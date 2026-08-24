@@ -262,6 +262,7 @@ export class Shipment {
     forwardingAgent = '',
     vesselName = '',
     bolNumber = '',
+    containerNumber = '',
     incoterm = '',
     priority = ShipmentPriority.MEDIUM,
     notes = '',
@@ -297,6 +298,7 @@ export class Shipment {
     this.forwardingAgent = forwardingAgent;
     this.vesselName = vesselName;
     this.bolNumber = bolNumber;
+    this.containerNumber = containerNumber;
     this.incoterm = incoterm;
     this.priority = priority;
     this.notes = notes;
