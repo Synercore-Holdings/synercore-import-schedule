@@ -142,7 +142,10 @@ export const AGENT_TRACKING_URLS = {
   // here) — this business's DHL bookings use dhl.com's tracking tool
   // directly, not the MyDHLi Global Forwarding portal.
   'DHL': 'https://www.dhl.com/za-en/home/tracking.html',
-  'DSV': 'https://www.dsv.com/en/our-solutions/track-and-trace',
+  // Confirmed 2026-08-24 by user — the actual portal this business uses,
+  // not dsv.com's public marketing page. Login-gated shipment list (no
+  // query param for a specific number), like MyDHLi/MSC.
+  'DSV': 'https://mydsv.com/new/tracking/shipment-list?shipmentType=IN_TRANSIT',
   'MSC': 'https://www.msc.com/en/track-a-shipment',
   'COSCO': 'https://elines.coscoshipping.com/ebusiness/cargoTracking',
   'ONE': 'https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking',
