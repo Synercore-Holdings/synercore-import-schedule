@@ -60,6 +60,19 @@ export const AIRFREIGHT_STATUSES = [
   ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
 ];
 
+// Unambiguously sea — before a shipment reaches a status shared by both
+// modes (in_transit_last_mile, arrived_*, delayed_*, cancelled). Airfreight
+// never moors, works berth, or gates through a port.
+export const SEAFREIGHT_STATUSES = [
+  ShipmentStatus.PLANNED_SEAFREIGHT,
+  ShipmentStatus.IN_TRANSIT_ROADWAY,
+  ShipmentStatus.IN_TRANSIT_SEAWAY,
+  ShipmentStatus.MOORED,
+  ShipmentStatus.BERTH_WORKING,
+  ShipmentStatus.BERTH_COMPLETE,
+  ShipmentStatus.GATED_IN_PORT,
+];
+
 // An AWB (air waybill) number is digits only (e.g. "724-79938666"); a vessel
 // name never is — use that as a last-resort signal when neither the status
 // nor the forwarding agent tell us the freight mode.
@@ -69,16 +82,20 @@ export const looksLikeAwbNumber = (value) => {
   return /^\d+$/.test(digitsOnly) && digitsOnly.length >= 10 && digitsOnly.length <= 12;
 };
 
-// Status alone is ambiguous once a shipment reaches a status shared by both
-// modes (e.g. in_transit_last_mile, arrived_*) — fall back to the already
-// selected forwarding agent (chosen from a mode-specific list), then to the
-// shape of the vessel/AWB value itself.
+// An unambiguous status is authoritative and must win over the forwarding
+// agent — a shipment explicitly marked planned_airfreight is airfreight
+// even if its agent field happens to hold a stale/wrong seafreight-listed
+// value (agent data errors do happen — see the DHL Express cleanup). Only
+// once status itself is ambiguous (shared by both modes: in_transit_last_mile,
+// arrived_*, delayed_*, cancelled, or missing) do we fall back to the agent,
+// then to the shape of the vessel/AWB value itself.
 export const isAirfreight = (status, forwardingAgent, vesselOrAwb) => {
+  if (AIRFREIGHT_STATUSES.includes(status)) return true;
+  if (SEAFREIGHT_STATUSES.includes(status)) return false;
   if (forwardingAgent) {
     if (AIRFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return true;
     if (SEAFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return false;
   }
-  if (AIRFREIGHT_STATUSES.includes(status)) return true;
   return looksLikeAwbNumber(vesselOrAwb);
 };
 

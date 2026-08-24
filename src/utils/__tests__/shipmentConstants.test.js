@@ -2,6 +2,7 @@ import {
   AIRFREIGHT_AGENTS,
   SEAFREIGHT_AGENTS,
   AIRFREIGHT_STATUSES,
+  SEAFREIGHT_STATUSES,
   isAirfreight,
   looksLikeAwbNumber,
   getShippingProgress,
@@ -126,6 +127,42 @@ describe('isAirfreight', () => {
   it('falls back to the AWB/vessel value when status and agent are both ambiguous', () => {
     expect(isAirfreight('in_transit_last_mile', '', '72479938666')).toBe(true);
     expect(isAirfreight('in_transit_last_mile', '', 'MSC OSCAR')).toBe(false);
+  });
+
+  it('an unambiguous status wins over a stale/wrong agent value (e.g. bad data entry)', () => {
+    // Real case: a shipment stuck with a seafreight-listed agent (data
+    // error) but an explicit, unambiguous airfreight status — the status
+    // must not be overridden by the wrong agent.
+    expect(isAirfreight('planned_airfreight', 'DHL')).toBe(true);
+    expect(isAirfreight('in_transit_airfreight', 'MSC')).toBe(true);
+    expect(isAirfreight('planned_seafreight', 'Emirates SkyCargo')).toBe(false);
+    expect(isAirfreight('in_transit_seaway', 'Qatar Airways Cargo')).toBe(false);
+  });
+});
+
+describe('SEAFREIGHT_STATUSES', () => {
+  it('is a non-empty array', () => {
+    expect(Array.isArray(SEAFREIGHT_STATUSES)).toBe(true);
+    expect(SEAFREIGHT_STATUSES.length).toBeGreaterThan(0);
+  });
+
+  it('contains the pre-arrival sea statuses', () => {
+    expect(SEAFREIGHT_STATUSES).toContain('planned_seafreight');
+    expect(SEAFREIGHT_STATUSES).toContain('in_transit_seaway');
+    expect(SEAFREIGHT_STATUSES).toContain('moored');
+    expect(SEAFREIGHT_STATUSES).toContain('gated_in_port');
+  });
+
+  it('does not contain shared/ambiguous statuses', () => {
+    expect(SEAFREIGHT_STATUSES).not.toContain('in_transit_last_mile');
+    expect(SEAFREIGHT_STATUSES).not.toContain('arrived_pta');
+  });
+
+  it('has no overlap with AIRFREIGHT_STATUSES', () => {
+    const airSet = new Set(AIRFREIGHT_STATUSES);
+    for (const s of SEAFREIGHT_STATUSES) {
+      expect(airSet.has(s)).toBe(false);
+    }
   });
 });
 
