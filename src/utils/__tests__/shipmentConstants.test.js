@@ -299,6 +299,7 @@ describe('getAwbTrackingUrl', () => {
 describe('getBolTrackingUrl', () => {
   it('builds a prefilled deep link for a known carrier', () => {
     expect(getBolTrackingUrl('Maersk', 'ABC123')).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getBolTrackingUrl('DHL', 'ABC123')).toBe('https://www.dhl.com/za-en/home/tracking.html?tracking-id=ABC123&submit=1');
     expect(getBolTrackingUrl('CMA CGM', 'ABC123')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=ABC123');
     expect(getBolTrackingUrl('Hapag-Lloyd', 'ABC123')).toBe('https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=ABC123');
   });

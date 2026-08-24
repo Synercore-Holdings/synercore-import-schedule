@@ -100,7 +100,7 @@ export const AGENT_TRACKING_URLS = {
   'Air France-KLM Cargo': 'https://www.afklcargo.com/track',
   'Ethiopian Airlines Cargo': 'https://cargo.ethiopianairlines.com/tracking',
   // Seafreight / forwarders
-  'DHL': 'https://www.dhl.com/global-en/home/tracking.html',
+  'DHL': 'https://www.dhl.com/za-en/home/tracking.html',
   'DSV': 'https://www.dsv.com/en/our-solutions/track-and-trace',
   'MSC': 'https://www.msc.com/en/track-a-shipment',
   'COSCO': 'https://elines.coscoshipping.com/ebusiness/cargoTracking',
@@ -132,10 +132,13 @@ export const getAwbTrackingUrl = (awbNumber) => {
 // falls back to their bare tracking page from AGENT_TRACKING_URLS.
 const BOL_TRACKING_URL_BUILDERS = {
   'Maersk': (bol) => `https://www.maersk.com/tracking/${encodeURIComponent(bol)}`,
-  // MSC: 'trackingNumber' confirmed WRONG by user testing on 2026-08-24 (2 real
-  // orders didn't prefill) — msc.com blocks automated fetches (403) so this
-  // can't be reverse-engineered from here either. Falls back to the bare page
-  // until someone captures the real URL from a manual search on msc.com.
+  // MSC: no deep-linking is possible at all — confirmed by user testing on
+  // 2026-08-24 that MSC's search is client-side state, not URL-driven (the
+  // address bar stayed on the plain tracking page after a manual search).
+  // Falls back to the bare page; don't re-attempt a query-param guess here.
+  // DHL: confirmed working by user testing on 2026-08-24 — exact URL captured
+  // from a manual search: https://www.dhl.com/za-en/home/tracking.html?tracking-id=PKGA86211&submit=1
+  'DHL': (bol) => `https://www.dhl.com/za-en/home/tracking.html?tracking-id=${encodeURIComponent(bol)}&submit=1`,
   'CMA CGM': (bol) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(bol)}`,
   'Hapag-Lloyd': (bol) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=${encodeURIComponent(bol)}`,
 };
