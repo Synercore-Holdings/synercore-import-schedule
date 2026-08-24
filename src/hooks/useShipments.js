@@ -110,6 +110,7 @@ export function useShipments() {
         vesselName: s.vessel_name || s.vesselName,
         bolNumber: s.bol_number || s.bolNumber || '',
         containerNumber: s.container_number || s.containerNumber || '',
+        shippingLine: s.shipping_line || s.shippingLine || '',
         incoterm: s.incoterm,
         notes: s.notes,
         createdAt: s.created_at || s.createdAt,

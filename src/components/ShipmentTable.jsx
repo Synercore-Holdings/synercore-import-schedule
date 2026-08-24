@@ -860,12 +860,12 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           </svg>
                         </a>
                       )}
-                      {!isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && shipment.bolNumber && getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber) && (
+                      {!isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && shipment.bolNumber && getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber, shipment.shippingLine) && (
                         <a
-                          href={getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber)}
+                          href={getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber, shipment.shippingLine)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={`Track BOL on ${shipment.forwardingAgent}`}
+                          title={`Track BOL on ${shipment.shippingLine || shipment.forwardingAgent}`}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -888,12 +888,12 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           </svg>
                         </a>
                       )}
-                      {!isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && shipment.containerNumber && getContainerTrackingUrl(shipment.forwardingAgent, shipment.containerNumber) && (
+                      {!isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && shipment.containerNumber && getContainerTrackingUrl(shipment.forwardingAgent, shipment.containerNumber, shipment.shippingLine) && (
                         <a
-                          href={getContainerTrackingUrl(shipment.forwardingAgent, shipment.containerNumber)}
+                          href={getContainerTrackingUrl(shipment.forwardingAgent, shipment.containerNumber, shipment.shippingLine)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={`Track Container on ${shipment.forwardingAgent}`}
+                          title={`Track Container on ${shipment.shippingLine || shipment.forwardingAgent}`}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',

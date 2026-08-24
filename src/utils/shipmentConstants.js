@@ -33,6 +33,22 @@ export const SEAFREIGHT_AGENTS = [
   { value: 'OOCL', label: 'OOCL' },
 ];
 
+// Freight forwarders in SEAFREIGHT_AGENTS above who book space on someone
+// else's vessel rather than operating one themselves — their own tracking
+// tool (if any) won't have container-level ocean tracking data, since they
+// didn't physically carry the container. Used to derive SHIPPING_LINES.
+const SEA_FORWARDER_ONLY_VALUES = ['DHL', 'DSV', 'Afrigistics'];
+
+// The actual ocean carriers (who operate the vessel) — a separate, optional
+// field from Forwarding Agent, since a shipment is often booked through a
+// forwarder (DHL, DSV, Afrigistics) but physically carried by one of these.
+// Both are worth recording independently: which carrier a given forwarder
+// actually uses (by origin, over time) is itself useful data, and having
+// both lets you cross-check that the two tracking sources agree.
+export const SHIPPING_LINES = SEAFREIGHT_AGENTS.filter(
+  a => !SEA_FORWARDER_ONLY_VALUES.includes(a.value)
+);
+
 export const AIRFREIGHT_STATUSES = [
   ShipmentStatus.PLANNED_AIRFREIGHT,
   ShipmentStatus.IN_TRANSIT_AIRFREIGHT,
@@ -143,11 +159,15 @@ const BOL_TRACKING_URL_BUILDERS = {
   'Hapag-Lloyd': (bol) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=${encodeURIComponent(bol)}`,
 };
 
-export const getBolTrackingUrl = (forwardingAgent, bolNumber) => {
-  if (forwardingAgent && bolNumber && BOL_TRACKING_URL_BUILDERS[forwardingAgent]) {
-    return BOL_TRACKING_URL_BUILDERS[forwardingAgent](bolNumber);
+// The actual carrier (shippingLine) has the real tracking data — prefer it
+// over forwardingAgent whenever both are known, since a forwarder's own site
+// won't have container-level data for a vessel it doesn't operate.
+export const getBolTrackingUrl = (forwardingAgent, bolNumber, shippingLine) => {
+  const carrier = shippingLine || forwardingAgent;
+  if (carrier && bolNumber && BOL_TRACKING_URL_BUILDERS[carrier]) {
+    return BOL_TRACKING_URL_BUILDERS[carrier](bolNumber);
   }
-  return getAgentTrackingUrl(forwardingAgent);
+  return getAgentTrackingUrl(carrier);
 };
 
 // Container-number deep links — deliberately a SEPARATE, smaller list from
@@ -160,9 +180,10 @@ const CONTAINER_TRACKING_URL_BUILDERS = {
   'CMA CGM': (container) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(container)}`,
 };
 
-export const getContainerTrackingUrl = (forwardingAgent, containerNumber) => {
-  if (forwardingAgent && containerNumber && CONTAINER_TRACKING_URL_BUILDERS[forwardingAgent]) {
-    return CONTAINER_TRACKING_URL_BUILDERS[forwardingAgent](containerNumber);
+export const getContainerTrackingUrl = (forwardingAgent, containerNumber, shippingLine) => {
+  const carrier = shippingLine || forwardingAgent;
+  if (carrier && containerNumber && CONTAINER_TRACKING_URL_BUILDERS[carrier]) {
+    return CONTAINER_TRACKING_URL_BUILDERS[carrier](containerNumber);
   }
-  return getAgentTrackingUrl(forwardingAgent);
+  return getAgentTrackingUrl(carrier);
 };

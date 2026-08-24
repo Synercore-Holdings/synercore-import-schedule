@@ -28,6 +28,7 @@ export interface CreateShipmentRequest {
   vesselName?: string;
   bolNumber?: string;
   containerNumber?: string;
+  shippingLine?: string;
   incoterm?: string;
   selectedWeekDate?: string;
   shipmentType?: 'international' | 'local' | 'iwt';
@@ -57,6 +58,7 @@ export interface UpdateShipmentRequest {
   vesselName?: string;
   bolNumber?: string;
   containerNumber?: string;
+  shippingLine?: string;
   incoterm?: string;
   selectedWeekDate?: string;
   updatedAt?: string;
@@ -104,6 +106,7 @@ export interface BulkImportShipment {
   vesselName?: string;
   bolNumber?: string;
   containerNumber?: string;
+  shippingLine?: string;
   selectedWeekDate?: string;
   updatedAt?: string;
   reminderDate?: string;
@@ -242,6 +245,7 @@ export class ShipmentController {
       vessel_name: data.vesselName || null,
       bol_number: data.bolNumber || null,
       container_number: data.containerNumber || null,
+      shipping_line: data.shippingLine || null,
       incoterm: data.incoterm || null,
       selected_week_date: data.selectedWeekDate ? new Date(data.selectedWeekDate) : null,
       // Captured once and never updated afterward — supplier performance
@@ -324,6 +328,9 @@ export class ShipmentController {
     }
     if (data.containerNumber !== undefined) {
       dbData.container_number = data.containerNumber;
+    }
+    if (data.shippingLine !== undefined) {
+      dbData.shipping_line = data.shippingLine;
     }
     if (data.incoterm !== undefined) {
       dbData.incoterm = data.incoterm;
@@ -1107,10 +1114,10 @@ export class ShipmentController {
           `INSERT INTO shipments (
             id, supplier, order_ref, final_pod, latest_status, week_number,
             product_name, quantity, cbm, pallet_qty, receiving_warehouse, notes, updated_at,
-            forwarding_agent, incoterm, vessel_name, bol_number, container_number, selected_week_date,
+            forwarding_agent, incoterm, vessel_name, bol_number, container_number, shipping_line, selected_week_date,
             reminder_date, reminder_note, shipment_type,
             original_week_number, original_selected_week_date
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
           [
             id,
             shipment.supplier,
@@ -1130,6 +1137,7 @@ export class ShipmentController {
             shipment.vesselName || null,
             shipment.bolNumber || null,
             shipment.containerNumber || null,
+            shipment.shippingLine || null,
             shipment.selectedWeekDate || null,
             shipment.reminderDate || null,
             shipment.reminderNote || null,

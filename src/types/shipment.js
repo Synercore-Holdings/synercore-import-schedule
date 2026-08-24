@@ -263,6 +263,7 @@ export class Shipment {
     vesselName = '',
     bolNumber = '',
     containerNumber = '',
+    shippingLine = '',
     incoterm = '',
     priority = ShipmentPriority.MEDIUM,
     notes = '',
@@ -299,6 +300,7 @@ export class Shipment {
     this.vesselName = vesselName;
     this.bolNumber = bolNumber;
     this.containerNumber = containerNumber;
+    this.shippingLine = shippingLine;
     this.incoterm = incoterm;
     this.priority = priority;
     this.notes = notes;

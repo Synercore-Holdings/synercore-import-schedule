@@ -441,6 +441,17 @@ async function start() {
       logWarn('Container number column migration warning', { error: error.message });
     }
 
+    // Add shipping line column to shipments — the actual ocean carrier,
+    // distinct from forwarding_agent (who the shipment was booked through).
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS shipping_line VARCHAR(255);
+      `);
+      logger.info('Shipping line column ready');
+    } catch (error) {
+      logWarn('Shipping line column migration warning', { error: error.message });
+    }
+
     // Add original_week_number/original_selected_week_date to shipments.
     // Week/selectedWeekDate get overwritten whenever a shipment is rescheduled,
     // so on-time/lead-time metrics were measuring drift from the latest edit

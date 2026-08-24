@@ -91,6 +91,10 @@ const OrderDetailsModal = ({ isOpen, shipment, onClose }) => {
           <span style={valueStyle}>{shipment.forwardingAgent || '—'}</span>
         </div>
         <div>
+          <label style={labelStyle}>Shipping Line</label>
+          <span style={valueStyle}>{shipment.shippingLine || '—'}</span>
+        </div>
+        <div>
           <label style={labelStyle}>{isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 'AWB Number' : 'Vessel Name'}</label>
           <span style={valueStyle}>{shipment.vesselName || '—'}</span>
         </div>

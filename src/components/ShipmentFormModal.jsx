@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useFormDraft from '../hooks/useFormDraft';
-import { isAirfreight, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl, getContainerTrackingUrl } from '../utils/shipmentConstants';
+import { isAirfreight, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl, getContainerTrackingUrl, SHIPPING_LINES } from '../utils/shipmentConstants';
 import WeekCalendar from './WeekCalendar';
 import ResizableModal from './ResizableModal';
 import { useNotification } from '../contexts/NotificationContext';
@@ -20,6 +20,7 @@ const EMPTY_FORM = {
   vesselName: '',
   bolNumber: '',
   containerNumber: '',
+  shippingLine: '',
   incoterm: '',
   notes: '',
   reminderDate: '',
@@ -537,6 +538,27 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
           </select>
         </div>
 
+        {/* Shipping Line — the actual ocean carrier, when different from the
+            forwarding agent booked through (e.g. booked via DHL, carried by ONE) */}
+        {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Shipping Line
+            </label>
+            <select
+              value={formData.shippingLine || ''}
+              onChange={(e) => handleInputChange('shippingLine', e.target.value)}
+              className="select"
+              style={{ width: '100%' }}
+            >
+              <option value="">Same as Forwarding Agent / unknown</option>
+              {SHIPPING_LINES.map(line => (
+                <option key={line.value} value={line.value}>{line.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Vessel / AWB */}
         <div>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
@@ -566,14 +588,14 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
         <div>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
             <span>BOL Number</span>
-            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getBolTrackingUrl(formData.forwardingAgent, formData.bolNumber) && (
+            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getBolTrackingUrl(formData.forwardingAgent, formData.bolNumber, formData.shippingLine) && (
               <a
-                href={getBolTrackingUrl(formData.forwardingAgent, formData.bolNumber)}
+                href={getBolTrackingUrl(formData.forwardingAgent, formData.bolNumber, formData.shippingLine)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
               >
-                Track BOL on {formData.forwardingAgent} →
+                Track BOL on {formData.shippingLine || formData.forwardingAgent} →
               </a>
             )}
           </label>
@@ -591,14 +613,14 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
         <div>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
             <span>Container Number</span>
-            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getContainerTrackingUrl(formData.forwardingAgent, formData.containerNumber) && (
+            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getContainerTrackingUrl(formData.forwardingAgent, formData.containerNumber, formData.shippingLine) && (
               <a
-                href={getContainerTrackingUrl(formData.forwardingAgent, formData.containerNumber)}
+                href={getContainerTrackingUrl(formData.forwardingAgent, formData.containerNumber, formData.shippingLine)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
               >
-                Track Container on {formData.forwardingAgent} →
+                Track Container on {formData.shippingLine || formData.forwardingAgent} →
               </a>
             )}
           </label>

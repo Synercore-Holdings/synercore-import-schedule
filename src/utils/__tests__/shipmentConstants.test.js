@@ -12,6 +12,7 @@ import {
   getAwbTrackingUrl,
   getBolTrackingUrl,
   getContainerTrackingUrl,
+  SHIPPING_LINES,
 } from '../shipmentConstants.js';
 
 describe('AIRFREIGHT_AGENTS', () => {
@@ -336,5 +337,40 @@ describe('getContainerTrackingUrl', () => {
 
   it('returns null when the agent has no tracking tool at all', () => {
     expect(getContainerTrackingUrl('Afrigistics', 'MSCU1234567')).toBe(null);
+  });
+});
+
+describe('SHIPPING_LINES', () => {
+  it('is a non-empty array', () => {
+    expect(Array.isArray(SHIPPING_LINES)).toBe(true);
+    expect(SHIPPING_LINES.length).toBeGreaterThan(0);
+  });
+
+  it('excludes freight-forwarder-only agents (DHL, DSV, Afrigistics)', () => {
+    const values = SHIPPING_LINES.map(l => l.value);
+    expect(values).not.toContain('DHL');
+    expect(values).not.toContain('DSV');
+    expect(values).not.toContain('Afrigistics');
+  });
+
+  it('includes the actual ocean carriers', () => {
+    const values = SHIPPING_LINES.map(l => l.value);
+    expect(values).toContain('Maersk');
+    expect(values).toContain('MSC');
+    expect(values).toContain('ONE');
+  });
+});
+
+describe('getBolTrackingUrl / getContainerTrackingUrl with shippingLine', () => {
+  it('prefers shippingLine over forwardingAgent when both are set', () => {
+    // Booked through DHL (forwarder) but actually carried by ONE — ONE has
+    // the real tracking data, not DHL.
+    expect(getBolTrackingUrl('DHL', 'ABC123', 'Maersk')).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getContainerTrackingUrl('DHL', 'MSCU1234567', 'CMA CGM')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=MSCU1234567');
+  });
+
+  it('falls back to forwardingAgent when shippingLine is not set', () => {
+    expect(getBolTrackingUrl('Maersk', 'ABC123', '')).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getBolTrackingUrl('Maersk', 'ABC123', undefined)).toBe('https://www.maersk.com/tracking/ABC123');
   });
 });

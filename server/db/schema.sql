@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   vessel_name VARCHAR(255),
   bol_number VARCHAR(255),
   container_number VARCHAR(255),
+  shipping_line VARCHAR(255),
   selected_week_date TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   -- Post-arrival workflow fields
