@@ -394,7 +394,7 @@ export class ExcelProcessor {
       'QUANTITY': 1000,
       'PALLET QTY': 4,
       'RECEIVING WAREHOUSE': 'PRETORIA',
-      'FORWARDING AGENT': 'DHL Express',
+      'FORWARDING AGENT': 'DHL',
       'VESSEL NAME': 'MSC MARINA',
       'INCOTERM': 'CIF',
       'NOTES': 'Example notes',
