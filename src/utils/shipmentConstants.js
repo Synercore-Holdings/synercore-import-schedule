@@ -39,7 +39,16 @@ export const AIRFREIGHT_STATUSES = [
   ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
 ];
 
-export const isAirfreight = (status) => AIRFREIGHT_STATUSES.includes(status);
+// Status alone is ambiguous once a shipment reaches a status shared by both
+// modes (e.g. in_transit_last_mile, arrived_*) — fall back to the already
+// selected forwarding agent, which is always chosen from a mode-specific list.
+export const isAirfreight = (status, forwardingAgent) => {
+  if (forwardingAgent) {
+    if (AIRFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return true;
+    if (SEAFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return false;
+  }
+  return AIRFREIGHT_STATUSES.includes(status);
+};
 
 export const getShippingProgress = (status) => {
   const stages = {
@@ -58,6 +67,6 @@ export const isAirfreightStatus = (status) => {
 };
 
 // Get forwarding agents based on shipment status
-export const getForwardingAgents = (status) => {
-  return isAirfreightStatus(status) ? AIRFREIGHT_AGENTS : SEAFREIGHT_AGENTS;
+export const getForwardingAgents = (status, forwardingAgent) => {
+  return isAirfreight(status, forwardingAgent) ? AIRFREIGHT_AGENTS : SEAFREIGHT_AGENTS;
 };

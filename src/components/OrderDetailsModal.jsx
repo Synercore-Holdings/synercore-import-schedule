@@ -1,15 +1,7 @@
 import React from 'react';
 import ResizableModal from './ResizableModal';
-import { ShipmentStatus } from '../types/shipment';
 import ShipmentTimeline from './ShipmentTimeline';
-
-const AIRFREIGHT_STATUSES = [
-  ShipmentStatus.PLANNED_AIRFREIGHT,
-  ShipmentStatus.IN_TRANSIT_AIRFREIGHT,
-  ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
-];
-
-const isAirfreight = (status) => AIRFREIGHT_STATUSES.includes(status);
+import { isAirfreight } from '../utils/shipmentConstants';
 
 const labelStyle = {
   display: 'block',
@@ -99,7 +91,7 @@ const OrderDetailsModal = ({ isOpen, shipment, onClose }) => {
           <span style={valueStyle}>{shipment.forwardingAgent || '—'}</span>
         </div>
         <div>
-          <label style={labelStyle}>{isAirfreight(shipment.latestStatus) ? 'AWB Number' : 'Vessel Name'}</label>
+          <label style={labelStyle}>{isAirfreight(shipment.latestStatus, shipment.forwardingAgent) ? 'AWB Number' : 'Vessel Name'}</label>
           <span style={valueStyle}>{shipment.vesselName || '—'}</span>
         </div>
         <div>
