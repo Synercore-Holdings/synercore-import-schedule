@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState } from 'react';
-import { isAirfreight } from '../utils/shipmentConstants';
+import { isAirfreight, isPureSeaForwarder } from '../utils/shipmentConstants';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement,
@@ -65,6 +65,15 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     return supplierCountryMap[name.toLowerCase()] || name || 'Unknown';
   }, [supplierCountryMap]);
 
+  // A Shipping Line only tells us something new for pure forwarders (DHL,
+  // DSV, Afrigistics) — they book space on someone else's vessel. If the
+  // agent is already an actual carrier (MSC, Maersk, ONE, ...), booked
+  // directly, that value IS the carrier: MSC uses MSC, Maersk uses Maersk.
+  const resolveCarrier = useCallback((s) => {
+    if (s.shippingLine) return s.shippingLine;
+    return isPureSeaForwarder(s.forwardingAgent) ? NOT_RECORDED : s.forwardingAgent;
+  }, []);
+
   const forwardingAgentNames = useMemo(() => {
     const names = new Set();
     seaShipments.forEach(s => names.add(s.forwardingAgent));
@@ -76,26 +85,33 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     const counts = {};
     seaShipments.forEach(s => {
       const agent = s.forwardingAgent;
-      const carrier = s.shippingLine || NOT_RECORDED;
+      const carrier = resolveCarrier(s);
       counts[agent] = counts[agent] || {};
       counts[agent][carrier] = (counts[agent][carrier] || 0) + 1;
     });
     return counts;
-  }, [seaShipments]);
+  }, [seaShipments, resolveCarrier]);
+
+  // Only pure forwarders can have a "missing" shipping line — a direct
+  // carrier booking is never missing one, its agent already is the carrier.
+  const forwarderOnlyShipments = useMemo(
+    () => seaShipments.filter(s => isPureSeaForwarder(s.forwardingAgent)),
+    [seaShipments]
+  );
 
   // ---- KPIs ----
   const kpis = useMemo(() => {
     const total = seaShipments.length;
-    const withLine = seaShipments.filter(s => s.shippingLine).length;
+    const withLine = forwarderOnlyShipments.filter(s => s.shippingLine).length;
     const distinctAgents = forwardingAgentNames.length;
-    const distinctCarriers = new Set(seaShipments.filter(s => s.shippingLine).map(s => s.shippingLine)).size;
+    const distinctCarriers = new Set(seaShipments.map(s => resolveCarrier(s)).filter(c => c !== NOT_RECORDED)).size;
     return {
       total,
-      completionPct: total > 0 ? Math.round((withLine / total) * 100) : 0,
+      completionPct: forwarderOnlyShipments.length > 0 ? Math.round((withLine / forwarderOnlyShipments.length) * 100) : 100,
       distinctAgents,
       distinctCarriers,
     };
-  }, [seaShipments, forwardingAgentNames]);
+  }, [seaShipments, forwardingAgentNames, forwarderOnlyShipments, resolveCarrier]);
 
   const completionColor = (pct) => pct >= 85 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
 
@@ -132,10 +148,10 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     },
   }), []);
 
-  // ---- Data completeness by agent ----
+  // ---- Data completeness by agent — pure forwarders only, see resolveCarrier ----
   const completeness = useMemo(() => {
     const byAgent = {};
-    seaShipments.forEach(s => {
+    forwarderOnlyShipments.forEach(s => {
       const agent = s.forwardingAgent;
       byAgent[agent] = byAgent[agent] || { agent, total: 0, missing: 0 };
       byAgent[agent].total++;
@@ -144,7 +160,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     return Object.values(byAgent)
       .map(d => ({ ...d, pct: d.total > 0 ? Math.round(((d.total - d.missing) / d.total) * 100) : 0 }))
       .sort((a, b) => a.pct - b.pct);
-  }, [seaShipments]);
+  }, [forwarderOnlyShipments]);
 
   // ---- Drill-down: origin x carrier, for selected agent (or all) ----
   const drillDownRows = useMemo(() => {
@@ -156,13 +172,13 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     relevant.forEach(s => {
       const agent = s.forwardingAgent;
       const origin = getOrigin(s);
-      const carrier = s.shippingLine || NOT_RECORDED;
+      const carrier = resolveCarrier(s);
       const key = `${agent}|||${origin}|||${carrier}`;
       if (!rows[key]) rows[key] = { agent, origin, carrier, count: 0 };
       rows[key].count++;
     });
     return Object.values(rows).sort((a, b) => b.count - a.count);
-  }, [seaShipments, selectedAgent, getOrigin]);
+  }, [seaShipments, selectedAgent, getOrigin, resolveCarrier]);
 
   return (
     <div style={{ padding: '0 8px 32px' }}>
@@ -204,7 +220,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
           value={kpis.completionPct}
           suffix="%"
           color={completionColor(kpis.completionPct)}
-          subtext="Of sea shipments with a forwarding agent"
+          subtext="Of shipments booked via a pure forwarder (DHL, DSV, Afrigistics)"
         />
         <KpiCard
           label="Distinct Forwarding Agents"
@@ -221,7 +237,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
 
       {/* Chart */}
       <div style={{ marginBottom: 24 }}>
-        <ChartCard title="Shipping Line used per Forwarding Agent" subtitle="Stacked by carrier, grey = not recorded">
+        <ChartCard title="Shipping Line used per Forwarding Agent" subtitle="Direct-carrier agents (MSC, Maersk, ...) always show as themselves; grey = a forwarder booking with no carrier recorded yet">
           {chartData.labels.length > 0
             ? <div style={{ height: Math.max(260, chartData.labels.length * 40) }}><BarChart data={chartData} options={chartOptions} /></div>
             : <ChartEmpty label="No sea-freight shipments with a forwarding agent yet" />}
@@ -229,7 +245,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
       </div>
 
       {/* Data completeness */}
-      <ChartCard title="Shipping Line Data Completeness" subtitle="Lowest first — where to focus data entry" style={{ marginBottom: 24 }}>
+      <ChartCard title="Shipping Line Data Completeness" subtitle="Pure forwarders only (DHL, DSV, Afrigistics) — lowest first" style={{ marginBottom: 24 }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

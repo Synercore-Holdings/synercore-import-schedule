@@ -37,7 +37,12 @@ export const SEAFREIGHT_AGENTS = [
 // else's vessel rather than operating one themselves — their own tracking
 // tool (if any) won't have container-level ocean tracking data, since they
 // didn't physically carry the container. Used to derive SHIPPING_LINES.
-const SEA_FORWARDER_ONLY_VALUES = ['DHL', 'DSV', 'Afrigistics'];
+// A Shipping Line only makes sense for these — if the Forwarding Agent is
+// already an actual carrier (MSC, Maersk, ONE, ...), booked directly, that
+// value IS the carrier; there's nothing separate to record.
+export const SEA_FORWARDER_ONLY_VALUES = ['DHL', 'DSV', 'Afrigistics'];
+
+export const isPureSeaForwarder = (forwardingAgent) => SEA_FORWARDER_ONLY_VALUES.includes(forwardingAgent);
 
 // The actual ocean carriers (who operate the vessel) — a separate, optional
 // field from Forwarding Agent, since a shipment is often booked through a

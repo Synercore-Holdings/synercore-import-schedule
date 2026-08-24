@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useFormDraft from '../hooks/useFormDraft';
-import { isAirfreight, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl, getContainerTrackingUrl, SHIPPING_LINES } from '../utils/shipmentConstants';
+import { isAirfreight, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl, getContainerTrackingUrl, SHIPPING_LINES, isPureSeaForwarder } from '../utils/shipmentConstants';
 import WeekCalendar from './WeekCalendar';
 import ResizableModal from './ResizableModal';
 import { useNotification } from '../contexts/NotificationContext';
@@ -113,6 +113,17 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
 
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  // Shipping Line only applies to pure forwarders (DHL, DSV, Afrigistics) —
+  // clear a stale value when switching to an agent that's already a carrier,
+  // since its field disappears and shouldn't silently keep submitting.
+  const handleForwardingAgentChange = useCallback((value) => {
+    setFormData(prev => ({
+      ...prev,
+      forwardingAgent: value,
+      shippingLine: isPureSeaForwarder(value) ? prev.shippingLine : '',
+    }));
   }, []);
 
   const handleSupplierChange = useCallback((value) => {
@@ -527,7 +538,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
           </label>
           <select
             value={formData.forwardingAgent || ''}
-            onChange={(e) => handleInputChange('forwardingAgent', e.target.value)}
+            onChange={(e) => handleForwardingAgentChange(e.target.value)}
             className="select"
             style={{ width: '100%' }}
           >
@@ -538,9 +549,11 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
           </select>
         </div>
 
-        {/* Shipping Line — the actual ocean carrier, when different from the
-            forwarding agent booked through (e.g. booked via DHL, carried by ONE) */}
-        {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && (
+        {/* Shipping Line — only relevant when Forwarding Agent is a pure
+            forwarder (DHL, DSV, Afrigistics) who books space on someone
+            else's vessel. If the agent is already an actual carrier (MSC,
+            Maersk, ONE, ...) booked directly, that value IS the carrier. */}
+        {isPureSeaForwarder(formData.forwardingAgent) && (
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
               Shipping Line
