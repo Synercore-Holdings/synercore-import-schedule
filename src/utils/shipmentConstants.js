@@ -116,3 +116,30 @@ export const AGENT_TRACKING_URLS = {
 // Returns the selected forwarding agent's own tracking page, or null if none
 // is known (e.g. SAA Cargo, Kenya Airways Cargo, Afrigistics, Evergreen).
 export const getAgentTrackingUrl = (forwardingAgent) => AGENT_TRACKING_URLS[forwardingAgent] || null;
+
+// track-trace.com's aircargo tool reliably prefills from a query string
+// regardless of airline, so AWB tracking always uses it directly rather than
+// sending the user to the airline's own (usually non-prefillable) page.
+export const getAwbTrackingUrl = (awbNumber) => {
+  if (!awbNumber) return null;
+  return `https://www.track-trace.com/aircargo?awb=${encodeURIComponent(awbNumber.replace(/\D/g, ''))}`;
+};
+
+// Best-effort prefilled deep links for the handful of ocean carriers whose
+// tracking-by-number query format is well documented and has been stable —
+// NOT guaranteed to still be accurate, since carriers change these without
+// notice. Report a broken one and it's a one-line fix. Every other agent
+// falls back to their bare tracking page from AGENT_TRACKING_URLS.
+const BOL_TRACKING_URL_BUILDERS = {
+  'Maersk': (bol) => `https://www.maersk.com/tracking/${encodeURIComponent(bol)}`,
+  'MSC': (bol) => `https://www.msc.com/en/track-a-shipment?trackingNumber=${encodeURIComponent(bol)}`,
+  'CMA CGM': (bol) => `https://www.cma-cgm.com/ebusiness/tracking/search?Reference=${encodeURIComponent(bol)}`,
+  'Hapag-Lloyd': (bol) => `https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=${encodeURIComponent(bol)}`,
+};
+
+export const getBolTrackingUrl = (forwardingAgent, bolNumber) => {
+  if (forwardingAgent && bolNumber && BOL_TRACKING_URL_BUILDERS[forwardingAgent]) {
+    return BOL_TRACKING_URL_BUILDERS[forwardingAgent](bolNumber);
+  }
+  return getAgentTrackingUrl(forwardingAgent);
+};

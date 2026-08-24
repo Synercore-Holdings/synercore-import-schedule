@@ -9,6 +9,8 @@ import {
   getForwardingAgents,
   AGENT_TRACKING_URLS,
   getAgentTrackingUrl,
+  getAwbTrackingUrl,
+  getBolTrackingUrl,
 } from '../shipmentConstants.js';
 
 describe('AIRFREIGHT_AGENTS', () => {
@@ -275,5 +277,43 @@ describe('getAgentTrackingUrl', () => {
     expect(getAgentTrackingUrl('')).toBe(null);
     expect(getAgentTrackingUrl(undefined)).toBe(null);
     expect(getAgentTrackingUrl('Some Random Agent')).toBe(null);
+  });
+});
+
+describe('getAwbTrackingUrl', () => {
+  it('builds a track-trace.com aircargo URL from the AWB number', () => {
+    expect(getAwbTrackingUrl('72479938666')).toBe('https://www.track-trace.com/aircargo?awb=72479938666');
+  });
+
+  it('strips non-digit characters (e.g. a dash) before building the URL', () => {
+    expect(getAwbTrackingUrl('724-79938666')).toBe('https://www.track-trace.com/aircargo?awb=72479938666');
+  });
+
+  it('returns null for empty/null/undefined', () => {
+    expect(getAwbTrackingUrl('')).toBe(null);
+    expect(getAwbTrackingUrl(null)).toBe(null);
+    expect(getAwbTrackingUrl(undefined)).toBe(null);
+  });
+});
+
+describe('getBolTrackingUrl', () => {
+  it('builds a prefilled deep link for a known carrier', () => {
+    expect(getBolTrackingUrl('Maersk', 'ABC123')).toBe('https://www.maersk.com/tracking/ABC123');
+    expect(getBolTrackingUrl('MSC', 'ABC123')).toBe('https://www.msc.com/en/track-a-shipment?trackingNumber=ABC123');
+    expect(getBolTrackingUrl('CMA CGM', 'ABC123')).toBe('https://www.cma-cgm.com/ebusiness/tracking/search?Reference=ABC123');
+    expect(getBolTrackingUrl('Hapag-Lloyd', 'ABC123')).toBe('https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=ABC123');
+  });
+
+  it('falls back to the bare agent tracking page when the BOL number is missing', () => {
+    expect(getBolTrackingUrl('Maersk', '')).toBe(AGENT_TRACKING_URLS['Maersk']);
+    expect(getBolTrackingUrl('Maersk', undefined)).toBe(AGENT_TRACKING_URLS['Maersk']);
+  });
+
+  it('falls back to the bare agent tracking page for a carrier with no known deep-link format', () => {
+    expect(getBolTrackingUrl('COSCO', 'ABC123')).toBe(AGENT_TRACKING_URLS['COSCO']);
+  });
+
+  it('returns null when the agent has no tracking tool at all', () => {
+    expect(getBolTrackingUrl('Afrigistics', 'ABC123')).toBe(null);
   });
 });

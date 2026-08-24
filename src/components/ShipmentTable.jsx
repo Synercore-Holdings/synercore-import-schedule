@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { ShipmentStatus, isDelayedStatus, SHIPPING_EXCLUDED_STATUSES } from '../types/shipment';
 import { getCurrentWeekNumber } from '../utils/dateUtils';
-import { isAirfreight, getShippingProgress, getForwardingAgents, getAgentTrackingUrl } from '../utils/shipmentConstants';
+import { isAirfreight, getShippingProgress, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl } from '../utils/shipmentConstants';
 import { generatePDF as generateShipmentPDF, generateExcel as generateShipmentExcel } from '../utils/shipmentExport';
 import WeekCalendar from './WeekCalendar';
 import BulkStatusUpdate from './BulkStatusUpdate';
@@ -833,12 +833,12 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                       {shipment.vesselName && (
                         <a
                           href={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName)
-                            ? (getAgentTrackingUrl(shipment.forwardingAgent) || `https://www.track-trace.com/aircargo?awb=${encodeURIComponent(shipment.vesselName.replace(/\D/g, ''))}`)
+                            ? getAwbTrackingUrl(shipment.vesselName)
                             : `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(shipment.vesselName)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? (getAgentTrackingUrl(shipment.forwardingAgent) ? `Track AWB on ${shipment.forwardingAgent}` : 'Track AWB') : 'Track vessel on VesselFinder'}
+                          title={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 'Track AWB' : 'Track vessel on VesselFinder'}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -860,9 +860,9 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           </svg>
                         </a>
                       )}
-                      {!isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && shipment.bolNumber && getAgentTrackingUrl(shipment.forwardingAgent) && (
+                      {!isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && shipment.bolNumber && getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber) && (
                         <a
-                          href={getAgentTrackingUrl(shipment.forwardingAgent)}
+                          href={getBolTrackingUrl(shipment.forwardingAgent, shipment.bolNumber)}
                           target="_blank"
                           rel="noopener noreferrer"
                           title={`Track BOL on ${shipment.forwardingAgent}`}

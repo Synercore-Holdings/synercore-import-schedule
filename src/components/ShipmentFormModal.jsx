@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useFormDraft from '../hooks/useFormDraft';
-import { isAirfreight, getForwardingAgents, getAgentTrackingUrl } from '../utils/shipmentConstants';
+import { isAirfreight, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl } from '../utils/shipmentConstants';
 import WeekCalendar from './WeekCalendar';
 import ResizableModal from './ResizableModal';
 import { useNotification } from '../contexts/NotificationContext';
@@ -540,14 +540,14 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
         <div>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
             <span>{isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB Number' : 'Vessel Name'}</span>
-            {isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getAgentTrackingUrl(formData.forwardingAgent) && (
+            {isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && formData.vesselName && (
               <a
-                href={getAgentTrackingUrl(formData.forwardingAgent)}
+                href={getAwbTrackingUrl(formData.vesselName)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
               >
-                Track AWB on {formData.forwardingAgent} →
+                Track AWB →
               </a>
             )}
           </label>
@@ -565,9 +565,9 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
         <div>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
             <span>BOL Number</span>
-            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getAgentTrackingUrl(formData.forwardingAgent) && (
+            {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && getBolTrackingUrl(formData.forwardingAgent, formData.bolNumber) && (
               <a
-                href={getAgentTrackingUrl(formData.forwardingAgent)}
+                href={getBolTrackingUrl(formData.forwardingAgent, formData.bolNumber)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}
