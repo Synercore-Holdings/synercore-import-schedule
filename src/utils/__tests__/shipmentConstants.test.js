@@ -3,6 +3,7 @@ import {
   SEAFREIGHT_AGENTS,
   AIRFREIGHT_STATUSES,
   isAirfreight,
+  looksLikeAwbNumber,
   getShippingProgress,
   isAirfreightStatus,
   getForwardingAgents,
@@ -105,6 +106,43 @@ describe('isAirfreight', () => {
   it('returns false for null/undefined', () => {
     expect(isAirfreight(null)).toBe(false);
     expect(isAirfreight(undefined)).toBe(false);
+  });
+
+  it('returns true for a shared status when the forwarding agent is an airfreight agent', () => {
+    expect(isAirfreight('in_transit_last_mile', 'Emirates SkyCargo')).toBe(true);
+    expect(isAirfreight('arrived_pta', 'Qatar Airways Cargo')).toBe(true);
+  });
+
+  it('returns false for a shared status when the forwarding agent is a seafreight agent', () => {
+    expect(isAirfreight('in_transit_last_mile', 'Maersk')).toBe(false);
+  });
+
+  it('falls back to the AWB/vessel value when status and agent are both ambiguous', () => {
+    expect(isAirfreight('in_transit_last_mile', '', '72479938666')).toBe(true);
+    expect(isAirfreight('in_transit_last_mile', '', 'MSC OSCAR')).toBe(false);
+  });
+});
+
+describe('looksLikeAwbNumber', () => {
+  it('returns true for digit-only AWB numbers', () => {
+    expect(looksLikeAwbNumber('72479938666')).toBe(true);
+    expect(looksLikeAwbNumber('724-79938666')).toBe(true);
+  });
+
+  it('returns false for vessel names', () => {
+    expect(looksLikeAwbNumber('MSC OSCAR')).toBe(false);
+    expect(looksLikeAwbNumber('EVER GIVEN')).toBe(false);
+  });
+
+  it('returns false for too-short or too-long digit strings', () => {
+    expect(looksLikeAwbNumber('12345')).toBe(false);
+    expect(looksLikeAwbNumber('1234567890123')).toBe(false);
+  });
+
+  it('returns false for empty/null/undefined', () => {
+    expect(looksLikeAwbNumber('')).toBe(false);
+    expect(looksLikeAwbNumber(null)).toBe(false);
+    expect(looksLikeAwbNumber(undefined)).toBe(false);
   });
 });
 

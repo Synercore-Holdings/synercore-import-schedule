@@ -39,15 +39,26 @@ export const AIRFREIGHT_STATUSES = [
   ShipmentStatus.AIR_CUSTOMS_CLEARANCE,
 ];
 
+// An AWB (air waybill) number is digits only (e.g. "724-79938666"); a vessel
+// name never is — use that as a last-resort signal when neither the status
+// nor the forwarding agent tell us the freight mode.
+export const looksLikeAwbNumber = (value) => {
+  if (!value) return false;
+  const digitsOnly = value.trim().replace(/[\s-]/g, '');
+  return /^\d+$/.test(digitsOnly) && digitsOnly.length >= 10 && digitsOnly.length <= 12;
+};
+
 // Status alone is ambiguous once a shipment reaches a status shared by both
 // modes (e.g. in_transit_last_mile, arrived_*) — fall back to the already
-// selected forwarding agent, which is always chosen from a mode-specific list.
-export const isAirfreight = (status, forwardingAgent) => {
+// selected forwarding agent (chosen from a mode-specific list), then to the
+// shape of the vessel/AWB value itself.
+export const isAirfreight = (status, forwardingAgent, vesselOrAwb) => {
   if (forwardingAgent) {
     if (AIRFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return true;
     if (SEAFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return false;
   }
-  return AIRFREIGHT_STATUSES.includes(status);
+  if (AIRFREIGHT_STATUSES.includes(status)) return true;
+  return looksLikeAwbNumber(vesselOrAwb);
 };
 
 export const getShippingProgress = (status) => {
@@ -67,6 +78,6 @@ export const isAirfreightStatus = (status) => {
 };
 
 // Get forwarding agents based on shipment status
-export const getForwardingAgents = (status, forwardingAgent) => {
-  return isAirfreight(status, forwardingAgent) ? AIRFREIGHT_AGENTS : SEAFREIGHT_AGENTS;
+export const getForwardingAgents = (status, forwardingAgent, vesselOrAwb) => {
+  return isAirfreight(status, forwardingAgent, vesselOrAwb) ? AIRFREIGHT_AGENTS : SEAFREIGHT_AGENTS;
 };

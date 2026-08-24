@@ -529,7 +529,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             style={{ width: '100%' }}
           >
             <option value="">Select Forwarding Agent</option>
-            {getForwardingAgents(formData.latestStatus, formData.forwardingAgent).map(agent => (
+            {getForwardingAgents(formData.latestStatus, formData.forwardingAgent, formData.vesselName).map(agent => (
               <option key={agent.value} value={agent.value}>{agent.label}</option>
             ))}
           </select>
@@ -538,7 +538,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
         {/* Vessel / AWB */}
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
-            {isAirfreight(formData.latestStatus, formData.forwardingAgent) ? 'AWB Number' : 'Vessel Name'}
+            {isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB Number' : 'Vessel Name'}
           </label>
           <input
             type="text"
@@ -546,7 +546,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             onChange={(e) => handleInputChange('vesselName', e.target.value)}
             className="input"
             style={{ width: '100%' }}
-            placeholder={isAirfreight(formData.latestStatus, formData.forwardingAgent) ? 'AWB number' : 'Vessel name'}
+            placeholder={isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB number' : 'Vessel name'}
           />
         </div>
 

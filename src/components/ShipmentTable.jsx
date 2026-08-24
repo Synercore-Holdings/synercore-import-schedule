@@ -282,7 +282,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
     const orderRef = (target?.orderRef || '').trim();
     if (!orderRef) return;
 
-    const vesselLabel = isAirfreight(target?.latestStatus, target?.forwardingAgent) ? 'AWB' : 'Vessel';
+    const vesselLabel = isAirfreight(target?.latestStatus, target?.forwardingAgent, target?.vesselName) ? 'AWB' : 'Vessel';
     const apoFieldDefs = [
       { key: 'vesselName', label: vesselLabel, normalize: (v) => (v || '').trim() },
       { key: 'incoterm', label: 'Incoterm', normalize: (v) => (v || '').trim() },
@@ -821,7 +821,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                         type="text"
                         value={(localTextValues[`${shipment.id}-vesselName`] ?? shipment.vesselName) || ''}
                         onChange={(e) => handleTextInputChange(shipment.id, 'vesselName', e.target.value)}
-                        placeholder={isAirfreight(shipment.latestStatus, shipment.forwardingAgent) ? 'AWB Number' : 'Vessel Name'}
+                        placeholder={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 'AWB Number' : 'Vessel Name'}
                         className="input"
                         style={{
                           minWidth: '120px',
@@ -832,13 +832,13 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                       />
                       {shipment.vesselName && (
                         <a
-                          href={isAirfreight(shipment.latestStatus, shipment.forwardingAgent)
+                          href={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName)
                             ? `https://www.track-trace.com/aircargo?awb=${encodeURIComponent(shipment.vesselName.replace(/\D/g, ''))}`
                             : `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(shipment.vesselName)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={isAirfreight(shipment.latestStatus, shipment.forwardingAgent) ? 'Track AWB' : 'Track vessel on VesselFinder'}
+                          title={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 'Track AWB' : 'Track vessel on VesselFinder'}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -899,7 +899,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                       }}
                     >
                       <option value="">Select Agent</option>
-                      {getForwardingAgents(edits[shipment.id]?.latestStatus ?? shipment.latestStatus, edits[shipment.id]?.forwardingAgent ?? shipment.forwardingAgent).map(agent => (
+                      {getForwardingAgents(edits[shipment.id]?.latestStatus ?? shipment.latestStatus, edits[shipment.id]?.forwardingAgent ?? shipment.forwardingAgent, edits[shipment.id]?.vesselName ?? shipment.vesselName).map(agent => (
                         <option key={agent.value} value={agent.value}>{agent.label}</option>
                       ))}
                     </select>
