@@ -201,7 +201,7 @@ export default function AlertHub({
                 onClick={() => {
                   if (a.meta?.orderRef) {
                     onMarkRead?.(a.id);
-                    const dest = viewForStatus(a.meta?.status);
+                    const dest = viewForStatus(a.meta);
                     navigate(`/${dest}?search=${encodeURIComponent(a.meta.orderRef)}`);
                     onClose();
                   }
@@ -235,10 +235,11 @@ export default function AlertHub({
                 )}
                 <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
                   {a.meta?.orderRef && (() => {
-                    const dest = viewForStatus(a.meta?.status);
+                    const dest = viewForStatus(a.meta);
                     const label = dest === 'stored' ? 'View in Stored Stock'
                       : dest === 'workflow' ? 'View in Workflow'
                       : dest === 'archives' ? 'View in Archives'
+                      : dest === 'rejections' ? 'View in Rejection Claims'
                       : 'View in Shipping';
                     return (
                       <button onClick={() => {
@@ -364,7 +365,9 @@ function DeliveryStatusIcon({ status }) {
   return null;
 }
 
-function viewForStatus(status) {
+function viewForStatus(meta) {
+  if (meta?.isClaim) return 'rejections';
+  const status = meta?.status;
   if (!status) return 'shipping';
   const postArrival = [
     'arrived_pta', 'arrived_klm', 'arrived_offsite',

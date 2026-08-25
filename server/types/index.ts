@@ -131,6 +131,12 @@ export interface Shipment {
   rejection_date?: Date;
   rejection_reason?: string;
   rejected_by?: string;
+  // Rejection claim tracking fields (supplier credit/refund follow-up)
+  claim_status?: string;
+  claim_reference?: string;
+  claim_notes?: string;
+  claim_updated_at?: Date;
+  claim_updated_by?: string;
   // Reminder fields
   reminder_date?: string | null;
   reminder_note?: string | null;

@@ -973,6 +973,33 @@ router.post(
 );
 
 /**
+ * PATCH /api/shipments/:id/claim
+ * Update the supplier credit/refund claim tracked against a rejected shipment
+ */
+router.patch(
+  '/:id/claim',
+  body('claimStatus').optional().isIn(['open', 'submitted', 'credited', 'closed']).withMessage('Invalid claim status'),
+  body('claimReference').optional().trim(),
+  body('claimNotes').optional().trim(),
+  asyncHandler(async (req: BodyRequest<{ claimStatus?: string; claimReference?: string; claimNotes?: string }>, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const shipment = await ShipmentController.updateClaim(
+      req.params.id!,
+      req.body.claimStatus,
+      req.body.claimReference,
+      req.body.claimNotes,
+      req.user?.username || req.user?.email
+    );
+
+    res.status(200).json({
+      data: shipment,
+      message: 'Claim updated successfully'
+    });
+  })
+);
+
+/**
  * POST /api/shipments/:id/damage-photos
  * Upload one or more photos of damaged goods for a failed-inspection shipment
  */

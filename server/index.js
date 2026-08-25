@@ -452,6 +452,20 @@ async function start() {
       logWarn('Shipment damage photos table migration warning', { error: error.message });
     }
 
+    // Add rejection-claim tracking columns to shipments (chasing supplier credit/refund)
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS claim_status VARCHAR(20);
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS claim_reference TEXT;
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS claim_notes TEXT;
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS claim_updated_at TIMESTAMP;
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS claim_updated_by TEXT;
+      `);
+      logger.info('Claim tracking columns ready');
+    } catch (error) {
+      logWarn('Claim tracking columns migration warning', { error: error.message });
+    }
+
     // Add container number column to shipments
     try {
       await getPool().query(`

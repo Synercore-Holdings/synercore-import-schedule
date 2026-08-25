@@ -28,6 +28,7 @@ const VIEW_TO_SECTION = {
   'capacity-offsite': 'warehouseCapacitySites',
   stored: 'warehouse',
   archives: 'warehouse',
+  rejections: 'warehouse',
   rates: 'finance',
   costing: 'finance',
   'export-costing': 'finance',
@@ -56,6 +57,7 @@ const VIEW_TITLES = {
   'capacity-offsite': 'Offsite Capacity',
   stored: 'Stored Stock',
   archives: 'Shipment Archives',
+  rejections: 'Rejection Claims',
   rates: 'Rates & Quotes',
   costing: 'Import Costing',
   'export-costing': 'Export Costing',
@@ -97,6 +99,7 @@ const GoodsReceiving = lazy(() => import('./components/GoodsReceiving'));
 const DockManagement = lazy(() => import('./components/DockManagement'));
 const LocalReceivingSchedule = lazy(() => import('./components/LocalReceivingSchedule'));
 const IWTIncoming = lazy(() => import('./components/IWTIncoming'));
+const RejectionsTracker = lazy(() => import('./components/RejectionsTracker'));
 
 import SupplierLogin from './pages/SupplierLogin';
 import ForgotPassword from './pages/ForgotPassword';
@@ -116,7 +119,7 @@ import {
   LayoutDashboard, Building2, Ship, Truck, Repeat, ClipboardList, Factory, Store,
   Package, Wallet, BarChart3, TrendingUp, Target, Inbox, ScrollText, FileText,
   Users, LogOut, Moon, Sun, BookOpen, Bell, Globe, Newspaper, MapPin, Settings as SettingsIcon,
-  Waves,
+  Waves, ShieldAlert,
 } from 'lucide-react';
 import './theme.css';
 
@@ -124,6 +127,15 @@ import './theme.css';
 initWebVitals();
 logWebVitalsToConsole();
 initializeAnalytics();
+
+// A shipment belongs on the Rejection Claims tracker if it's a full rejection
+// (archived via reject-shipment, with a reason recorded) or a partial receipt
+// (some quantity was rejected/damaged but the rest was accepted).
+function isRejectionClaim(s) {
+  const isFullReject = s.latestStatus === 'archived' && !!s.rejectionReason;
+  const isPartialReject = s.receivingStatus === 'partial' && (Number(s.quantity) || 0) > (Number(s.receivedQuantity) || 0);
+  return isFullReject || isPartialReject;
+}
 
 // Per-route loading fallback
 const PageLoader = () => (
@@ -500,6 +512,17 @@ function App() {
     );
   };
 
+  const RejectionsWrapper = () => {
+    const rejectionShipments = shipments.filter(isRejectionClaim);
+    return (
+      <RejectionsTracker
+        shipments={rejectionShipments}
+        onRefresh={fetchShipments}
+        loading={loading}
+      />
+    );
+  };
+
   const AccessDenied = () => (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <h2>Access Denied</h2>
@@ -591,6 +614,11 @@ function App() {
 
           const delayedCount = shipments.filter(s => s.latestStatus && s.latestStatus.startsWith('delayed_')).length;
           const workflowCount = shipments.filter(s => POST_ARRIVAL_STATUSES.includes(s.latestStatus)).length;
+          const rejectionsCount = shipments.filter(s => {
+            const claimStatus = s.claimStatus || 'open';
+            if (claimStatus === 'credited' || claimStatus === 'closed') return false;
+            return isRejectionClaim(s);
+          }).length;
 
           const navItems = {
             dashboard: { label: 'Dashboard', icon: LayoutDashboard, view: 'dashboard' },
@@ -605,6 +633,7 @@ function App() {
             capacityOffsite: { label: 'Offsite', icon: Factory, view: 'capacity-offsite' },
             stored: { label: 'Stored Stock', icon: Store, view: 'stored' },
             archives: { label: 'Shipment Archives', icon: Package, view: 'archives' },
+            rejections: { label: 'Rejection Claims', icon: ShieldAlert, view: 'rejections', badge: rejectionsCount, badgeType: 'danger' },
             rates: { label: 'Rates & Quotes', icon: Wallet, view: 'rates' },
             costing: { label: 'Import Costing', icon: BarChart3, view: 'costing' },
             exportCosting: { label: 'Export Costing', icon: BarChart3, view: 'export-costing' },
@@ -721,7 +750,7 @@ function App() {
               {match('Dashboard') && renderItem('dashboard')}
               {renderSection('Master Data', 'masterData', ['suppliers'])}
               {renderSection('Operations', 'operations', ['shipping', 'localReceiving', 'iwtIncoming', 'workflow', 'bolAudit'])}
-              {renderSection('Warehouse', 'warehouse', ['receiving', 'dockManagement', 'stored'])}
+              {renderSection('Warehouse', 'warehouse', ['receiving', 'dockManagement', 'stored', 'rejections'])}
               {renderSection('Warehouse Capacity per site', 'warehouseCapacitySites', ['capacityPretoria', 'capacityKlapmuts', 'capacityOffsite'])}
               {renderSection('Finance', 'finance', ['rates', 'costing', 'exportCosting', 'costingRequests'])}
               {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'forwarderCarrier', 'audit'])}
@@ -1025,6 +1054,9 @@ function App() {
             } />
             <Route path="/archives" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><ArchiveView /></ErrorBoundary></Suspense>
+            } />
+            <Route path="/rejections" element={
+              <Suspense fallback={<PageLoader />}><ErrorBoundary><RejectionsWrapper /></ErrorBoundary></Suspense>
             } />
             <Route path="/rates" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><RatesQuotes loading={loading} /></ErrorBoundary></Suspense>

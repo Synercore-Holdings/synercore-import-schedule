@@ -13,7 +13,34 @@ export function computeShipmentAlerts(shipments) {
   startOfNextWeek.setHours(0,0,0,0);
 
   for (const s of shipments) {
-    // Skip archived shipments — they should not generate alerts
+    // Rejection claims still awaiting supplier credit/refund — checked before
+    // the archived skip below, since a fully-rejected shipment is archived.
+    const isPartialReject = s.receivingStatus === 'partial' && (Number(s.quantity) || 0) > (Number(s.receivedQuantity) || 0);
+    const isFullReject = s.latestStatus === 'archived' && !!s.rejectionReason;
+    if (isPartialReject || isFullReject) {
+      const claimStatus = s.claimStatus || 'open';
+      if (claimStatus !== 'credited' && claimStatus !== 'closed') {
+        const rejectedQty = isFullReject ? (Number(s.quantity) || 0) : (Number(s.quantity) || 0) - (Number(s.receivedQuantity) || 0);
+        alerts.push({
+          id: `claim-${s.orderRef || s.id}`,
+          ts: now,
+          read: false,
+          severity: 'warning',
+          title: 'Rejection Claim Open',
+          description: `${s.supplier} - ${s.productName || s.orderRef}: ${rejectedQty} units rejected, awaiting supplier credit/refund.`,
+          meta: {
+            supplier: s.supplier,
+            product: s.productName,
+            orderRef: s.orderRef,
+            status: s.latestStatus,
+            isClaim: true,
+            rejectedQty
+          }
+        });
+      }
+    }
+
+    // Skip archived shipments — they should not generate other alert types
     if (s.latestStatus === 'archived') continue;
 
     // Use orderRef as the dedup key so duplicate APO numbers produce one alert

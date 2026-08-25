@@ -72,7 +72,12 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'source_warehouse',
     'source_pallet_ref',
     'batch_lot',
-    'release_number'
+    'release_number',
+    'claim_status',
+    'claim_reference',
+    'claim_notes',
+    'claim_updated_at',
+    'claim_updated_by'
   ];
 
   /**

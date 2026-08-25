@@ -456,6 +456,31 @@ export class ShipmentController {
   }
 
   /**
+   * Update the supplier credit/refund claim tracked against a rejected or
+   * partially-received shipment (see the Rejection Claims tracker).
+   */
+  static async updateClaim(
+    id: string,
+    claimStatus?: string,
+    claimReference?: string,
+    claimNotes?: string,
+    updatedBy?: string
+  ): Promise<Shipment> {
+    await this.getShipment(id);
+
+    const updateData: Record<string, any> = {
+      claim_updated_by: updatedBy || '',
+      claim_updated_at: new Date(),
+      updated_at: new Date()
+    };
+    if (claimStatus !== undefined) updateData.claim_status = claimStatus;
+    if (claimReference !== undefined) updateData.claim_reference = claimReference;
+    if (claimNotes !== undefined) updateData.claim_notes = claimNotes;
+
+    return shipmentRepository.update(id, updateData as Partial<Shipment>);
+  }
+
+  /**
    * Unarchive shipment
    */
   static async unarchiveShipment(id: string): Promise<Shipment> {
