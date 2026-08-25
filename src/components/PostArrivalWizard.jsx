@@ -538,8 +538,9 @@ function PostArrivalWizard({
   } else if (action === 'start-receiving') {
     // For starting receiving, only show receiving step
     steps = allSteps.filter(s => s.id === 'receiving' || s.id === 'review');
-  } else if (action === 'complete-receiving') {
-    // For completing receiving, only show receiving step
+  } else if (action === 'complete-receiving' || action === 'receive-partial') {
+    // For completing receiving (or receiving the accepted balance after a failed
+    // inspection in one step), show the full receiving step, not the start-only version
     steps = allSteps.filter(s => s.id === 'receiving' || s.id === 'review');
   }
 

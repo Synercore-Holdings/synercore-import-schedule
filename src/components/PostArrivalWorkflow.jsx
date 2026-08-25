@@ -239,7 +239,7 @@ function PostArrivalWorkflow() {
       actions.push({ key: 'start-receiving', label: 'Start Receiving', icon: '📋', color: 'var(--navy-600)' });
     } else if (status === 'inspection_failed') {
       actions.push({ key: 'start-inspection', label: 'Re-inspect', icon: '🔍', color: 'var(--info)' });
-      actions.push({ key: 'start-receiving', label: 'Receive Accepted Balance', icon: '📋', color: 'var(--navy-600)' });
+      actions.push({ key: 'receive-partial', label: 'Receive Accepted Balance', icon: '📋', color: 'var(--navy-600)' });
       actions.push({ key: 'reject-shipment', label: 'Reject/Return to Supplier', icon: '↩️', color: 'var(--danger)' });
     } else if (status === 'receiving' || status === 'receiving_goods') {
       actions.push({ key: 'complete-receiving', label: 'Complete Receiving', icon: '✔️', color: 'var(--success)' });
@@ -262,6 +262,19 @@ function PostArrivalWorkflow() {
     if (action === 'reject-shipment') {
       setSelectedShipment(shipment);
       setShowRejectionDialog(true);
+      return;
+    }
+
+    if (action === 'receive-partial') {
+      // Traditional dialog only handles inspection_in_progress/inspection_passed/receiving_goods
+      // statuses, not inspection_failed, so always use the wizard for this action.
+      setSelectedShipment(shipment);
+      setWorkflowData({
+        ...workflowData,
+        workflowAction: action,
+        receivedQuantity: shipment.quantity || ''
+      });
+      setShowWizard(true);
       return;
     }
 
@@ -917,6 +930,41 @@ function PostArrivalWorkflow() {
               const currentStatus = selectedShipment.latest_status;
               const workflowAction = workflowData.workflowAction;
               let apiCalls = [];
+
+              // Handle receive-partial: accepting the balance of a failed-inspection
+              // shipment in one step. start-receiving must succeed before
+              // complete-receiving is valid, so these run sequentially, not via apiCalls.
+              if (workflowAction === 'receive-partial') {
+                const startRes = await authFetch(getApiUrl(`/api/shipments/${selectedShipment.id}/start-receiving`), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ receivedBy: formData.receivedBy || '' })
+                });
+                if (!startRes.ok) {
+                  const errorData = await startRes.json().catch(() => ({}));
+                  showError(`❌ Error: ${errorData.error || 'Failed to start receiving'}`);
+                  return;
+                }
+                const completeRes = await authFetch(getApiUrl(`/api/shipments/${selectedShipment.id}/complete-receiving`), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    receivedQuantity: parseInt(formData.receivedQuantity) || 0,
+                    receivedBy: formData.receivedBy || '',
+                    discrepancies: formData.discrepancies || ''
+                  })
+                });
+                if (completeRes.ok) {
+                  showSuccess('✅ Accepted balance received and stored successfully!');
+                  setShowWizard(false);
+                  setSelectedShipment(null);
+                  await fetchPostArrivalShipments();
+                } else {
+                  const errorData = await completeRes.json().catch(() => ({}));
+                  showError(`❌ Error: ${errorData.error || 'Failed to complete receiving'}`);
+                }
+                return;
+              }
 
               // Handle start-inspection
               if (workflowAction === 'start-inspection') {
