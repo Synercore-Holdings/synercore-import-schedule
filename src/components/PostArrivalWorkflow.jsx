@@ -600,6 +600,11 @@ function PostArrivalWorkflow() {
                         title="View order details"
                       >{shipment.orderRef}</span>
                     </h4>
+                    {(shipment.productName || shipment.product_name) && (
+                      <div style={{ color: 'var(--text-700)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '2px' }}>
+                        🧪 {shipment.productName || shipment.product_name}
+                      </div>
+                    )}
                     <div style={{ color: 'var(--text-500)', fontSize: '0.9rem' }}>
                       📍 {shipment.finalPod} | 📦 {shipment.quantity} units | 🏭 {shipment.receivingWarehouse}
                     </div>
