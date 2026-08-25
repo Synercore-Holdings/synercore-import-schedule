@@ -66,6 +66,15 @@ function buildFreightOrderGroups(shipmentList, warehouseName) {
   return Object.values(orders);
 }
 
+// Actual quantity on hand: falls back to the ordered quantity for shipments
+// that were never partially received (receivedQuantity unset), but respects
+// a lower receivedQuantity (including 0) so partial/rejected stock isn't
+// double-counted as if it were all in the warehouse.
+const stockQty = (shipment) => {
+  const received = shipment.receivedQuantity ?? shipment.received_quantity;
+  return Number(received ?? shipment.quantity) || 0;
+};
+
 const hasBeenStored = (shipment) => {
   const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
   return shipment.latestStatus === 'stored'
@@ -219,7 +228,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
 
       if (!byWarehouse[wh]) byWarehouse[wh] = {};
       if (!byWarehouse[wh][monthKey]) byWarehouse[wh][monthKey] = { qty: 0, pallets: 0 };
-      byWarehouse[wh][monthKey].qty += Number(s.quantity) || 0;
+      byWarehouse[wh][monthKey].qty += stockQty(s);
       byWarehouse[wh][monthKey].pallets += Number(s.palletQty) || 0;
     }
 
@@ -352,7 +361,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     setMoveModal({
       shipment,
       destination: '',
-      moveQty: shipment.quantity || 0,
+      moveQty: stockQty(shipment),
       movePallets: Math.round(shipment.palletQty) || 1,
     });
   };
@@ -360,7 +369,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const handleMoveSubmit = async () => {
     if (!moveModal || !moveModal.destination) return;
     const { shipment, destination, moveQty, movePallets } = moveModal;
-    const totalQty = shipment.quantity || 0;
+    const totalQty = stockQty(shipment);
     const totalPallets = Math.round(shipment.palletQty) || 1;
     const isFullMove = moveQty >= totalQty && movePallets >= totalPallets;
 
@@ -393,7 +402,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const openSoldModal = (shipment) => {
     setSoldModal({
       shipment,
-      soldQty: shipment.quantity || 0,
+      soldQty: stockQty(shipment),
       soldPallets: Math.round(shipment.palletQty) || 1,
       notes: '',
       asoNumber: '',
@@ -483,7 +492,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     const wb = XLSX.utils.book_new();
 
     // Summary Sheet
-    const totalQty = filteredAndSortedShipments.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+    const totalQty = filteredAndSortedShipments.reduce((sum, s) => sum + stockQty(s), 0);
     const pallets = Math.round(filteredAndSortedShipments.reduce((sum, s) => sum + (Number(s.palletQty) || 0), 0));
     const summaryData = [
       ['Stored Stock Report'],
@@ -506,7 +515,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       'Order Ref': s.orderRef || '',
       'Supplier': s.supplier || '',
       'Product': s.productName || '',
-      'Quantity': s.quantity || 0,
+      'Quantity': stockQty(s),
       'Pallet Qty': Math.round(s.palletQty || 0),
       'CBM': s.cbm || 0,
       'Week': s.weekNumber || '',
@@ -541,7 +550,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     const whRows = groupedByWarehouse.map(({ name, shipments: wh }) => ({
       'Warehouse': name,
       'Items': wh.length,
-      'Total Quantity': wh.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0),
+      'Total Quantity': wh.reduce((sum, s) => sum + stockQty(s), 0),
       'Total Pallets': Math.round(wh.reduce((sum, s) => sum + (Number(s.palletQty) || 0), 0)),
       'Total Items': wh.length
     }));
@@ -573,7 +582,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     yPos += 3;
 
     // Summary
-    const totalQty = filteredAndSortedShipments.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+    const totalQty = filteredAndSortedShipments.reduce((sum, s) => sum + stockQty(s), 0);
     const pallets = Math.round(filteredAndSortedShipments.reduce((sum, s) => sum + (Number(s.palletQty) || 0), 0));
     doc.setFontSize(12);
     doc.text('Summary:', 20, yPos);
@@ -599,7 +608,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
             s.orderRef || '',
             s.supplier || '',
             s.productName || '',
-            s.quantity || 0,
+            stockQty(s),
             Math.round(s.palletQty || 0) || 1,
             getWarehouseName(s),
             formatDate(s.warehouseSince || s.receivingDate || s.updatedAt || s.estimatedArrival),
@@ -634,7 +643,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
         body: groupedByWarehouse.map(({ name, shipments: wh }) => [
           name,
           wh.length,
-          wh.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0),
+          wh.reduce((sum, s) => sum + stockQty(s), 0),
           Math.round(wh.reduce((sum, s) => sum + (Number(s.palletQty) || 0), 0)),
         ]),
         styles: { fontSize: 9 },
@@ -1024,7 +1033,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                           <dl className="card-details">
                             <dt>Supplier</dt><dd>{shipment.supplier || '-'}</dd>
                             <dt>Product</dt><dd>{shipment.productName || 'N/A'}</dd>
-                            <dt>Quantity</dt><dd>{shipment.quantity || 'N/A'}</dd>
+                            <dt>Quantity</dt><dd>{stockQty(shipment) || 'N/A'}{shipment.receivingStatus === 'partial' && ' ⚠'}</dd>
                             <dt>Pallets</dt><dd>{shipment.palletQty ? Math.round(shipment.palletQty) : '-'}</dd>
                             <dt>Stored</dt><dd>{formatDate(shipment.warehouseSince || shipment.receivingDate || shipment.updatedAt || shipment.estimatedArrival)}</dd>
                             {isOffsite && (() => {
@@ -1166,7 +1175,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                             </td>
                             <td style={{ padding: '8px 12px', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={shipment.supplier}>{shipment.supplier}</td>
                             <td style={{ padding: '8px 12px', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={shipment.productName}>{shipment.productName || 'N/A'}</td>
-                            <td style={{ padding: '8px 12px', fontSize: 13 }}>{shipment.quantity || 'N/A'}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 13 }}>{stockQty(shipment) || 'N/A'}{shipment.receivingStatus === 'partial' && ' ⚠'}</td>
                             <td style={{ padding: '8px 12px', fontSize: 13 }}>{shipment.palletQty ? (Math.round(shipment.palletQty) || 1) : '-'}</td>
                             <td style={{ padding: '8px 12px', fontSize: 13 }}>
                               {editingDate === shipment.id ? (
@@ -1277,7 +1286,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                               Totals
                             </td>
                             <td style={{ padding: '8px 12px', fontWeight: 700, fontSize: 13, color: 'var(--navy-900)' }}>
-                              {warehouseShipments.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0).toLocaleString('en-ZA')}
+                              {warehouseShipments.reduce((sum, s) => sum + stockQty(s), 0).toLocaleString('en-ZA')}
                             </td>
                             <td style={{ padding: '8px 12px', fontWeight: 700, fontSize: 13, color: 'var(--navy-900)' }}>
                               {Math.round(warehouseShipments.reduce((sum, s) => sum + (Number(s.palletQty) || 0), 0))}
@@ -1402,7 +1411,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-500)', marginBottom: 2 }}>Available Qty</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy-900)' }}>{moveModal.shipment.quantity || 0}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy-900)' }}>{stockQty(moveModal.shipment)}</div>
               </div>
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-500)', marginBottom: 2 }}>Available Pallets</div>
@@ -1430,9 +1439,9 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                 <input
                   type="number"
                   min={1}
-                  max={moveModal.shipment.quantity || 1}
+                  max={stockQty(moveModal.shipment) || 1}
                   value={moveModal.moveQty}
-                  onChange={(e) => setMoveModal(prev => ({ ...prev, moveQty: Math.min(parseInt(e.target.value) || 0, prev.shipment.quantity || 0) }))}
+                  onChange={(e) => setMoveModal(prev => ({ ...prev, moveQty: Math.min(parseInt(e.target.value) || 0, stockQty(prev.shipment)) }))}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
                 />
               </div>
@@ -1449,13 +1458,13 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
               </div>
             </div>
 
-            {moveModal.moveQty < (moveModal.shipment.quantity || 0) || moveModal.movePallets < (Math.round(moveModal.shipment.palletQty) || 1) ? (
+            {moveModal.moveQty < stockQty(moveModal.shipment) || moveModal.movePallets < (Math.round(moveModal.shipment.palletQty) || 1) ? (
               <div style={{
                 background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8,
                 padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#92400E'
               }}>
                 <strong>Partial move:</strong> {moveModal.moveQty} qty / {moveModal.movePallets} pallets will move to {moveModal.destination || '...'}.
-                Remaining {(moveModal.shipment.quantity || 0) - moveModal.moveQty} qty / {(Math.round(moveModal.shipment.palletQty) || 1) - moveModal.movePallets} pallets stays in {moveModal.shipment.receivingWarehouse || 'current'}.
+                Remaining {stockQty(moveModal.shipment) - moveModal.moveQty} qty / {(Math.round(moveModal.shipment.palletQty) || 1) - moveModal.movePallets} pallets stays in {moveModal.shipment.receivingWarehouse || 'current'}.
               </div>
             ) : null}
 
@@ -1499,7 +1508,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-500)', marginBottom: 2 }}>Available Qty</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy-900)' }}>{soldModal.shipment.quantity || 0}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy-900)' }}>{stockQty(soldModal.shipment)}</div>
               </div>
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-500)', marginBottom: 2 }}>Available Pallets</div>
@@ -1513,9 +1522,9 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                 <input
                   type="number"
                   min={1}
-                  max={soldModal.shipment.quantity || 1}
+                  max={stockQty(soldModal.shipment) || 1}
                   value={soldModal.soldQty}
-                  onChange={(e) => setSoldModal(prev => ({ ...prev, soldQty: Math.min(parseInt(e.target.value) || 0, prev.shipment.quantity || 0) }))}
+                  onChange={(e) => setSoldModal(prev => ({ ...prev, soldQty: Math.min(parseInt(e.target.value) || 0, stockQty(prev.shipment)) }))}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
                 />
               </div>
@@ -1554,13 +1563,13 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
               style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 16 }}
             />
 
-            {soldModal.soldQty < (soldModal.shipment.quantity || 0) || soldModal.soldPallets < (Math.round(soldModal.shipment.palletQty) || 1) ? (
+            {soldModal.soldQty < stockQty(soldModal.shipment) || soldModal.soldPallets < (Math.round(soldModal.shipment.palletQty) || 1) ? (
               <div style={{
                 background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8,
                 padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#92400E'
               }}>
                 <strong>Partial sale:</strong> {soldModal.soldQty} qty / {soldModal.soldPallets} pallets will be marked sold.
-                Remaining {(soldModal.shipment.quantity || 0) - soldModal.soldQty} qty / {(Math.round(soldModal.shipment.palletQty) || 1) - soldModal.soldPallets} pallets stays in storage.
+                Remaining {stockQty(soldModal.shipment) - soldModal.soldQty} qty / {(Math.round(soldModal.shipment.palletQty) || 1) - soldModal.soldPallets} pallets stays in storage.
               </div>
             ) : null}
 

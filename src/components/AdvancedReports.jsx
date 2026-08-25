@@ -10,6 +10,11 @@ import * as XLSX from 'xlsx';
 
 const formatDeliveryMonth = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }) : '';
 
+// Actual quantity on hand: falls back to the ordered quantity when a shipment
+// was never partially received, but respects a lower receivedQuantity so
+// rejected/damaged stock isn't counted as if it were fully stored.
+const stockQty = (shipment) => Number(shipment.receivedQuantity ?? shipment.quantity) || 0;
+
 function AdvancedReports() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -225,7 +230,7 @@ function AdvancedReports() {
       }
 
       grouped[key].count++;
-      grouped[key].totalQuantity += shipment.quantity || 0;
+      grouped[key].totalQuantity += stockQty(shipment);
       grouped[key].totalPallets += shipment.palletQty || 0;
       grouped[key].shipments.push(shipment);
     });
@@ -310,7 +315,7 @@ function AdvancedReports() {
       [],
       ['Summary Statistics:'],
       ['Total Shipments:', filteredShipments.length],
-      ['Total Quantity:', filteredShipments.reduce((sum, s) => sum + (s.quantity || 0), 0)],
+      ['Total Quantity:', filteredShipments.reduce((sum, s) => sum + stockQty(s), 0)],
       ['Total Pallets:', filteredShipments.reduce((sum, s) => sum + (s.palletQty || 0), 0)]
     ];
 
@@ -326,7 +331,7 @@ function AdvancedReports() {
         'Product': s.productName || '',
         'Month': formatDeliveryMonth(s.selectedWeekDate),
         'Expected Delivery Date': s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
-        'Quantity': s.quantity || 0,
+        'Quantity': stockQty(s),
         'Pallets': s.palletQty || 0,
         'Status': s.latestStatus || '',
         'Warehouse': s.receivingWarehouse || '',
@@ -395,7 +400,7 @@ function AdvancedReports() {
     doc.setFontSize(10);
     doc.text(`Total Shipments: ${filteredShipments.length}`, 25, yPos);
     yPos += 5;
-    doc.text(`Total Quantity: ${filteredShipments.reduce((sum, s) => sum + (s.quantity || 0), 0).toLocaleString()}`, 25, yPos);
+    doc.text(`Total Quantity: ${filteredShipments.reduce((sum, s) => sum + stockQty(s), 0).toLocaleString()}`, 25, yPos);
     yPos += 5;
     doc.text(`Total Pallets: ${Math.round(filteredShipments.reduce((sum, s) => sum + (s.palletQty || 0), 0)).toLocaleString()}`, 25, yPos);
     yPos += 10;
@@ -412,7 +417,7 @@ function AdvancedReports() {
           s.productName || '',
           formatDeliveryMonth(s.selectedWeekDate) || '-',
           s.selectedWeekDate ? new Date(s.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-',
-          s.quantity || 0,
+          stockQty(s),
           Math.round(s.palletQty || 0) || 1,
           s.latestStatus || '',
           s.receivingWarehouse || ''
@@ -816,7 +821,7 @@ function AdvancedReports() {
             </div>
             <div className="stat-card ring-accent">
               <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', color: 'var(--navy-900)' }}>
-                {filteredShipments.reduce((sum, s) => sum + (s.quantity || 0), 0).toLocaleString()}
+                {filteredShipments.reduce((sum, s) => sum + stockQty(s), 0).toLocaleString()}
               </h3>
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Total Quantity</p>
             </div>
@@ -881,7 +886,7 @@ function AdvancedReports() {
                       <td style={{ padding: '10px', textAlign: 'center' }}>
                         {shipment.selectedWeekDate ? new Date(shipment.selectedWeekDate).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                       </td>
-                      <td style={{ padding: '10px', textAlign: 'right' }}>{(shipment.quantity || 0).toLocaleString()}</td>
+                      <td style={{ padding: '10px', textAlign: 'right' }}>{stockQty(shipment).toLocaleString()}{shipment.receivingStatus === 'partial' && ' ⚠'}</td>
                       <td style={{ padding: '10px', textAlign: 'right' }}>{(Math.round(shipment.palletQty || 0) || 1).toLocaleString()}</td>
                       <td style={{ padding: '10px' }}>
                         <span style={{
@@ -965,6 +970,7 @@ function AdvancedReports() {
                 ['Supplier', s.supplier],
                 ['Product', s.productName],
                 ['Quantity', s.quantity != null ? Number(s.quantity).toLocaleString() : '-'],
+                ['Received Qty', s.receivedQuantity != null ? Number(s.receivedQuantity).toLocaleString() : '-'],
                 ['Pallets', s.palletQty ? (Math.round(s.palletQty) || 1) : '-'],
                 ['CBM', s.cbm || '-'],
                 ['Week', s.weekNumber ? `Week ${s.weekNumber}` : '-'],

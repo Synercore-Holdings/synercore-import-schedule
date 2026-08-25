@@ -3,6 +3,14 @@ import { authFetch } from '../utils/authFetch';
 import { getCurrentWeekNumber, getWeekDateRange } from '../utils/dateUtils';
 import { getApiUrl } from '../config/api';
 
+// Actual quantity on hand: falls back to the ordered quantity when a shipment
+// was never partially received, but respects a lower receivedQuantity
+// (including 0) so rejected/damaged stock isn't counted as if it were stored.
+const stockQty = (shipment) => {
+  const received = shipment.receivedQuantity ?? shipment.received_quantity;
+  return Number(received ?? shipment.quantity) || 0;
+};
+
 function CurrentWeekStoredReport({ shipments, showTitle = true }) {
   const currentWeek = getCurrentWeekNumber();
   const currentYear = new Date().getFullYear();
@@ -87,7 +95,7 @@ function CurrentWeekStoredReport({ shipments, showTitle = true }) {
   // Calculate statistics
   const statistics = useMemo(() => {
     const totalShipments = currentWeekStoredShipments.length;
-    const totalQuantity = currentWeekStoredShipments.reduce((sum, s) => sum + (s.quantity || 0), 0);
+    const totalQuantity = currentWeekStoredShipments.reduce((sum, s) => sum + stockQty(s), 0);
     const totalPalletQty = currentWeekStoredShipments.reduce((sum, s) => sum + (s.cbm || 0), 0);
 
     // Group by warehouse
@@ -98,7 +106,7 @@ function CurrentWeekStoredReport({ shipments, showTitle = true }) {
         warehouseStats[warehouse] = { count: 0, quantity: 0, palletQty: 0 };
       }
       warehouseStats[warehouse].count++;
-      warehouseStats[warehouse].quantity += shipment.quantity || 0;
+      warehouseStats[warehouse].quantity += stockQty(shipment);
       warehouseStats[warehouse].palletQty += shipment.cbm || 0;
     });
 
@@ -110,7 +118,7 @@ function CurrentWeekStoredReport({ shipments, showTitle = true }) {
         supplierStats[supplier] = { count: 0, quantity: 0, palletQty: 0 };
       }
       supplierStats[supplier].count++;
-      supplierStats[supplier].quantity += shipment.quantity || 0;
+      supplierStats[supplier].quantity += stockQty(shipment);
       supplierStats[supplier].palletQty += shipment.cbm || 0;
     });
 
@@ -358,7 +366,7 @@ function CurrentWeekStoredReport({ shipments, showTitle = true }) {
                   <td style={{ padding: '12px', fontWeight: 'bold' }}>{shipment.orderRef}</td>
                   <td style={{ padding: '12px' }}>{shipment.supplier}</td>
                   <td style={{ padding: '12px' }}>{shipment.productName || 'N/A'}</td>
-                  <td style={{ padding: '12px', textAlign: 'center' }}>{formatNumber(shipment.quantity || 0)}</td>
+                  <td style={{ padding: '12px', textAlign: 'center' }}>{formatNumber(stockQty(shipment))}</td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>{formatNumber(Math.round(shipment.cbm || 0))}</td>
                   <td style={{ padding: '12px' }}>{shipment.receivingWarehouse || shipment.finalPod || 'N/A'}</td>
                   <td style={{ padding: '12px' }}>
