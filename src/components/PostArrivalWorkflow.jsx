@@ -579,8 +579,8 @@ function PostArrivalWorkflow() {
 
   const getWorkflowProgress = (shipment) => {
     const states = [
-      'arrived_pta', 'arrived_klm', 'unloading', 'inspection_in_progress',
-      'inspection_passed', 'receiving_goods', 'in_warehouse', 'stored'
+      'arrived_pta', 'arrived_klm', 'arrived_offsite', 'unloading', 'inspection_pending',
+      'inspecting', 'inspection_failed', 'inspection_passed', 'receiving', 'received', 'stored'
     ];
 
     const currentIndex = states.indexOf(shipment.latest_status);

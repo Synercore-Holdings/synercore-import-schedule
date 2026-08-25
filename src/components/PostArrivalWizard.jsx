@@ -63,8 +63,42 @@ const ArrivalInfoStep = ({ formData, updateFormData, errors, touched }) => (
 );
 
 // Step 2: Inspection
-const InspectionStep = ({ formData, updateFormData, errors, touched }) => (
+const InspectionStep = ({ formData, updateFormData, errors, touched, action }) => {
+  const isStart = action === 'start-inspection';
+  return (
   <div>
+    <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
+      Inspector Name
+    </label>
+    <input
+      type="text"
+      value={formData.inspectedBy || ''}
+      onChange={(e) => updateFormData('inspectedBy', e.target.value)}
+      placeholder="Enter inspector name"
+      style={{
+        width: '100%',
+        padding: '10px 12px',
+        border: '2px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '1rem',
+        marginBottom: '1.5rem',
+        boxSizing: 'border-box'
+      }}
+    />
+
+    {isStart ? (
+      <div style={{
+        padding: '12px',
+        backgroundColor: '#eff6ff',
+        borderLeft: '4px solid #3b82f6',
+        borderRadius: '4px',
+        color: '#1e40af',
+        fontSize: '0.9rem'
+      }}>
+        ℹ️ This starts the inspection. You'll record Passed/Failed and any findings when you complete it.
+      </div>
+    ) : (
+      <>
     <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
       Inspection Status *
     </label>
@@ -128,12 +162,48 @@ const InspectionStep = ({ formData, updateFormData, errors, touched }) => (
       }}
     />
     {errors.inspectionDate && <div style={{ color: '#ef4444', fontSize: '0.85rem' }}>{errors.inspectionDate}</div>}
+      </>
+    )}
   </div>
-);
+  );
+};
 
 // Step 3: Receiving
-const ReceivingStep = ({ formData, updateFormData, errors, touched }) => (
+const ReceivingStep = ({ formData, updateFormData, errors, touched, action }) => {
+  const isStart = action === 'start-receiving';
+  return (
   <div>
+    <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
+      Receiver Name
+    </label>
+    <input
+      type="text"
+      value={formData.receivedBy || ''}
+      onChange={(e) => updateFormData('receivedBy', e.target.value)}
+      placeholder="Enter receiver name"
+      style={{
+        width: '100%',
+        padding: '10px 12px',
+        border: '2px solid #d1d5db',
+        borderRadius: '6px',
+        fontSize: '1rem',
+        marginBottom: '1.5rem',
+        boxSizing: 'border-box'
+      }}
+    />
+
+    {isStart && (
+      <div style={{
+        marginBottom: '1.5rem', padding: '12px',
+        backgroundColor: '#eff6ff', borderLeft: '4px solid #3b82f6',
+        borderRadius: '4px', color: '#1e40af', fontSize: '0.9rem'
+      }}>
+        ℹ️ This starts receiving. You'll record the received quantity and any discrepancies when you complete it.
+      </div>
+    )}
+
+    {!isStart && (
+      <>
     <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
       Quantity Received *
     </label>
@@ -215,6 +285,8 @@ const ReceivingStep = ({ formData, updateFormData, errors, touched }) => (
         boxSizing: 'border-box'
       }}
     />
+      </>
+    )}
 
     {/* Mark as Stored Option */}
     <div style={{
@@ -254,7 +326,8 @@ const ReceivingStep = ({ formData, updateFormData, errors, touched }) => (
       </p>
     </div>
   </div>
-);
+  );
+};
 
 // Step 4: Review
 const ReviewStep = ({ formData, updateFormData, errors, touched, steps = [] }) => {
@@ -380,6 +453,7 @@ function PostArrivalWizard({
 
   const validateInspection = async (data) => {
     const errors = {};
+    if (action === 'start-inspection') return errors;
     if (!data.inspectionStatus) errors.inspectionStatus = 'Inspection status is required';
     if (!data.inspectionDate) errors.inspectionDate = 'Inspection date is required';
     return errors;
@@ -387,6 +461,7 @@ function PostArrivalWizard({
 
   const validateReceiving = async (data) => {
     const errors = {};
+    if (action === 'start-receiving') return errors;
     if (data.receivedQuantity === undefined || data.receivedQuantity === null) {
       errors.receivedQuantity = 'Received quantity is required';
     }
@@ -408,7 +483,7 @@ function PostArrivalWizard({
       id: 'inspection',
       label: 'Inspection',
       icon: '🔍',
-      component: InspectionStep,
+      component: (props) => <InspectionStep {...props} action={action} />,
       validate: validateInspection,
       helpText: 'Document the inspection results and any findings'
     },
@@ -416,7 +491,7 @@ function PostArrivalWizard({
       id: 'receiving',
       label: 'Receiving',
       icon: '✓',
-      component: ReceivingStep,
+      component: (props) => <ReceivingStep {...props} action={action} />,
       validate: validateReceiving,
       helpText: 'Confirm quantities received and note any discrepancies'
     },
@@ -448,9 +523,11 @@ function PostArrivalWizard({
   const initialData = {
     warehouse: shipment?.receivingWarehouse || '',
     unloadingStartDate: shipment?.unloadingStartDate ? new Date(shipment.unloadingStartDate).toISOString().split('T')[0] : '',
+    inspectedBy: shipment?.inspectedBy || '',
     inspectionStatus: shipment?.inspectionStatus || '',
     inspectionDate: shipment?.inspectionDate ? new Date(shipment.inspectionDate).toISOString().split('T')[0] : '',
     inspectionNotes: shipment?.inspectionNotes || '',
+    receivedBy: shipment?.receivedBy || '',
     receivingStatus: shipment?.receivingStatus || '',
     receivedQuantity: shipment?.receivedQuantity || 0,
     receivingDate: shipment?.receivingDate ? new Date(shipment.receivingDate).toISOString().split('T')[0] : '',
