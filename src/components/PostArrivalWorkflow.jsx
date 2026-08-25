@@ -606,8 +606,7 @@ function PostArrivalWorkflow() {
                       </div>
                     )}
                     <div style={{ color: 'var(--text-500)', fontSize: '0.9rem' }}>
-                      📍 {shipment.finalPod} | 📦 {shipment.quantity} units | 🏭 {shipment.receivingWarehouse}
-                      {shipment.orderRef && <> | 🔖 APO: {shipment.orderRef}</>}
+                      📍 {shipment.finalPod} | 📦 {shipment.quantity} units | 🏭 {shipment.receivingWarehouse} | 🔖 APO: {shipment.orderRef || 'Not set'}
                     </div>
                     {truckInfoMap[shipment.id] && (
                       <div style={{ color: 'var(--info)', fontSize: '0.82rem', marginTop: '2px' }}>
