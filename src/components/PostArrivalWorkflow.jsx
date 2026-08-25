@@ -65,12 +65,36 @@ function PostArrivalWorkflow() {
     }
   }, [globalSearchTerm]);
 
+  // The /api/shipments/post-arrival endpoint returns raw snake_case DB columns
+  // (order_ref, final_pod, inspection_date, ...) rather than the camelCase shape
+  // the rest of this component expects, so normalize before using it.
+  const normalizeShipment = (s) => ({
+    ...s,
+    orderRef: s.orderRef || s.order_ref,
+    productName: s.productName || s.product_name,
+    palletQty: s.palletQty ?? s.pallet_qty,
+    finalPod: s.finalPod || s.final_pod,
+    receivingWarehouse: s.receivingWarehouse || s.receiving_warehouse,
+    weekNumber: s.weekNumber ?? s.week_number,
+    freightType: s.freightType || s.freight_type,
+    unloadingStartDate: s.unloadingStartDate || s.unloading_start_date,
+    unloadingCompletedDate: s.unloadingCompletedDate || s.unloading_completed_date,
+    inspectionDate: s.inspectionDate || s.inspection_date,
+    inspectionStatus: s.inspectionStatus || s.inspection_status,
+    inspectionNotes: s.inspectionNotes || s.inspection_notes,
+    inspectedBy: s.inspectedBy || s.inspected_by,
+    receivingDate: s.receivingDate || s.receiving_date,
+    receivingNotes: s.receivingNotes || s.receiving_notes,
+    receivedBy: s.receivedBy || s.received_by,
+    receivedQuantity: s.receivedQuantity ?? s.received_quantity,
+  });
+
   const fetchPostArrivalShipments = async () => {
     try {
       setLoading(true);
       const response = await authFetch(getApiUrl('/api/shipments/post-arrival'));
       if (response.ok) {
-        const shipments = await response.json();
+        const shipments = (await response.json()).map(normalizeShipment);
         setPostArrivalShipments(shipments);
         // Fetch truck info for each shipment
         const truckMap = {};
@@ -600,9 +624,9 @@ function PostArrivalWorkflow() {
                         title="View order details"
                       >{shipment.orderRef}</span>
                     </h4>
-                    {(shipment.productName || shipment.product_name) && (
+                    {shipment.productName && (
                       <div style={{ color: 'var(--text-700)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '2px' }}>
-                        🧪 {shipment.productName || shipment.product_name}
+                        🧪 {shipment.productName}
                       </div>
                     )}
                     <div style={{ color: 'var(--text-500)', fontSize: '0.9rem' }}>
