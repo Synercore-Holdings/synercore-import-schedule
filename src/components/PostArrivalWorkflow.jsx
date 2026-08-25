@@ -781,6 +781,11 @@ function PostArrivalWorkflow() {
                           ⚠ Partial
                         </span>
                       )}
+                      {shipment.receivingStatus === 'partial' && shipment.quantity > shipment.receivedQuantity && (
+                        <div style={{ color: 'var(--warning)', marginTop: '2px' }}>
+                          Rejected: {shipment.quantity - shipment.receivedQuantity} units
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

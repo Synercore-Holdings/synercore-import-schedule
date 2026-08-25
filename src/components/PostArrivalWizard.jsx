@@ -169,8 +169,12 @@ const InspectionStep = ({ formData, updateFormData, errors, touched, action }) =
 };
 
 // Step 3: Receiving
-const ReceivingStep = ({ formData, updateFormData, errors, touched, action }) => {
+const ReceivingStep = ({ formData, updateFormData, errors, touched, action, orderedQuantity }) => {
   const isStart = action === 'start-receiving';
+  const hasOrderedQty = orderedQuantity !== undefined && orderedQuantity !== null && orderedQuantity !== '';
+  const rejectedQty = hasOrderedQty
+    ? Math.max(0, Number(orderedQuantity) - Number(formData.receivedQuantity || 0))
+    : null;
   return (
   <div>
     <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
@@ -205,7 +209,7 @@ const ReceivingStep = ({ formData, updateFormData, errors, touched, action }) =>
     {!isStart && (
       <>
     <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
-      Quantity Received *
+      Quantity Received *{hasOrderedQty && <span style={{ fontWeight: 400, color: '#6b7280' }}> (ordered: {orderedQuantity})</span>}
     </label>
     <input
       type="number"
@@ -217,12 +221,22 @@ const ReceivingStep = ({ formData, updateFormData, errors, touched, action }) =>
         border: `2px solid ${errors.receivedQuantity ? '#ef4444' : '#d1d5db'}`,
         borderRadius: '6px',
         fontSize: '1rem',
-        marginBottom: '1rem',
+        marginBottom: '0.5rem',
         boxSizing: 'border-box'
       }}
       min="0"
+      max={hasOrderedQty ? orderedQuantity : undefined}
     />
     {errors.receivedQuantity && <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem' }}>{errors.receivedQuantity}</div>}
+    {hasOrderedQty && rejectedQty > 0 && (
+      <div style={{
+        marginBottom: '1rem', padding: '8px 12px',
+        backgroundColor: '#fef3c7', borderRadius: '6px',
+        color: '#92400e', fontSize: '0.85rem', fontWeight: 500
+      }}>
+        ⚠ Rejected / not received: {rejectedQty} units
+      </div>
+    )}
 
     <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '500', color: '#374151' }}>
       Receiving Status *
@@ -330,11 +344,15 @@ const ReceivingStep = ({ formData, updateFormData, errors, touched, action }) =>
 };
 
 // Step 4: Review
-const ReviewStep = ({ formData, updateFormData, errors, touched, steps = [] }) => {
+const ReviewStep = ({ formData, updateFormData, errors, touched, steps = [], orderedQuantity }) => {
   const hasStep = (id) => steps.some(s => s.id === id);
   const showArrival = hasStep('arrival');
   const showInspection = hasStep('inspection');
   const showReceiving = hasStep('receiving');
+  const hasOrderedQty = orderedQuantity !== undefined && orderedQuantity !== null && orderedQuantity !== '';
+  const rejectedQty = hasOrderedQty
+    ? Math.max(0, Number(orderedQuantity) - Number(formData.receivedQuantity || 0))
+    : null;
 
   return (
   <div>
@@ -384,7 +402,12 @@ const ReviewStep = ({ formData, updateFormData, errors, touched, steps = [] }) =
             <>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Received Quantity</label>
-                <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.receivedQuantity || 0}</div>
+                <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                  {formData.receivedQuantity || 0}{hasOrderedQty && ` / ${orderedQuantity}`}
+                </div>
+                {hasOrderedQty && rejectedQty > 0 && (
+                  <div style={{ color: '#b45309', fontSize: '0.85rem', marginTop: '2px' }}>⚠ Rejected: {rejectedQty} units</div>
+                )}
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
@@ -491,7 +514,7 @@ function PostArrivalWizard({
       id: 'receiving',
       label: 'Receiving',
       icon: '✓',
-      component: (props) => <ReceivingStep {...props} action={action} />,
+      component: (props) => <ReceivingStep {...props} action={action} orderedQuantity={shipment?.quantity} />,
       validate: validateReceiving,
       helpText: 'Confirm quantities received and note any discrepancies'
     },
@@ -499,7 +522,7 @@ function PostArrivalWizard({
       id: 'review',
       label: 'Review',
       icon: '👀',
-      component: ReviewStep,
+      component: (props) => <ReviewStep {...props} orderedQuantity={shipment?.quantity} />,
       helpText: 'Review all information before completing'
     }
   ];
