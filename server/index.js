@@ -431,6 +431,27 @@ async function start() {
       logWarn('BOL number column migration warning', { error: error.message });
     }
 
+    // Create shipment_damage_photos table (evidence photos for inspection-failed shipments)
+    try {
+      await getPool().query(`
+        CREATE TABLE IF NOT EXISTS shipment_damage_photos (
+          id VARCHAR(255) PRIMARY KEY,
+          shipment_id VARCHAR(255) NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+          file_name TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          file_size INTEGER,
+          mime_type TEXT,
+          uploaded_by TEXT,
+          notes TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_damage_photos_shipment ON shipment_damage_photos(shipment_id);
+      `);
+      logger.info('Shipment damage photos table ready');
+    } catch (error) {
+      logWarn('Shipment damage photos table migration warning', { error: error.message });
+    }
+
     // Add container number column to shipments
     try {
       await getPool().query(`

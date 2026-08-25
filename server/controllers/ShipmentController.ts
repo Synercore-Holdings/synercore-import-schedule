@@ -3,11 +3,27 @@
  * Handles all shipment-related business logic
  */
 
+import fs from 'fs/promises';
+import path from 'path';
 import type { Shipment, ShipmentStatus } from '../types/index.js';
 import { AppError } from '../utils/AppError.ts';
 import { shipmentRepository } from '../db/repositories/index.js';
 import archiveService from '../services/archiveService.js';
 import { getPool, queryAll, queryOne, transaction } from '../db/connection.js';
+
+const DAMAGE_PHOTOS_DIR = './uploads/damage-photos';
+
+export interface DamagePhoto {
+  id: string;
+  shipment_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  uploaded_by: string | null;
+  notes: string | null;
+  created_at: Date;
+}
 
 /**
  * Create shipment request body
@@ -415,6 +431,31 @@ export class ShipmentController {
   }
 
   /**
+   * Reject a failed-inspection shipment and return it to the supplier.
+   * Records the rejection details then archives it via the existing archive flow.
+   */
+  static async rejectShipment(
+    id: string,
+    rejectionReason: string,
+    rejectedBy?: string
+  ): Promise<Shipment> {
+    const shipment = await this.getShipment(id);
+
+    if (shipment.latest_status !== 'inspection_failed') {
+      throw AppError.conflict('Only failed-inspection shipments can be rejected');
+    }
+
+    await shipmentRepository.update(id, {
+      rejection_date: new Date(),
+      rejection_reason: rejectionReason,
+      rejected_by: rejectedBy || '',
+      updated_at: new Date()
+    } as Partial<Shipment>);
+
+    return shipmentRepository.archive(id);
+  }
+
+  /**
    * Unarchive shipment
    */
   static async unarchiveShipment(id: string): Promise<Shipment> {
@@ -598,9 +639,10 @@ export class ShipmentController {
     // Verify shipment exists
     const shipment = await this.getShipment(id);
 
-    // Verify shipment is in inspection_passed state
-    if (shipment.latest_status !== 'inspection_passed') {
-      throw AppError.conflict('Shipment must have passed inspection to start receiving');
+    // Verify shipment has completed inspection — either passed outright, or failed
+    // with an accepted balance still being received (e.g. 1 damaged drum out of many)
+    if (shipment.latest_status !== 'inspection_passed' && shipment.latest_status !== 'inspection_failed') {
+      throw AppError.conflict('Shipment must have completed inspection to start receiving');
     }
 
     // Update status to receiving
@@ -635,9 +677,10 @@ export class ShipmentController {
     }
 
     // Update status to stored (auto-advance past received)
+    const isPartial = receivedQuantity !== undefined && receivedQuantity < shipment.quantity;
     const updateData: Record<string, any> = {
       latest_status: 'stored' as ShipmentStatus,
-      receiving_status: 'completed',
+      receiving_status: isPartial ? 'partial' : 'completed',
       received_quantity: receivedQuantity,
       received_by: receivedBy || shipment.received_by || '',
       updated_at: new Date()
@@ -1204,6 +1247,81 @@ export class ShipmentController {
       total: parseInt(countRow?.count || '0', 10),
       query: q
     };
+  }
+
+  // ─── Damage photos (inspection-failure evidence) ───
+
+  /**
+   * Save uploaded damage photos to disk and record them against a shipment
+   */
+  static async uploadDamagePhotos(
+    id: string,
+    files: Array<{ originalname: string; buffer: Buffer; size: number; mimetype: string }>,
+    uploadedBy?: string
+  ): Promise<DamagePhoto[]> {
+    // Verify shipment exists
+    await this.getShipment(id);
+
+    const shipmentDir = path.join(DAMAGE_PHOTOS_DIR, id);
+    await fs.mkdir(shipmentDir, { recursive: true });
+
+    const saved: DamagePhoto[] = [];
+    for (const file of files) {
+      const ext = path.extname(file.originalname);
+      const random = Math.random().toString(36).substr(2, 9);
+      const safeName = `${Date.now()}_${random}${ext}`;
+      const filePath = path.join(shipmentDir, safeName);
+      await fs.writeFile(filePath, file.buffer);
+
+      const photoId = `photo_${Date.now()}_${random}`;
+      const row = await queryOne<DamagePhoto>(
+        `INSERT INTO shipment_damage_photos
+         (id, shipment_id, file_name, file_path, file_size, mime_type, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [photoId, id, file.originalname, filePath, file.size, file.mimetype, uploadedBy || '']
+      );
+      if (row) saved.push(row);
+    }
+
+    return saved;
+  }
+
+  /**
+   * List damage photos recorded against a shipment
+   */
+  static async getDamagePhotos(id: string): Promise<DamagePhoto[]> {
+    return queryAll<DamagePhoto>(
+      `SELECT * FROM shipment_damage_photos WHERE shipment_id = $1 ORDER BY created_at DESC`,
+      [id]
+    );
+  }
+
+  /**
+   * Fetch a single damage photo's DB record (for serving the file back)
+   */
+  static async getDamagePhoto(id: string, photoId: string): Promise<DamagePhoto> {
+    const photo = await queryOne<DamagePhoto>(
+      `SELECT * FROM shipment_damage_photos WHERE id = $1 AND shipment_id = $2`,
+      [photoId, id]
+    );
+    if (!photo) {
+      throw AppError.notFound('Damage photo not found');
+    }
+    return photo;
+  }
+
+  /**
+   * Delete a damage photo (DB row + file on disk)
+   */
+  static async deleteDamagePhoto(id: string, photoId: string): Promise<void> {
+    const photo = await this.getDamagePhoto(id, photoId);
+    await queryOne(`DELETE FROM shipment_damage_photos WHERE id = $1`, [photoId]);
+    try {
+      await fs.unlink(photo.file_path);
+    } catch {
+      // File already gone — nothing more to clean up
+    }
   }
 }
 

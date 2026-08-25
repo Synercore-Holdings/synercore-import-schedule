@@ -257,7 +257,13 @@ const ReceivingStep = ({ formData, updateFormData, errors, touched }) => (
 );
 
 // Step 4: Review
-const ReviewStep = ({ formData, updateFormData, errors, touched }) => (
+const ReviewStep = ({ formData, updateFormData, errors, touched, steps = [] }) => {
+  const hasStep = (id) => steps.some(s => s.id === id);
+  const showArrival = hasStep('arrival');
+  const showInspection = hasStep('inspection');
+  const showReceiving = hasStep('receiving');
+
+  return (
   <div>
     <div style={{
       backgroundColor: '#f0fdf4',
@@ -270,38 +276,50 @@ const ReviewStep = ({ formData, updateFormData, errors, touched }) => (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         {/* Column 1 */}
         <div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Warehouse</label>
-            <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.warehouse || 'Not specified'}</div>
-          </div>
+          {showArrival && (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Warehouse</label>
+                <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.warehouse || 'Not specified'}</div>
+              </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Unloading Date</label>
-            <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.unloadingStartDate || 'Not specified'}</div>
-          </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Unloading Date</label>
+                <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.unloadingStartDate || 'Not specified'}</div>
+              </div>
+            </>
+          )}
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Inspection Status</label>
-            <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.inspectionStatus?.toUpperCase() || 'Not specified'}</div>
-          </div>
+          {showInspection && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Inspection Status</label>
+              <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.inspectionStatus?.toUpperCase() || 'Not specified'}</div>
+            </div>
+          )}
         </div>
 
         {/* Column 2 */}
         <div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Inspection Date</label>
-            <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.inspectionDate || 'Not specified'}</div>
-          </div>
+          {showInspection && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Inspection Date</label>
+              <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.inspectionDate || 'Not specified'}</div>
+            </div>
+          )}
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Received Quantity</label>
-            <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.receivedQuantity || 0}</div>
-          </div>
+          {showReceiving && (
+            <>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Received Quantity</label>
+                <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.receivedQuantity || 0}</div>
+              </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Receiving Status</label>
-            <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.receivingStatus?.toUpperCase() || 'Not specified'}</div>
-          </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Receiving Status</label>
+                <div style={{ fontWeight: '500', color: '#1f2937' }}>{formData.receivingStatus?.toUpperCase() || 'Not specified'}</div>
+              </div>
+            </>
+          )}
 
           {formData.markAsStored && (
             <div style={{ marginBottom: '1rem' }}>
@@ -312,14 +330,14 @@ const ReviewStep = ({ formData, updateFormData, errors, touched }) => (
         </div>
       </div>
 
-      {formData.inspectionNotes && (
+      {showInspection && formData.inspectionNotes && (
         <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #86efac' }}>
           <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Inspection Notes</label>
           <div style={{ color: '#1f2937', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{formData.inspectionNotes}</div>
         </div>
       )}
 
-      {formData.discrepancies && (
+      {showReceiving && formData.discrepancies && (
         <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #86efac' }}>
           <label style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Discrepancies</label>
           <div style={{ color: '#1f2937', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{formData.discrepancies}</div>
@@ -339,7 +357,8 @@ const ReviewStep = ({ formData, updateFormData, errors, touched }) => (
       ✓ Click 'Complete' to save all changes
     </div>
   </div>
-);
+  );
+};
 
 /**
  * PostArrivalWizard Component

@@ -3,11 +3,13 @@
  * Handles CRUD operations for shipments with full type safety
  */
 
+import path from 'path';
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { AppError } from '../utils/AppError.ts';
 import { asyncHandler } from '../middleware/errorHandler.ts';
 import { requireAdmin } from '../middleware/auth.ts';
+import { createMultipleFileUpload, handleUploadError, validateFilesPresent } from '../middleware/fileUpload.js';
 import ShipmentController, {
   type CreateShipmentRequest,
   type UpdateShipmentRequest,
@@ -16,6 +18,8 @@ import ShipmentController, {
 } from '../controllers/ShipmentController.js';
 import type { BodyRequest } from '../types/api.js';
 import { AuditRepository } from '../db/repositories/AuditRepository.ts';
+
+const damagePhotoUpload = createMultipleFileUpload();
 
 const router = Router();
 
@@ -941,6 +945,91 @@ router.post(
       data: shipment,
       message: 'Workflow completed by admin'
     });
+  })
+);
+
+/**
+ * POST /api/shipments/:id/reject-shipment
+ * Reject a failed-inspection shipment and return it to the supplier
+ */
+router.post(
+  '/:id/reject-shipment',
+  body('rejectionReason').trim().notEmpty().withMessage('Rejection reason is required'),
+  body('rejectedBy').optional().trim(),
+  asyncHandler(async (req: BodyRequest<{ rejectionReason: string; rejectedBy?: string }>, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const shipment = await ShipmentController.rejectShipment(
+      req.params.id!,
+      req.body.rejectionReason,
+      req.body.rejectedBy
+    );
+
+    res.status(200).json({
+      data: shipment,
+      message: 'Shipment rejected successfully'
+    });
+  })
+);
+
+/**
+ * POST /api/shipments/:id/damage-photos
+ * Upload one or more photos of damaged goods for a failed-inspection shipment
+ */
+router.post(
+  '/:id/damage-photos',
+  damagePhotoUpload.array('photos', 10),
+  handleUploadError,
+  validateFilesPresent,
+  asyncHandler(async (req: Request, res: Response) => {
+    const files = (req.files as Express.Multer.File[]) || [];
+    const photos = await ShipmentController.uploadDamagePhotos(
+      req.params.id!,
+      files,
+      req.user?.username || req.user?.email
+    );
+
+    res.status(201).json({
+      data: photos,
+      message: `${photos.length} photo(s) uploaded successfully`
+    });
+  })
+);
+
+/**
+ * GET /api/shipments/:id/damage-photos
+ * List damage photos recorded against a shipment
+ */
+router.get(
+  '/:id/damage-photos',
+  asyncHandler(async (req: Request, res: Response) => {
+    const photos = await ShipmentController.getDamagePhotos(req.params.id!);
+    res.status(200).json({ data: photos });
+  })
+);
+
+/**
+ * GET /api/shipments/:id/damage-photos/:photoId
+ * Stream a single damage photo's file back
+ */
+router.get(
+  '/:id/damage-photos/:photoId',
+  asyncHandler(async (req: Request, res: Response) => {
+    const photo = await ShipmentController.getDamagePhoto(req.params.id!, req.params.photoId!);
+    res.setHeader('Content-Type', photo.mime_type || 'application/octet-stream');
+    res.sendFile(path.resolve(photo.file_path));
+  })
+);
+
+/**
+ * DELETE /api/shipments/:id/damage-photos/:photoId
+ * Remove a damage photo
+ */
+router.delete(
+  '/:id/damage-photos/:photoId',
+  asyncHandler(async (req: Request, res: Response) => {
+    await ShipmentController.deleteDamagePhoto(req.params.id!, req.params.photoId!);
+    res.status(200).json({ message: 'Damage photo deleted successfully' });
   })
 );
 

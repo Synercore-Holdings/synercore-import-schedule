@@ -26,6 +26,11 @@ function PostArrivalWorkflow() {
 
   const [truckInfoMap, setTruckInfoMap] = useState({});
 
+  const [damagePhotos, setDamagePhotos] = useState({}); // { [shipmentId]: [{ id, file_name, ... }] }
+  const [photoBlobUrls, setPhotoBlobUrls] = useState({}); // { [photoId]: objectURL }
+  const [uploadingPhotos, setUploadingPhotos] = useState({}); // { [shipmentId]: boolean }
+  const [viewingPhoto, setViewingPhoto] = useState(null); // { url, fileName }
+
   const [workflowData, setWorkflowData] = useState({
     inspectedBy: '',
     inspectionNotes: '',
@@ -56,6 +61,13 @@ function PostArrivalWorkflow() {
   }, []);
 
   useEffect(() => {
+    postArrivalShipments
+      .filter(s => s.latest_status === 'inspection_failed' && !(s.id in damagePhotos))
+      .forEach(s => fetchDamagePhotos(s.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postArrivalShipments]);
+
+  useEffect(() => {
     if (globalSearchTerm) {
       setSearchTerm(globalSearchTerm);
       // Clear the search param from URL after consuming it
@@ -84,6 +96,7 @@ function PostArrivalWorkflow() {
     inspectionNotes: s.inspectionNotes || s.inspection_notes,
     inspectedBy: s.inspectedBy || s.inspected_by,
     receivingDate: s.receivingDate || s.receiving_date,
+    receivingStatus: s.receivingStatus || s.receiving_status,
     receivingNotes: s.receivingNotes || s.receiving_notes,
     receivedBy: s.receivedBy || s.received_by,
     receivedQuantity: s.receivedQuantity ?? s.received_quantity,
@@ -117,6 +130,59 @@ function PostArrivalWorkflow() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchDamagePhotos = async (shipmentId) => {
+    try {
+      const res = await authFetch(getApiUrl(`/api/shipments/${shipmentId}/damage-photos`));
+      if (!res.ok) return;
+      const { data } = await res.json();
+      setDamagePhotos(prev => ({ ...prev, [shipmentId]: data }));
+
+      // Fetch each photo's file as a blob so it can be shown in an <img> without
+      // exposing the auth-protected download URL directly (authFetch attaches the token).
+      data.forEach(async (photo) => {
+        try {
+          const imgRes = await authFetch(getApiUrl(`/api/shipments/${shipmentId}/damage-photos/${photo.id}`));
+          if (imgRes.ok) {
+            const blob = await imgRes.blob();
+            setPhotoBlobUrls(prev => ({ ...prev, [photo.id]: URL.createObjectURL(blob) }));
+          }
+        } catch { /* ignore */ }
+      });
+    } catch { /* ignore */ }
+  };
+
+  const handleDamagePhotoUpload = async (shipmentId, files) => {
+    if (!files || files.length === 0) return;
+    setUploadingPhotos(prev => ({ ...prev, [shipmentId]: true }));
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach(f => formData.append('photos', f));
+      const res = await authFetch(getApiUrl(`/api/shipments/${shipmentId}/damage-photos`), {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        await fetchDamagePhotos(shipmentId);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showError(`❌ Error uploading photo: ${err.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      showError('❌ Error uploading photo. Please try again.');
+    } finally {
+      setUploadingPhotos(prev => ({ ...prev, [shipmentId]: false }));
+    }
+  };
+
+  const handleDeleteDamagePhoto = async (shipmentId, photoId) => {
+    try {
+      const res = await authFetch(getApiUrl(`/api/shipments/${shipmentId}/damage-photos/${photoId}`), { method: 'DELETE' });
+      if (res.ok) {
+        setDamagePhotos(prev => ({ ...prev, [shipmentId]: (prev[shipmentId] || []).filter(p => p.id !== photoId) }));
+      }
+    } catch { /* ignore */ }
   };
 
   const getStatusColor = (status) => {
@@ -173,6 +239,7 @@ function PostArrivalWorkflow() {
       actions.push({ key: 'start-receiving', label: 'Start Receiving', icon: '📋', color: 'var(--navy-600)' });
     } else if (status === 'inspection_failed') {
       actions.push({ key: 'start-inspection', label: 'Re-inspect', icon: '🔍', color: 'var(--info)' });
+      actions.push({ key: 'start-receiving', label: 'Receive Accepted Balance', icon: '📋', color: 'var(--navy-600)' });
       actions.push({ key: 'reject-shipment', label: 'Reject/Return to Supplier', icon: '↩️', color: 'var(--danger)' });
     } else if (status === 'receiving' || status === 'receiving_goods') {
       actions.push({ key: 'complete-receiving', label: 'Complete Receiving', icon: '✔️', color: 'var(--success)' });
@@ -706,6 +773,14 @@ function PostArrivalWorkflow() {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-500)' }}>
                       📦 <strong>Received:</strong><br />
                       {shipment.receivedQuantity} / {shipment.quantity} units
+                      {shipment.receivingStatus === 'partial' && (
+                        <span style={{
+                          marginLeft: '6px', padding: '1px 6px', borderRadius: '10px',
+                          backgroundColor: 'var(--warning)', color: 'white', fontSize: '0.7rem', fontWeight: 600
+                        }}>
+                          ⚠ Partial
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -722,6 +797,67 @@ function PostArrivalWorkflow() {
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-500)' }}>
                         <strong>Receiving Notes:</strong> {shipment.receivingNotes}
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Damage Photos */}
+                {shipment.latest_status === 'inspection_failed' && (
+                  <div style={{
+                    marginBottom: '1rem', padding: '0.75rem',
+                    backgroundColor: 'var(--surface-2)', borderRadius: '8px',
+                    border: '1px dashed var(--border)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <strong style={{ fontSize: '0.85rem', color: 'var(--text-700)' }}>📷 Damage Photos</strong>
+                      <label style={{
+                        fontSize: '0.75rem', padding: '4px 10px',
+                        backgroundColor: 'var(--danger)', color: 'white', borderRadius: '4px',
+                        cursor: uploadingPhotos[shipment.id] ? 'not-allowed' : 'pointer',
+                        opacity: uploadingPhotos[shipment.id] ? 0.6 : 1
+                      }}>
+                        {uploadingPhotos[shipment.id] ? 'Uploading...' : '+ Add Photo'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          disabled={uploadingPhotos[shipment.id]}
+                          onChange={(e) => {
+                            handleDamagePhotoUpload(shipment.id, e.target.files);
+                            e.target.value = '';
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                    {(damagePhotos[shipment.id] || []).length > 0 ? (
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {damagePhotos[shipment.id].map((photo) => (
+                          <div key={photo.id} style={{ position: 'relative' }}>
+                            <img
+                              src={photoBlobUrls[photo.id]}
+                              alt={photo.file_name}
+                              onClick={() => photoBlobUrls[photo.id] && setViewingPhoto({ url: photoBlobUrls[photo.id], fileName: photo.file_name })}
+                              style={{
+                                width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px',
+                                cursor: photoBlobUrls[photo.id] ? 'pointer' : 'default',
+                                border: '1px solid var(--border)', backgroundColor: '#e9ecef'
+                              }}
+                            />
+                            <button
+                              onClick={() => handleDeleteDamagePhoto(shipment.id, photo.id)}
+                              title="Remove photo"
+                              style={{
+                                position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px',
+                                borderRadius: '50%', border: 'none', backgroundColor: 'var(--danger)', color: 'white',
+                                fontSize: '11px', lineHeight: '18px', cursor: 'pointer', padding: 0
+                              }}
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-500)' }}>No photos uploaded yet</div>
                     )}
                   </div>
                 )}
@@ -826,7 +962,8 @@ function PostArrivalWorkflow() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       receivedQuantity: parseInt(formData.receivedQuantity) || 0,
-                      receivedBy: formData.receivedBy || ''
+                      receivedBy: formData.receivedBy || '',
+                      discrepancies: formData.discrepancies || ''
                     })
                   })
                 );
@@ -1438,6 +1575,24 @@ function PostArrivalWorkflow() {
               );
             })()}
           </div>
+        </div>
+      )}
+
+      {/* Damage Photo Lightbox */}
+      {viewingPhoto && (
+        <div
+          onClick={() => setViewingPhoto(null)}
+          style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1100, cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={viewingPhoto.url}
+            alt={viewingPhoto.fileName}
+            style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '8px' }}
+          />
         </div>
       )}
 

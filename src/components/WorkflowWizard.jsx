@@ -271,6 +271,7 @@ function WorkflowWizard({
                   updateFormData={updateFormData}
                   errors={errors}
                   touched={touched}
+                  steps={steps}
                 />
               );
             })()}
