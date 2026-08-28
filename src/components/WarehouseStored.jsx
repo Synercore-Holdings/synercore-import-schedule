@@ -60,8 +60,9 @@ function buildFreightOrderGroups(shipmentList, warehouseName) {
     if (isNaN(d)) continue;
     const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const orderKey = s.orderRef || s.id;
-    if (!orders[orderKey]) orders[orderKey] = { pallets: 0, monthKey };
+    if (!orders[orderKey]) orders[orderKey] = { pallets: 0, qty: 0, monthKey };
     orders[orderKey].pallets += Number(s.palletQty) || 0;
+    orders[orderKey].qty += stockQty(s);
   }
   return Object.values(orders);
 }
@@ -250,15 +251,16 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
     });
   }, [allShipments, shipments]);
 
-  const computeFreightCost = (containers20, containers40) => {
+  const computeFreightCost = (containers20, containers40, qty = 0) => {
     const totalContainers = containers20 + containers40;
     const portToWhs = PRETORIA_FREIGHT_RATES.portToWhs * totalContainers;
     const unpackReload = PRETORIA_FREIGHT_RATES.unpackReload * totalContainers;
     const cartage20 = PRETORIA_FREIGHT_RATES.cartage20ft * containers20;
     const cartage40 = PRETORIA_FREIGHT_RATES.cartage40ft * containers40;
+    const total = portToWhs + unpackReload + cartage20 + cartage40;
     return {
-      containers20, containers40, portToWhs, unpackReload, cartage20, cartage40,
-      total: portToWhs + unpackReload + cartage20 + cartage40,
+      containers20, containers40, portToWhs, unpackReload, cartage20, cartage40, total,
+      qty, perKg: qty > 0 ? total / qty : 0,
     };
   };
 
@@ -274,12 +276,14 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       const inMonth = orderList.filter(o => o.monthKey === month);
       const c20 = inMonth.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
       const c40 = inMonth.length - c20;
-      byMonth[month] = computeFreightCost(c20, c40);
+      const monthQty = inMonth.reduce((sum, o) => sum + o.qty, 0);
+      byMonth[month] = computeFreightCost(c20, c40, monthQty);
     }
 
     const totalCount20 = orderList.filter(o => o.pallets <= CONTAINER_20FT_PALLET_THRESHOLD).length;
     const totalCount40 = orderList.length - totalCount20;
-    const average = computeFreightCost(totalCount20 / monthCount, totalCount40 / monthCount);
+    const totalQty = orderList.reduce((sum, o) => sum + o.qty, 0);
+    const average = computeFreightCost(totalCount20 / monthCount, totalCount40 / monthCount, totalQty / monthCount);
 
     return { months, byMonth, average };
   }, [allShipments, shipments]);
@@ -895,6 +899,12 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
             <div>
               <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Total{freightMonthFilter ? '' : ' / month'}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent, #3b82f6)' }}>R{Math.round(pretoriaFreightEstimate.total).toLocaleString('en-ZA')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-500)' }}>Per kg</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy-900)' }}>
+                {pretoriaFreightEstimate.qty > 0 ? `R${pretoriaFreightEstimate.perKg.toFixed(2)}` : '-'}
+              </div>
             </div>
           </div>
         </div>
