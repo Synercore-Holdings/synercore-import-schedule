@@ -33,6 +33,7 @@ const VIEW_TO_SECTION = {
   costing: 'finance',
   'export-costing': 'finance',
   'costing-requests': 'finance',
+  'quote-requests': 'finance',
 
   reports: 'reports',
   'advanced-reports': 'reports',
@@ -66,6 +67,7 @@ const VIEW_TITLES = {
   'supplier-performance': 'Supplier Performance',
   'forwarder-carrier': 'Forwarder vs Carrier',
   'costing-requests': 'Cost Requests',
+  'quote-requests': 'Quote Requests',
   users: 'User Management',
   audit: 'Activity Log',
 };
@@ -89,6 +91,7 @@ const NotificationPreferences = lazy(() => import('./components/NotificationPref
 const ImportCosting = lazy(() => import('./components/ImportCosting'));
 const ExportCosting = lazy(() => import('./components/ExportCosting'));
 const CostingRequests = lazy(() => import('./components/CostingRequests'));
+const QuoteRequestForm = lazy(() => import('./components/QuoteRequestForm'));
 const GlobalSearch = lazy(() => import('./components/GlobalSearch'));
 const LiveBoard = lazy(() => import('./components/LiveBoard'));
 const AuditLog = lazy(() => import('./components/AuditLog'));
@@ -119,7 +122,7 @@ import {
   LayoutDashboard, Building2, Ship, Truck, Repeat, ClipboardList, Factory, Store,
   Package, Wallet, BarChart3, TrendingUp, Target, Inbox, ScrollText, FileText,
   Users, LogOut, Moon, Sun, BookOpen, Bell, Globe, Newspaper, MapPin, Settings as SettingsIcon,
-  Waves, ShieldAlert,
+  Waves, ShieldAlert, Send,
 } from 'lucide-react';
 import './theme.css';
 
@@ -457,6 +460,7 @@ function App() {
     if (path === '/costing') return 'costing';
     if (path === '/export-costing') return 'export-costing';
     if (path === '/costing-requests') return 'costing-requests';
+    if (path === '/quote-requests') return 'quote-requests';
     if (path === '/reports') return 'reports';
     if (path === '/advanced-reports') return 'advanced-reports';
     if (path === '/supplier-performance') return 'supplier-performance';
@@ -638,6 +642,7 @@ function App() {
             costing: { label: 'Import Costing', icon: BarChart3, view: 'costing' },
             exportCosting: { label: 'Export Costing', icon: BarChart3, view: 'export-costing' },
             costingRequests: { label: 'Cost Requests', icon: ClipboardList, view: 'costing-requests', adminOnly: true, badge: costingRequestCount },
+            quoteRequests: { label: 'Quote Requests', icon: Send, view: 'quote-requests' },
             reports: { label: 'Reports', icon: BarChart3, view: 'reports' },
             advancedReports: { label: 'Advanced Reports', icon: TrendingUp, view: 'advanced-reports' },
             supplierPerformance: { label: 'Supplier Performance', icon: Target, view: 'supplier-performance' },
@@ -752,7 +757,7 @@ function App() {
               {renderSection('Operations', 'operations', ['shipping', 'localReceiving', 'iwtIncoming', 'workflow', 'bolAudit'])}
               {renderSection('Warehouse', 'warehouse', ['receiving', 'dockManagement', 'stored', 'rejections'])}
               {renderSection('Warehouse Capacity per site', 'warehouseCapacitySites', ['capacityPretoria', 'capacityKlapmuts', 'capacityOffsite'])}
-              {renderSection('Finance', 'finance', ['rates', 'costing', 'exportCosting', 'costingRequests'])}
+              {renderSection('Finance', 'finance', ['rates', 'costing', 'exportCosting', 'costingRequests', 'quoteRequests'])}
               {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'forwarderCarrier', 'audit'])}
 
               {!sidebarCollapsed && (!q || resourcesVisible.length > 0) && (
@@ -1069,6 +1074,9 @@ function App() {
             } />
             <Route path="/costing-requests" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary>{isAdmin ? <CostingRequests /> : <AccessDenied />}</ErrorBoundary></Suspense>
+            } />
+            <Route path="/quote-requests" element={
+              <Suspense fallback={<PageLoader />}><ErrorBoundary><QuoteRequestForm /></ErrorBoundary></Suspense>
             } />
             <Route path="/reports" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><ReportsView shipments={shipments} /></ErrorBoundary></Suspense>

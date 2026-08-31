@@ -53,6 +53,7 @@ import schedulerAdminRouter from './routes/schedulerAdmin.ts';
 import supplierPortalRouter from './routes/supplierPortal.ts';
 import costingRouter from './routes/costing.ts';
 import costingRequestsRouter from './routes/costingRequests.ts';
+import quoteRequestsRouter from './routes/quoteRequests.ts';
 import auditRouter from './routes/audit.ts';
 import newsRouter from './routes/news.ts';
 import bolAuditRouter from './routes/bolAudit.ts';
@@ -199,6 +200,7 @@ app.use('/api/notifications', notificationsRouter); // Auth required within rout
 app.use('/api/supplier', supplierPortalRouter); // Supplier portal routes (auth within router)
 app.use('/api/costing', costingRouter); // Import costing routes (auth within router)
 app.use('/api/costing-requests', costingRequestsRouter); // Costing request routes (auth within router)
+app.use('/api/quote-requests', quoteRequestsRouter); // Freight quote request routes (auth within router)
 app.use('/api/audit', authenticateToken, auditRouter);
 app.use('/api/bol-audit', authenticateToken, bolAuditRouter);
 app.use('/api/docks', authenticateToken, docksRouter);
@@ -377,6 +379,13 @@ async function start() {
       await addCostingRequestsTable.default();
     } catch (error) {
       logWarn('Costing requests migration warning', { error: error.message });
+    }
+
+    try {
+      const addQuoteRequestsTable = await import('./db/add-quote-requests-table.js');
+      await addQuoteRequestsTable.default();
+    } catch (error) {
+      logWarn('Quote requests migration warning', { error: error.message });
     }
 
     try {
