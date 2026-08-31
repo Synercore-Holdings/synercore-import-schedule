@@ -29,11 +29,12 @@ const EMPTY_FORM = {
   pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
 };
 
-// CBM = L x W x H (cm) / 1,000,000
-const calcVolumeCbm = (length_cm, width_cm, height_cm) => {
+// Total CBM = L x W x H (cm) / 1,000,000 x quantity of pallets/packages at those dimensions
+const calcVolumeCbm = (length_cm, width_cm, height_cm, pallet_count) => {
   const l = parseFloat(length_cm), w = parseFloat(width_cm), h = parseFloat(height_cm);
+  const qty = parseFloat(pallet_count) || 1;
   if (!l || !w || !h) return null;
-  return Math.round((l * w * h / 1000000) * 1000) / 1000;
+  return Math.round((l * w * h / 1000000) * qty * 1000) / 1000;
 };
 
 const inputStyle = {
@@ -84,7 +85,7 @@ function QuoteRequestForm({ onClose }) {
     if (!form.forwarder_name.trim()) return;
     setSaving(true);
     try {
-      const payload = { ...form, volume_cbm: calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm) };
+      const payload = { ...form, volume_cbm: calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count) };
       const response = await authFetch(getApiUrl('/api/quote-requests'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -415,22 +416,17 @@ function QuoteRequestForm({ onClose }) {
                 <div />
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Dimensions (cm) — Length x Width x Height</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                  <label style={labelStyle}>Dimensions per Pallet/Package (cm) — Length x Width x Height x Qty</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem' }}>
                     <input type="number" min="0" step="any" style={inputStyle} placeholder="Length" value={form.length_cm} onChange={e => handleFieldChange('length_cm', e.target.value)} />
                     <input type="number" min="0" step="any" style={inputStyle} placeholder="Width" value={form.width_cm} onChange={e => handleFieldChange('width_cm', e.target.value)} />
                     <input type="number" min="0" step="any" style={inputStyle} placeholder="Height" value={form.height_cm} onChange={e => handleFieldChange('height_cm', e.target.value)} />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-500)', whiteSpace: 'nowrap' }}>
-                      = {calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm) ?? '—'} CBM
-                    </span>
+                    <input type="number" min="0" step="1" style={inputStyle} placeholder="Qty" value={form.pallet_count} onChange={e => handleFieldChange('pallet_count', e.target.value)} />
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                    = {calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count) ?? '—'} CBM total
                   </div>
                 </div>
-
-                <div style={fieldWrap}>
-                  <label style={labelStyle}>Pallets / Packages</label>
-                  <input type="number" min="0" step="1" style={inputStyle} value={form.pallet_count} onChange={e => handleFieldChange('pallet_count', e.target.value)} />
-                </div>
-                <div />
 
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Cargo Ready Date</label>

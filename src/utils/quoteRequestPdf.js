@@ -90,11 +90,11 @@ export function generateQuoteRequestPDF(req) {
       ['HS Code', fmt(req.hs_code)],
       ['DG Classification', DG_LABELS[req.dg_classification] || DG_LABELS.non_dg],
       ['Gross Weight', fmt(req.gross_weight_kg, ' kg')],
-      ['Dimensions (L x W x H)', (req.length_cm && req.width_cm && req.height_cm)
+      ['Dimensions per Pallet/Package (L x W x H)', (req.length_cm && req.width_cm && req.height_cm)
         ? `${req.length_cm} x ${req.width_cm} x ${req.height_cm} cm`
         : '—'],
-      ['Volume', fmt(req.volume_cbm, ' CBM')],
       ['Pallets / Packages', fmt(req.pallet_count)],
+      ['Volume (Total)', fmt(req.volume_cbm, ' CBM')],
     ],
     theme: 'plain',
     styles: { fontSize: 9, cellPadding: 3 },
