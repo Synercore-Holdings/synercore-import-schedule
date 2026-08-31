@@ -71,6 +71,7 @@ const calcVolumeCbm = (length_cm, width_cm, height_cm, pallet_count) => {
 
 const toDateInput = (d) => {
   if (!d) return '';
+  if (d === 'TBC') return 'TBC';
   if (typeof d === 'string') return d.slice(0, 10);
   try { return new Date(d).toISOString().slice(0, 10); } catch { return ''; }
 };
@@ -637,11 +638,43 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Cargo Ready Date</label>
-                  <input type="date" style={inputStyle} value={form.cargo_ready_date} onChange={e => handleFieldChange('cargo_ready_date', e.target.value)} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="date"
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={form.cargo_ready_date === 'TBC' ? '' : form.cargo_ready_date}
+                      disabled={form.cargo_ready_date === 'TBC'}
+                      onChange={e => handleFieldChange('cargo_ready_date', e.target.value)}
+                    />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-700)', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.cargo_ready_date === 'TBC'}
+                        onChange={e => handleFieldChange('cargo_ready_date', e.target.checked ? 'TBC' : '')}
+                      />
+                      TBC
+                    </label>
+                  </div>
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Required Delivery Date</label>
-                  <input type="date" style={inputStyle} value={form.required_date} onChange={e => handleFieldChange('required_date', e.target.value)} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="date"
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={form.required_date === 'TBC' ? '' : form.required_date}
+                      disabled={form.required_date === 'TBC'}
+                      onChange={e => handleFieldChange('required_date', e.target.value)}
+                    />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-700)', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.required_date === 'TBC'}
+                        onChange={e => handleFieldChange('required_date', e.target.checked ? 'TBC' : '')}
+                      />
+                      TBC
+                    </label>
+                  </div>
                 </div>
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>

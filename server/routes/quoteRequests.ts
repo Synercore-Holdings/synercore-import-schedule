@@ -27,6 +27,9 @@ const TRANSPORT_MODES = ['sea', 'air', 'road'];
 const STATUSES = ['draft', 'sent', 'quoted', 'expired', 'cancelled'];
 const DG_CLASSIFICATIONS = ['dg', 'non_dg'];
 
+// Cargo/delivery dates accept either an ISO date (YYYY-MM-DD, what <input type="date"> sends) or "TBC"
+const isDateOrTbc = (value: string) => value === 'TBC' || /^\d{4}-\d{2}-\d{2}$/.test(value);
+
 // ==================== QUOTE REQUEST ROUTES ====================
 
 /**
@@ -54,8 +57,8 @@ router.post(
     body('height_cm').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('volume_cbm').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('pallet_count').optional({ checkFalsy: true }).isInt({ min: 0 }),
-    body('cargo_ready_date').optional({ checkFalsy: true }).isISO8601(),
-    body('required_date').optional({ checkFalsy: true }).isISO8601(),
+    body('cargo_ready_date').optional({ checkFalsy: true }).custom(isDateOrTbc).withMessage('Must be a valid date or "TBC"'),
+    body('required_date').optional({ checkFalsy: true }).custom(isDateOrTbc).withMessage('Must be a valid date or "TBC"'),
     body('notes').optional({ nullable: true }).trim(),
   ],
   validate,

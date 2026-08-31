@@ -25,8 +25,8 @@ async function createQuoteRequestsTable() {
         height_cm NUMERIC,
         volume_cbm NUMERIC,
         pallet_count INTEGER,
-        cargo_ready_date DATE,
-        required_date DATE,
+        cargo_ready_date VARCHAR(20),
+        required_date VARCHAR(20),
         notes TEXT,
         status VARCHAR(20) DEFAULT 'draft',
         quoted_rate NUMERIC,
@@ -49,6 +49,9 @@ async function createQuoteRequestsTable() {
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quote_reference VARCHAR(100);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_transit_days INTEGER;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quote_notes TEXT;`);
+    // Allow "TBC" as a value — was DATE, now a free-form string so undecided dates can be recorded
+    await pool.query(`ALTER TABLE quote_requests ALTER COLUMN cargo_ready_date TYPE VARCHAR(20) USING cargo_ready_date::text;`);
+    await pool.query(`ALTER TABLE quote_requests ALTER COLUMN required_date TYPE VARCHAR(20) USING required_date::text;`);
 
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_user ON quote_requests(requested_by);`);
