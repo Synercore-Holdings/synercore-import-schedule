@@ -14,6 +14,7 @@ async function createQuoteRequestsTable() {
         incoterm VARCHAR(20),
         origin VARCHAR(255),
         destination VARCHAR(255),
+        collection_address TEXT,
         supplier_name VARCHAR(255),
         cargo_description TEXT,
         hs_code VARCHAR(50),
@@ -28,6 +29,8 @@ async function createQuoteRequestsTable() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS collection_address TEXT;`);
 
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_user ON quote_requests(requested_by);`);

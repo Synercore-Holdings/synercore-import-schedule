@@ -15,9 +15,16 @@ const STATUS_STYLES = {
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
+// EXW: forwarder collects from the supplier's premises, so we need the full
+// pickup address, and delivery is always into one of our two warehouses.
+const RECEIVING_WAREHOUSES = [
+  'Klapmuts: 58 Main Road, Klapmuts, Cape Town, 7625',
+  'Pretoria: Unit 9 Steyns Industrial Park, 433 van Riebeeck Street, Hermanstad, Pretoria, 0001',
+];
+
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', incoterm: '',
-  origin: '', destination: '', supplier_name: '', cargo_description: '', hs_code: '',
+  origin: '', destination: '', collection_address: '', supplier_name: '', cargo_description: '', hs_code: '',
   gross_weight_kg: '', volume_cbm: '', pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
 };
 
@@ -308,19 +315,56 @@ function QuoteRequestForm({ onClose }) {
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Incoterm</label>
-                  <select style={inputStyle} value={form.incoterm} onChange={e => handleFieldChange('incoterm', e.target.value)}>
+                  <select
+                    style={inputStyle}
+                    value={form.incoterm}
+                    onChange={e => {
+                      const nextIncoterm = e.target.value;
+                      const wasExw = form.incoterm === 'EXW';
+                      const isExw = nextIncoterm === 'EXW';
+                      setForm(prev => ({
+                        ...prev,
+                        incoterm: nextIncoterm,
+                        // reset destination when toggling EXW so a free-text value
+                        // isn't mistaken for one of the fixed warehouse addresses (or vice versa)
+                        destination: wasExw !== isExw ? '' : prev.destination,
+                        collection_address: isExw ? prev.collection_address : '',
+                      }));
+                    }}
+                  >
                     <option value="">—</option>
                     {INCOTERMS.map(term => <option key={term} value={term}>{term}</option>)}
                   </select>
                 </div>
 
-                <div style={fieldWrap}>
+                <div style={{ ...fieldWrap, gridColumn: form.incoterm === 'EXW' ? '1 / -1' : 'auto' }}>
                   <label style={labelStyle}>Origin</label>
                   <input style={inputStyle} value={form.origin} onChange={e => handleFieldChange('origin', e.target.value)} placeholder="Port / city, country" />
                 </div>
-                <div style={fieldWrap}>
-                  <label style={labelStyle}>Destination</label>
-                  <input style={inputStyle} value={form.destination} onChange={e => handleFieldChange('destination', e.target.value)} placeholder="Port / city, country" />
+
+                {form.incoterm === 'EXW' && (
+                  <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Collection Address (Full Address) *</label>
+                    <textarea
+                      style={{ ...inputStyle, minHeight: '50px', resize: 'vertical' }}
+                      value={form.collection_address}
+                      onChange={e => handleFieldChange('collection_address', e.target.value)}
+                      placeholder="Full pickup address at the supplier's premises"
+                      required={form.incoterm === 'EXW'}
+                    />
+                  </div>
+                )}
+
+                <div style={{ ...fieldWrap, gridColumn: form.incoterm === 'EXW' ? '1 / -1' : 'auto' }}>
+                  <label style={labelStyle}>Destination {form.incoterm === 'EXW' && '(Delivery Warehouse)'}</label>
+                  {form.incoterm === 'EXW' ? (
+                    <select style={inputStyle} value={form.destination} onChange={e => handleFieldChange('destination', e.target.value)} required>
+                      <option value="">— Select warehouse —</option>
+                      {RECEIVING_WAREHOUSES.map(addr => <option key={addr} value={addr}>{addr}</option>)}
+                    </select>
+                  ) : (
+                    <input style={inputStyle} value={form.destination} onChange={e => handleFieldChange('destination', e.target.value)} placeholder="Port / city, country" />
+                  )}
                 </div>
 
                 <div style={fieldWrap}>

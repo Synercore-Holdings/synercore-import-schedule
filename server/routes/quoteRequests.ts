@@ -42,6 +42,7 @@ router.post(
     body('incoterm').optional({ nullable: true }).trim(),
     body('origin').optional({ nullable: true }).trim(),
     body('destination').optional({ nullable: true }).trim(),
+    body('collection_address').optional({ nullable: true }).trim(),
     body('supplier_name').optional({ nullable: true }).trim(),
     body('cargo_description').optional({ nullable: true }).trim(),
     body('hs_code').optional({ nullable: true }).trim(),
@@ -56,7 +57,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const {
       forwarder_name, forwarder_email, transport_mode = 'sea', incoterm,
-      origin, destination, supplier_name, cargo_description, hs_code,
+      origin, destination, collection_address, supplier_name, cargo_description, hs_code,
       gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes,
     } = req.body;
     const userId = req.user!.id;
@@ -65,13 +66,13 @@ router.post(
     const result = await pool.query(
       `INSERT INTO quote_requests (
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode,
-        incoterm, origin, destination, supplier_name, cargo_description, hs_code,
+        incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code,
         gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode,
-        incoterm || null, origin || null, destination || null, supplier_name || null,
+        incoterm || null, origin || null, destination || null, collection_address || null, supplier_name || null,
         cargo_description || null, hs_code || null, gross_weight_kg || null, volume_cbm || null,
         pallet_count || null, cargo_ready_date || null, required_date || null, notes || null,
       ]
@@ -128,7 +129,7 @@ router.put(
     const { id } = req.params;
     const allowedFields = [
       'forwarder_name', 'forwarder_email', 'transport_mode', 'incoterm', 'origin', 'destination',
-      'supplier_name', 'cargo_description', 'hs_code', 'gross_weight_kg', 'volume_cbm',
+      'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'gross_weight_kg', 'volume_cbm',
       'pallet_count', 'cargo_ready_date', 'required_date', 'notes', 'status',
     ];
 

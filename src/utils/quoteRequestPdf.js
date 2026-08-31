@@ -67,6 +67,7 @@ export function generateQuoteRequestPDF(req) {
       ['Mode', TRANSPORT_LABELS[req.transport_mode] || fmt(req.transport_mode)],
       ['Incoterm', fmt(req.incoterm)],
       ['Origin', fmt(req.origin)],
+      ...(req.collection_address ? [['Collection Address', req.collection_address]] : []),
       ['Destination', fmt(req.destination)],
       ['Cargo Ready Date', fmtDate(req.cargo_ready_date)],
       ['Required Delivery Date', fmtDate(req.required_date)],
