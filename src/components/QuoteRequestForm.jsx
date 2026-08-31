@@ -214,6 +214,13 @@ function QuoteRequestForm({ onClose }) {
     setShowForm(true);
   };
 
+  const handleCopyClick = (req) => {
+    setEditingId(null);
+    setForm({ ...toFormState(req), forwarder_name: '', forwarder_email: '' });
+    setIsViewMode(false);
+    setShowForm(true);
+  };
+
   const handleUpdateStatus = async (id, status) => {
     try {
       const response = await authFetch(getApiUrl(`/api/quote-requests/${id}`), {
@@ -425,6 +432,13 @@ function QuoteRequestForm({ onClose }) {
                           style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
                         >
                           Edit
+                        </button>
+                        <button
+                          onClick={() => handleCopyClick(req)}
+                          title="Reuse this shipment's details for another forwarder"
+                          style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                        >
+                          Copy
                         </button>
                         <button
                           onClick={() => generateQuoteRequestPDF(req)}
