@@ -254,22 +254,44 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
     };
   }, [costingEstimates]);
 
-  // % of costings that have shown up in the Shipping Schedule — matched either
-  // by direct shipment_id link, or by supplier + product name cross-reference
-  // (most estimates are never explicitly linked to a shipment record).
+  // % of costings that have shown up in the Shipping Schedule — matched by
+  // direct shipment_id link where present, otherwise by fuzzy supplier +
+  // product name cross-reference. Exact-string matching undercounts badly
+  // here because the costing sheet and shipment records name the same goods
+  // differently (trade abbreviation vs formal name, legal-suffix variants),
+  // e.g. "SHMP" vs "Sodium Hexametaphosphate", "QIDA CHEMICAL" vs "Qida
+  // Chemical Co. Ltd" — so we match on substring/legal-suffix-stripped
+  // supplier names and substring/shared-token product names instead.
   const costingConversion = useMemo(() => {
     const active = costingEstimates.filter(e => !e.archived);
     if (active.length === 0) return { convertedCount: 0, totalCount: 0, pct: 0 };
 
     const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+    const LEGAL_SUFFIXES = /\b(ltd|co|inc|pty|plc|sdn|bhd|corp|company|srl|s\.r\.l|gmbh|llc|sa|s\.a)\b/g;
+    const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'reg', 'regular']);
+
+    const fuzzySupplierMatch = (a, b) => {
+      const clean = (s) => norm(s).replace(/[.,]/g, ' ').replace(LEGAL_SUFFIXES, ' ').replace(/\s+/g, ' ').trim();
+      const ca = clean(a), cb = clean(b);
+      if (!ca || !cb) return false;
+      return ca === cb || ca.includes(cb) || cb.includes(ca);
+    };
+
+    const tokenize = (s) => norm(s).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !STOPWORDS.has(w));
+
+    const fuzzyProductMatch = (a, b) => {
+      const na = norm(a), nb = norm(b);
+      if (!na || !nb) return false;
+      if (na === nb) return true;
+      if (na.length >= 4 && nb.length >= 4 && (na.includes(nb) || nb.includes(na))) return true;
+      const ta = tokenize(a), tb = tokenize(b);
+      if (!ta.length || !tb.length) return false;
+      const setB = new Set(tb);
+      return ta.some(t => setB.has(t));
+    };
 
     const shipmentIds = new Set((shipments || []).map(s => s.id).filter(Boolean));
-    const shipmentPairs = new Set();
-    (shipments || []).forEach(s => {
-      const sup = norm(s.supplier);
-      const prod = norm(s.productName);
-      if (sup && prod) shipmentPairs.add(`${sup}|${prod}`);
-    });
+    const shipmentList = shipments || [];
 
     let convertedCount = 0;
     active.forEach(est => {
@@ -277,9 +299,9 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
         convertedCount++;
         return;
       }
-      const sup = norm(est.supplier_name);
       const products = Array.isArray(est.products) ? est.products : [];
-      const matched = products.some(p => shipmentPairs.has(`${sup}|${norm(p.name)}`));
+      const relevant = shipmentList.filter(s => fuzzySupplierMatch(est.supplier_name, s.supplier));
+      const matched = relevant.some(s => products.some(p => fuzzyProductMatch(p.name, s.productName)));
       if (matched) convertedCount++;
     });
 
@@ -1447,7 +1469,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
               className={`stat-card ${costingConversion.pct >= 50 ? 'ring-success' : 'ring-warning'}`}
               style={{ cursor: 'pointer' }}
               onClick={() => navigate('/costing')}
-              title="Costings matched to a shipment in the Shipping Schedule, by shipment link or by supplier + product name"
+              title="Costings matched to a shipment in the Shipping Schedule, by direct shipment link or by fuzzy supplier + product name matching"
             >
               <div style={{
                 width: 24, height: 24, borderRadius: '50%', display: 'flex',
