@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
-import { generateQuoteRequestPDF } from '../utils/quoteRequestPdf';
+import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
 
 const STATUS_STYLES = {
   draft: { backgroundColor: '#f3f4f6', color: '#6b7280' },
@@ -471,6 +471,13 @@ function QuoteRequestForm({ onClose }) {
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
                     = {calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count) ?? '—'} CBM total
+                    {(() => {
+                      const cbm = calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count);
+                      const volKg = calcVolumetricWeight(cbm, form.transport_mode);
+                      return volKg
+                        ? ` ≈ ${volKg} kg volumetric (${TRANSPORT_LABELS[form.transport_mode]} factor: ${VOLUMETRIC_FACTORS[form.transport_mode]} kg/m³)`
+                        : '';
+                    })()}
                   </div>
                 </div>
 

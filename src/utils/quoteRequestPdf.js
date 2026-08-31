@@ -12,6 +12,15 @@ const ROW_ALT = [248, 250, 252];
 const TRANSPORT_LABELS = { sea: 'Sea Freight', air: 'Air Freight', road: 'Road Freight' };
 const DG_LABELS = { dg: 'DG (Dangerous Goods)', non_dg: 'Non-DG' };
 
+// Standard volumetric conversion factors (kg per CBM) by transport mode:
+// Air = 167 (IATA standard), Sea = 1000 (1 CBM = 1 ton, LCL convention), Road = 333 (common SA road-freight factor)
+export const VOLUMETRIC_FACTORS = { air: 167, sea: 1000, road: 333 };
+export const calcVolumetricWeight = (cbm, transportMode) => {
+  if (!cbm) return null;
+  const factor = VOLUMETRIC_FACTORS[transportMode] || VOLUMETRIC_FACTORS.sea;
+  return Math.round(cbm * factor * 10) / 10;
+};
+
 const fmt = (v, suffix = '') => (v === null || v === undefined || v === '' ? '—' : `${v}${suffix}`);
 const fmtDate = (d) => {
   if (!d) return '—';
@@ -95,6 +104,7 @@ export function generateQuoteRequestPDF(req) {
         : '—'],
       ['Pallets / Packages', fmt(req.pallet_count)],
       ['Volume (Total)', fmt(req.volume_cbm, ' CBM')],
+      ['Volumetric Weight', fmt(calcVolumetricWeight(req.volume_cbm, req.transport_mode), ' kg')],
     ],
     theme: 'plain',
     styles: { fontSize: 9, cellPadding: 3 },
