@@ -37,6 +37,34 @@ const calcVolumeCbm = (length_cm, width_cm, height_cm, pallet_count) => {
   return Math.round((l * w * h / 1000000) * qty * 1000) / 1000;
 };
 
+const toDateInput = (d) => {
+  if (!d) return '';
+  if (typeof d === 'string') return d.slice(0, 10);
+  try { return new Date(d).toISOString().slice(0, 10); } catch { return ''; }
+};
+
+const toFormState = (req) => ({
+  forwarder_name: req.forwarder_name || '',
+  forwarder_email: req.forwarder_email || '',
+  transport_mode: req.transport_mode || 'sea',
+  incoterm: req.incoterm || '',
+  origin: req.origin || '',
+  destination: req.destination || '',
+  collection_address: req.collection_address || '',
+  supplier_name: req.supplier_name || '',
+  cargo_description: req.cargo_description || '',
+  hs_code: req.hs_code || '',
+  dg_classification: req.dg_classification || 'non_dg',
+  gross_weight_kg: req.gross_weight_kg ?? '',
+  length_cm: req.length_cm ?? '',
+  width_cm: req.width_cm ?? '',
+  height_cm: req.height_cm ?? '',
+  pallet_count: req.pallet_count ?? '',
+  cargo_ready_date: toDateInput(req.cargo_ready_date),
+  required_date: toDateInput(req.required_date),
+  notes: req.notes || '',
+});
+
 const inputStyle = {
   width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.85rem',
 };
@@ -52,6 +80,7 @@ function QuoteRequestForm({ onClose }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -84,30 +113,39 @@ function QuoteRequestForm({ onClose }) {
     e.preventDefault();
     if (!form.forwarder_name.trim()) return;
     setSaving(true);
+    const isEdit = editingId !== null;
     try {
       const payload = { ...form, volume_cbm: calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count) };
-      const response = await authFetch(getApiUrl('/api/quote-requests'), {
-        method: 'POST',
+      const url = isEdit ? getApiUrl(`/api/quote-requests/${editingId}`) : getApiUrl('/api/quote-requests');
+      const response = await authFetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (response.ok) {
         const result = await response.json();
         setShowForm(false);
+        setEditingId(null);
         setForm(EMPTY_FORM);
         await fetchRequests();
         generateQuoteRequestPDF(result.data);
-        showSuccess?.('Quote request created — PDF downloaded');
+        showSuccess?.(isEdit ? 'Quote request updated — PDF downloaded' : 'Quote request created — PDF downloaded');
       } else {
         const err = await response.json().catch(() => ({}));
-        showError?.(err.error || 'Failed to create quote request');
+        showError?.(err.error || `Failed to ${isEdit ? 'update' : 'create'} quote request`);
       }
     } catch (err) {
-      console.error('Failed to create quote request:', err);
-      showError?.('Failed to create quote request');
+      console.error(`Failed to ${isEdit ? 'update' : 'create'} quote request:`, err);
+      showError?.(`Failed to ${isEdit ? 'update' : 'create'} quote request`);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEditClick = (req) => {
+    setEditingId(req.id);
+    setForm(toFormState(req));
+    setShowForm(true);
   };
 
   const handleUpdateStatus = async (id, status) => {
@@ -150,7 +188,7 @@ function QuoteRequestForm({ onClose }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            onClick={() => { setForm(EMPTY_FORM); setShowForm(true); }}
+            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }}
             style={{
               background: 'var(--navy-900)', border: 'none', color: 'white',
               padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
@@ -258,6 +296,12 @@ function QuoteRequestForm({ onClose }) {
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button
+                          onClick={() => handleEditClick(req)}
+                          style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                        >
+                          Edit
+                        </button>
+                        <button
                           onClick={() => generateQuoteRequestPDF(req)}
                           style={{ padding: '5px 8px', backgroundColor: 'var(--navy-900)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
                         >
@@ -312,7 +356,9 @@ function QuoteRequestForm({ onClose }) {
             backgroundColor: 'white', borderRadius: '10px', maxWidth: '640px', width: '100%',
             maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
           }}>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: '#0f172a' }}>New Quote Request</h3>
+            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: '#0f172a' }}>
+              {editingId ? `Edit Quote Request QR-${String(editingId).padStart(5, '0')}` : 'New Quote Request'}
+            </h3>
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
                 <div style={fieldWrap}>
@@ -444,7 +490,7 @@ function QuoteRequestForm({ onClose }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setShowForm(false)} style={{
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} style={{
                   padding: '8px 16px', background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
                   borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem',
                 }}>
@@ -455,7 +501,7 @@ function QuoteRequestForm({ onClose }) {
                   borderRadius: '6px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600,
                   opacity: saving ? 0.7 : 1,
                 }}>
-                  {saving ? 'Saving...' : 'Create & Download PDF'}
+                  {saving ? 'Saving...' : editingId ? 'Save Changes & Download PDF' : 'Create & Download PDF'}
                 </button>
               </div>
             </form>
