@@ -5,7 +5,7 @@ import {
   formatNumber,
 } from '../utils/costingCalculations';
 
-function CostingEstimatesTable({ estimates, isAdmin, onEdit, onDelete, onDuplicate, onGeneratePDF, onEmailEstimate, isExport = false, initialTransportModeFilter = 'all' }) {
+function CostingEstimatesTable({ estimates, isAdmin, onEdit, onView, onDelete, onDuplicate, onGeneratePDF, onEmailEstimate, isExport = false, initialTransportModeFilter = 'all' }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [transportModeFilter, setTransportModeFilter] = useState(initialTransportModeFilter); // 'all', 'sea', 'air'
 
@@ -226,6 +226,12 @@ function CostingEstimatesTable({ estimates, isAdmin, onEdit, onDelete, onDuplica
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => onView(est)}
+                          style={{ padding: '6px 10px', backgroundColor: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                        >
+                          View
+                        </button>
                         {isAdmin && (
                           <button
                             onClick={() => onEdit(est)}

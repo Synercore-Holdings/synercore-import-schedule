@@ -155,6 +155,7 @@ function ExportCosting() {
   const [formExpanded, setFormExpanded] = useState(true);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [editingId, setEditingId] = useState(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   const { clearDraft: clearCostingDraft, confirmClose: confirmCloseCosting } = useFormDraft(
     `export_costing_${editingId || 'new'}`, formData, setFormData, { enabled: showForm }
   );
@@ -499,6 +500,17 @@ function ExportCosting() {
       ...estimate,
     });
     setEditingId(estimate.id);
+    setIsViewMode(false);
+    setShowForm(true);
+  };
+
+  const handleView = (estimate) => {
+    setFormData({
+      ...INITIAL_FORM_STATE,
+      ...estimate,
+    });
+    setEditingId(estimate.id);
+    setIsViewMode(true);
     setShowForm(true);
   };
 
@@ -656,7 +668,7 @@ function ExportCosting() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <h3 style={{ margin: 0, color: '#0f172a' }}>
-                  {editingId ? 'Edit Export Cost Estimate' : 'New Export Cost Estimate'}
+                  {isViewMode ? 'View Export Cost Estimate (Read Only)' : editingId ? 'Edit Export Cost Estimate' : 'New Export Cost Estimate'}
                 </h3>
                 <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '2px solid #e5e7eb' }}>
                   <button
@@ -719,7 +731,10 @@ function ExportCosting() {
                   {formExpanded ? '⊖ Collapse' : '⊕ Expand'}
                 </button>
                 <button
-                  onClick={() => confirmCloseCosting(() => { setShowForm(false); setEditingId(null); setFormExpanded(false); })}
+                  onClick={() => {
+                    const close = () => { setShowForm(false); setEditingId(null); setIsViewMode(false); setFormExpanded(false); };
+                    isViewMode ? close() : confirmCloseCosting(close);
+                  }}
                   style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-500)' }}
                 >
                   x
@@ -727,6 +742,12 @@ function ExportCosting() {
               </div>
             </div>
 
+            {isViewMode && (
+              <div style={{ padding: '8px 24px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.8rem', fontWeight: 600 }}>
+                🔒 Read-only view — this estimate cannot be edited from here.
+              </div>
+            )}
+            <div style={isViewMode ? { pointerEvents: 'none', opacity: 0.85 } : undefined}>
             <CostingFormSections
               formData={formData}
               calculatedTotals={calculatedTotals}
@@ -740,8 +761,11 @@ function ExportCosting() {
               onAddLastMileCharge={addLastMileCharge}
               onRemoveLastMileCharge={removeLastMileCharge}
               onUpdateLastMileCharge={updateLastMileCharge}
-              onSubmit={handleSubmit}
-              onCancel={() => confirmCloseCosting(() => { setShowForm(false); setEditingId(null); })}
+              onSubmit={isViewMode ? (e) => e?.preventDefault?.() : handleSubmit}
+              onCancel={() => {
+                const close = () => { setShowForm(false); setEditingId(null); setIsViewMode(false); };
+                isViewMode ? close() : confirmCloseCosting(close);
+              }}
               showAddSupplier={showAddCustomer}
               onToggleAddSupplier={setShowAddCustomer}
               newSupplierName={newCustomerName}
@@ -758,6 +782,7 @@ function ExportCosting() {
               departureAirportOptions={SA_AIRPORTS}
               arrivalAirportOptions={WORLD_AIRPORTS}
             />
+            </div>
           </div>
         </div>
       )}
@@ -766,6 +791,7 @@ function ExportCosting() {
         estimates={estimates}
         isAdmin={isAdmin}
         onEdit={handleEdit}
+        onView={handleView}
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
         onGeneratePDF={generatePDF}

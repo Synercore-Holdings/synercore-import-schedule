@@ -81,6 +81,7 @@ function QuoteRequestForm({ onClose }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [isViewMode, setIsViewMode] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -145,6 +146,14 @@ function QuoteRequestForm({ onClose }) {
   const handleEditClick = (req) => {
     setEditingId(req.id);
     setForm(toFormState(req));
+    setIsViewMode(false);
+    setShowForm(true);
+  };
+
+  const handleViewClick = (req) => {
+    setEditingId(req.id);
+    setForm(toFormState(req));
+    setIsViewMode(true);
     setShowForm(true);
   };
 
@@ -188,7 +197,7 @@ function QuoteRequestForm({ onClose }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }}
+            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowForm(true); }}
             style={{
               background: 'var(--navy-900)', border: 'none', color: 'white',
               padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
@@ -296,6 +305,12 @@ function QuoteRequestForm({ onClose }) {
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button
+                          onClick={() => handleViewClick(req)}
+                          style={{ padding: '5px 8px', backgroundColor: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                        >
+                          View
+                        </button>
+                        <button
                           onClick={() => handleEditClick(req)}
                           style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
                         >
@@ -357,10 +372,17 @@ function QuoteRequestForm({ onClose }) {
             maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
           }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: '#0f172a' }}>
-              {editingId ? `Edit Quote Request QR-${String(editingId).padStart(5, '0')}` : 'New Quote Request'}
+              {isViewMode
+                ? `View Quote Request QR-${String(editingId).padStart(5, '0')} (Read Only)`
+                : editingId ? `Edit Quote Request QR-${String(editingId).padStart(5, '0')}` : 'New Quote Request'}
             </h3>
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+            {isViewMode && (
+              <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 600, borderRadius: '6px', marginBottom: '0.75rem' }}>
+                🔒 Read-only view — this request cannot be edited from here.
+              </div>
+            )}
+            <form onSubmit={isViewMode ? (e) => e.preventDefault() : handleSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem', ...(isViewMode ? { pointerEvents: 'none', opacity: 0.85 } : {}) }}>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Forwarder / Agent Name *</label>
                   <input style={inputStyle} value={form.forwarder_name} onChange={e => handleFieldChange('forwarder_name', e.target.value)} required />
@@ -497,19 +519,30 @@ function QuoteRequestForm({ onClose }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} style={{
-                  padding: '8px 16px', background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
-                  borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem',
-                }}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={saving} style={{
-                  padding: '8px 16px', background: 'var(--navy-900)', color: 'white', border: 'none',
-                  borderRadius: '6px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600,
-                  opacity: saving ? 0.7 : 1,
-                }}>
-                  {saving ? 'Saving...' : editingId ? 'Save Changes & Download PDF' : 'Create & Download PDF'}
-                </button>
+                {isViewMode ? (
+                  <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setIsViewMode(false); }} style={{
+                    padding: '8px 16px', background: 'var(--navy-900)', color: 'white', border: 'none',
+                    borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                  }}>
+                    Close
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} style={{
+                      padding: '8px 16px', background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+                      borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem',
+                    }}>
+                      Cancel
+                    </button>
+                    <button type="submit" disabled={saving} style={{
+                      padding: '8px 16px', background: 'var(--navy-900)', color: 'white', border: 'none',
+                      borderRadius: '6px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                      opacity: saving ? 0.7 : 1,
+                    }}>
+                      {saving ? 'Saving...' : editingId ? 'Save Changes & Download PDF' : 'Create & Download PDF'}
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           </div>

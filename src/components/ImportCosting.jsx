@@ -382,6 +382,7 @@ function ImportCosting() {
   const [formExpanded, setFormExpanded] = useState(true);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [editingId, setEditingId] = useState(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   const { clearDraft: clearCostingDraft, confirmClose: confirmCloseCosting } = useFormDraft(
     `costing_${editingId || 'new'}`, formData, setFormData, { enabled: showForm }
   );
@@ -880,6 +881,16 @@ function ImportCosting() {
       ...normalizeEstimateForForm(estimate),
     });
     setEditingId(estimate.id);
+    setIsViewMode(false);
+    setShowForm(true);
+  };
+
+  const handleView = (estimate) => {
+    setFormData({
+      ...normalizeEstimateForForm(estimate),
+    });
+    setEditingId(estimate.id);
+    setIsViewMode(true);
     setShowForm(true);
   };
 
@@ -1163,7 +1174,7 @@ function ImportCosting() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <h3 style={{ margin: 0, color: '#0f172a' }}>
-                  {editingId ? 'Edit Cost Estimate' : 'New Cost Estimate'}
+                  {isViewMode ? 'View Cost Estimate (Read Only)' : editingId ? 'Edit Cost Estimate' : 'New Cost Estimate'}
                 </h3>
                 <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '2px solid #e5e7eb' }}>
                   <button
@@ -1199,7 +1210,10 @@ function ImportCosting() {
                   {formExpanded ? '⊖ Collapse' : '⊕ Expand'}
                 </button>
                 <button
-                  onClick={() => confirmCloseCosting(() => { setShowForm(false); setEditingId(null); setFormExpanded(false); })}
+                  onClick={() => {
+                    const close = () => { setShowForm(false); setEditingId(null); setIsViewMode(false); setFormExpanded(false); };
+                    isViewMode ? close() : confirmCloseCosting(close);
+                  }}
                   style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-500)' }}
                 >
                   x
@@ -1207,35 +1221,45 @@ function ImportCosting() {
               </div>
             </div>
 
-            <CostingFormSections
-              formData={formData}
-              calculatedTotals={calculatedTotals}
-              editingId={editingId}
-              suppliers={suppliers}
-              exchangeRate={exchangeRate}
-              onInputChange={handleInputChange}
-              onAddProduct={addProduct}
-              onRemoveProduct={removeProduct}
-                onUpdateProduct={updateProduct}
-                onAddLastMileCharge={addLastMileCharge}
-                onRemoveLastMileCharge={removeLastMileCharge}
-                onUpdateLastMileCharge={updateLastMileCharge}
-                onSubmit={handleSubmit}
-              onCancel={() => confirmCloseCosting(() => { setShowForm(false); setEditingId(null); })}
-              showAddSupplier={showAddSupplier}
-              onToggleAddSupplier={setShowAddSupplier}
-              newSupplierName={newSupplierName}
-              onNewSupplierNameChange={setNewSupplierName}
-              onCreateSupplier={createSupplier}
-              getTotalWeight={getTotalWeight}
-              getCustomsTotals={getCustomsTotals}
-              calculateProductCustomsValues={calculateProductCustomsValues}
-              calculateProductAllocation={calculateProductAllocation}
-              originPortOptions={importPortOptions}
-              dischargePortOptions={importDischargePortOptions}
-              onAddOriginPort={(portName) => addCustomImportPort(portName, 'port_of_loading')}
-              onAddDischargePort={(portName) => addCustomImportPort(portName, 'port_of_discharge')}
-            />
+            {isViewMode && (
+              <div style={{ padding: '8px 24px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.8rem', fontWeight: 600 }}>
+                🔒 Read-only view — this estimate cannot be edited from here.
+              </div>
+            )}
+            <div style={isViewMode ? { pointerEvents: 'none', opacity: 0.85 } : undefined}>
+              <CostingFormSections
+                formData={formData}
+                calculatedTotals={calculatedTotals}
+                editingId={editingId}
+                suppliers={suppliers}
+                exchangeRate={exchangeRate}
+                onInputChange={handleInputChange}
+                onAddProduct={addProduct}
+                onRemoveProduct={removeProduct}
+                  onUpdateProduct={updateProduct}
+                  onAddLastMileCharge={addLastMileCharge}
+                  onRemoveLastMileCharge={removeLastMileCharge}
+                  onUpdateLastMileCharge={updateLastMileCharge}
+                  onSubmit={isViewMode ? (e) => e?.preventDefault?.() : handleSubmit}
+                onCancel={() => {
+                  const close = () => { setShowForm(false); setEditingId(null); setIsViewMode(false); };
+                  isViewMode ? close() : confirmCloseCosting(close);
+                }}
+                showAddSupplier={showAddSupplier}
+                onToggleAddSupplier={setShowAddSupplier}
+                newSupplierName={newSupplierName}
+                onNewSupplierNameChange={setNewSupplierName}
+                onCreateSupplier={createSupplier}
+                getTotalWeight={getTotalWeight}
+                getCustomsTotals={getCustomsTotals}
+                calculateProductCustomsValues={calculateProductCustomsValues}
+                calculateProductAllocation={calculateProductAllocation}
+                originPortOptions={importPortOptions}
+                dischargePortOptions={importDischargePortOptions}
+                onAddOriginPort={(portName) => addCustomImportPort(portName, 'port_of_loading')}
+                onAddDischargePort={(portName) => addCustomImportPort(portName, 'port_of_discharge')}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1246,6 +1270,7 @@ function ImportCosting() {
         isAdmin={isAdmin}
         initialTransportModeFilter={initialTransportModeFilter}
         onEdit={handleEdit}
+        onView={handleView}
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
         onGeneratePDF={generatePDF}
