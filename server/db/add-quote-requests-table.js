@@ -29,6 +29,11 @@ async function createQuoteRequestsTable() {
         required_date DATE,
         notes TEXT,
         status VARCHAR(20) DEFAULT 'draft',
+        quoted_rate NUMERIC,
+        quoted_currency VARCHAR(10) DEFAULT 'USD',
+        quote_reference VARCHAR(100),
+        quoted_transit_days INTEGER,
+        quote_notes TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -39,6 +44,11 @@ async function createQuoteRequestsTable() {
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS length_cm NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS width_cm NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS height_cm NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_currency VARCHAR(10) DEFAULT 'USD';`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quote_reference VARCHAR(100);`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_transit_days INTEGER;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quote_notes TEXT;`);
 
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_user ON quote_requests(requested_by);`);

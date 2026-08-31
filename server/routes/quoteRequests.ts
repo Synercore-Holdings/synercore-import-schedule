@@ -132,6 +132,11 @@ router.put(
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('dg_classification').optional().isIn(DG_CLASSIFICATIONS),
     body('notes').optional({ nullable: true }).trim(),
+    body('quoted_rate').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('quoted_currency').optional({ nullable: true }).trim(),
+    body('quote_reference').optional({ nullable: true }).trim(),
+    body('quoted_transit_days').optional({ checkFalsy: true }).isInt({ min: 0 }),
+    body('quote_notes').optional({ nullable: true }).trim(),
   ],
   validate,
   asyncHandler(async (req: Request, res: Response) => {
@@ -141,6 +146,7 @@ router.put(
       'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'dg_classification',
       'gross_weight_kg', 'length_cm', 'width_cm', 'height_cm', 'volume_cbm', 'pallet_count',
       'cargo_ready_date', 'required_date', 'notes', 'status',
+      'quoted_rate', 'quoted_currency', 'quote_reference', 'quoted_transit_days', 'quote_notes',
     ];
 
     const updates: string[] = [];

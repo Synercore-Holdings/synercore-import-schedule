@@ -12,6 +12,14 @@ const STATUS_STYLES = {
   cancelled: { backgroundColor: '#fef2f2', color: '#dc2626' },
 };
 
+// "quoted" internally = rate received, request complete — shown to the user as "Completed"
+const STATUS_LABELS = {
+  all: 'All', draft: 'Draft', sent: 'Sent', quoted: 'Completed', expired: 'Expired', cancelled: 'Cancelled',
+};
+
+const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
+const EMPTY_RATE_FORM = { quoted_rate: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
+
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
@@ -82,6 +90,9 @@ function QuoteRequestForm({ onClose }) {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [rateModalReq, setRateModalReq] = useState(null);
+  const [rateForm, setRateForm] = useState(EMPTY_RATE_FORM);
+  const [savingRate, setSavingRate] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -170,6 +181,43 @@ function QuoteRequestForm({ onClose }) {
     }
   };
 
+  const handleOpenRateModal = (req) => {
+    setRateModalReq(req);
+    setRateForm({
+      quoted_rate: req.quoted_rate ?? '',
+      quoted_currency: req.quoted_currency || 'USD',
+      quote_reference: req.quote_reference || '',
+      quoted_transit_days: req.quoted_transit_days ?? '',
+      quote_notes: req.quote_notes || '',
+    });
+  };
+
+  const handleSaveRate = async (e) => {
+    e.preventDefault();
+    if (!rateModalReq) return;
+    setSavingRate(true);
+    try {
+      const response = await authFetch(getApiUrl(`/api/quote-requests/${rateModalReq.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...rateForm, status: 'quoted' }),
+      });
+      if (response.ok) {
+        setRateModalReq(null);
+        await fetchRequests();
+        showSuccess?.('Rate captured — request marked complete');
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showError?.(err.error || 'Failed to save rate');
+      }
+    } catch (err) {
+      console.error('Failed to save rate:', err);
+      showError?.('Failed to save rate');
+    } finally {
+      setSavingRate(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!(await confirmAction({ title: 'Delete Quote Request', message: 'Are you sure you want to delete this request?', type: 'danger', confirmText: 'Delete' }))) return;
     try {
@@ -237,10 +285,9 @@ function QuoteRequestForm({ onClose }) {
                 color: statusFilter === status ? 'white' : 'var(--text-700)',
                 border: 'none', borderRadius: '6px', cursor: 'pointer',
                 fontSize: '0.85rem', fontWeight: statusFilter === status ? '600' : '400',
-                textTransform: 'capitalize',
               }}
             >
-              {status}
+              {STATUS_LABELS[status]}
             </button>
           ))}
         </div>
@@ -262,6 +309,7 @@ function QuoteRequestForm({ onClose }) {
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Mode</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Cargo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Rate Received</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Date</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Actions</th>
                 </tr>
@@ -293,11 +341,18 @@ function QuoteRequestForm({ onClose }) {
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{
                         padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500',
-                        textTransform: 'capitalize',
                         ...(STATUS_STYLES[req.status] || STATUS_STYLES.draft)
                       }}>
-                        {req.status}
+                        {STATUS_LABELS[req.status] || req.status}
                       </span>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>
+                      {req.quoted_rate ? (
+                        <div>
+                          <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{req.quoted_currency} {Number(req.quoted_rate).toLocaleString()}</div>
+                          {req.quoted_transit_days && <div style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>{req.quoted_transit_days} days transit</div>}
+                        </div>
+                      ) : '—'}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-500)' }}>
                       {new Date(req.created_at).toLocaleDateString()}
@@ -330,12 +385,20 @@ function QuoteRequestForm({ onClose }) {
                             Mark Sent
                           </button>
                         )}
-                        {req.status === 'sent' && (
+                        {(req.status === 'draft' || req.status === 'sent') && (
                           <button
-                            onClick={() => handleUpdateStatus(req.id, 'quoted')}
+                            onClick={() => handleOpenRateModal(req)}
                             style={{ padding: '5px 8px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
                           >
-                            Mark Quoted
+                            Add Rate
+                          </button>
+                        )}
+                        {req.status === 'quoted' && (
+                          <button
+                            onClick={() => handleOpenRateModal(req)}
+                            style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                          >
+                            Edit Rate
                           </button>
                         )}
                         {(req.status === 'draft' || req.status === 'sent') && (
@@ -543,6 +606,91 @@ function QuoteRequestForm({ onClose }) {
                     </button>
                   </>
                 )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {rateModalReq && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '10px', maxWidth: '480px', width: '100%',
+            maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
+          }}>
+            <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
+              Add Rate Received
+            </h3>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-500)' }}>
+              QR-{String(rateModalReq.id).padStart(5, '0')} — {rateModalReq.forwarder_name}
+            </p>
+            <form onSubmit={handleSaveRate}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0 1rem' }}>
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Rate *</label>
+                  <input
+                    type="number" min="0" step="any" required style={inputStyle}
+                    value={rateForm.quoted_rate}
+                    onChange={e => setRateForm(prev => ({ ...prev, quoted_rate: e.target.value }))}
+                  />
+                </div>
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Currency</label>
+                  <select
+                    style={inputStyle}
+                    value={rateForm.quoted_currency}
+                    onChange={e => setRateForm(prev => ({ ...prev, quoted_currency: e.target.value }))}
+                  >
+                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Forwarder's Quote Reference</label>
+                  <input
+                    style={inputStyle}
+                    value={rateForm.quote_reference}
+                    onChange={e => setRateForm(prev => ({ ...prev, quote_reference: e.target.value }))}
+                  />
+                </div>
+
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Transit Days</label>
+                  <input
+                    type="number" min="0" step="1" style={inputStyle}
+                    value={rateForm.quoted_transit_days}
+                    onChange={e => setRateForm(prev => ({ ...prev, quoted_transit_days: e.target.value }))}
+                  />
+                </div>
+                <div />
+
+                <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Notes</label>
+                  <textarea
+                    style={{ ...inputStyle, minHeight: '50px', resize: 'vertical' }}
+                    value={rateForm.quote_notes}
+                    onChange={e => setRateForm(prev => ({ ...prev, quote_notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setRateModalReq(null)} style={{
+                  padding: '8px 16px', background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+                  borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem',
+                }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={savingRate} style={{
+                  padding: '8px 16px', background: 'var(--success)', color: 'white', border: 'none',
+                  borderRadius: '6px', cursor: savingRate ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                  opacity: savingRate ? 0.7 : 1,
+                }}>
+                  {savingRate ? 'Saving...' : 'Save & Mark Complete'}
+                </button>
               </div>
             </form>
           </div>
