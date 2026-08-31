@@ -20,6 +20,30 @@ const STATUS_LABELS = {
 const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
 const EMPTY_RATE_FORM = { quoted_rate: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
 
+const normRoute = (s) => (s || '').toString().trim().toLowerCase();
+
+// Groups completed requests by route (origin + destination + mode) — comparing
+// sea to air rates, or different origins, would be misleading, so each group
+// is a like-for-like set of forwarder quotes.
+const groupRatesByRoute = (completedRequests) => {
+  const groups = new Map();
+  completedRequests.forEach(req => {
+    if (!req.quoted_rate) return;
+    const key = `${normRoute(req.origin)}|${normRoute(req.destination)}|${req.transport_mode}`;
+    if (!groups.has(key)) {
+      groups.set(key, { origin: req.origin || '—', destination: req.destination || '—', transport_mode: req.transport_mode, entries: [] });
+    }
+    groups.get(key).entries.push(req);
+  });
+  return Array.from(groups.values())
+    .map(g => ({
+      ...g,
+      entries: g.entries.sort((a, b) => Number(a.quoted_rate) - Number(b.quoted_rate)),
+      mixedCurrency: new Set(g.entries.map(e => e.quoted_currency)).size > 1,
+    }))
+    .sort((a, b) => b.entries.length - a.entries.length);
+};
+
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
@@ -93,6 +117,9 @@ function QuoteRequestForm({ onClose }) {
   const [rateModalReq, setRateModalReq] = useState(null);
   const [rateForm, setRateForm] = useState(EMPTY_RATE_FORM);
   const [savingRate, setSavingRate] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [compareGroups, setCompareGroups] = useState([]);
+  const [loadingCompare, setLoadingCompare] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -116,6 +143,25 @@ function QuoteRequestForm({ onClose }) {
       setError('Failed to load quote requests');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenCompare = async () => {
+    setShowCompare(true);
+    setLoadingCompare(true);
+    try {
+      const response = await authFetch(getApiUrl('/api/quote-requests?status=quoted'));
+      if (response.ok) {
+        const result = await response.json();
+        setCompareGroups(groupRatesByRoute(result.data || []));
+      } else {
+        showError?.('Failed to load rate comparison');
+      }
+    } catch (err) {
+      console.error('Failed to fetch rate comparison:', err);
+      showError?.('Failed to load rate comparison');
+    } finally {
+      setLoadingCompare(false);
     }
   };
 
@@ -252,6 +298,15 @@ function QuoteRequestForm({ onClose }) {
             }}
           >
             + New Quote Request
+          </button>
+          <button
+            onClick={handleOpenCompare}
+            style={{
+              background: 'white', border: '1px solid var(--navy-900)', color: 'var(--navy-900)',
+              padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+            }}
+          >
+            Compare Rates
           </button>
           <button
             onClick={() => onClose ? onClose() : window.history.back()}
@@ -693,6 +748,84 @@ function QuoteRequestForm({ onClose }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showCompare && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '10px', maxWidth: '760px', width: '100%',
+            maxHeight: '85vh', overflow: 'auto', padding: '1.5rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Compare Rates by Route</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-500)' }}>
+                  Completed requests grouped by origin, destination, and mode
+                </p>
+              </div>
+              <button onClick={() => setShowCompare(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-500)' }}>
+                x
+              </button>
+            </div>
+
+            {loadingCompare ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)' }}>Loading...</div>
+            ) : compareGroups.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)', backgroundColor: 'var(--surface-2)', borderRadius: '8px' }}>
+                No completed requests with a rate yet — add a rate to a request to see it here.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {compareGroups.map((group, i) => (
+                  <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 14px', backgroundColor: '#f8f9fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--navy-900)' }}>
+                        {group.origin} → {group.destination}
+                        <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-500)' }}>
+                          ({TRANSPORT_LABELS[group.transport_mode] || group.transport_mode})
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-500)' }}>{group.entries.length} quote{group.entries.length > 1 ? 's' : ''}</span>
+                    </div>
+                    {group.mixedCurrency && (
+                      <div style={{ padding: '6px 14px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.7rem', fontWeight: 600 }}>
+                        ⚠️ Rates below are in different currencies — compare with care
+                      </div>
+                    )}
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {group.entries.map((entry, idx) => (
+                          <tr key={entry.id} style={{ borderTop: idx > 0 ? '1px solid #eee' : 'none', backgroundColor: idx === 0 ? '#f0fdf4' : 'white' }}>
+                            <td style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                              {idx === 0 && (
+                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#166534', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px', marginRight: '6px' }}>
+                                  BEST
+                                </span>
+                              )}
+                              {entry.forwarder_name}
+                            </td>
+                            <td style={{ padding: '8px 14px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'right' }}>
+                              {entry.quoted_currency} {Number(entry.quoted_rate).toLocaleString()}
+                            </td>
+                            <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
+                              {entry.quoted_transit_days ? `${entry.quoted_transit_days} days` : ''}
+                            </td>
+                            <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
+                              QR-{String(entry.id).padStart(5, '0')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
