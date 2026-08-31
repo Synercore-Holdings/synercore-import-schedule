@@ -254,6 +254,42 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
     };
   }, [costingEstimates]);
 
+  // % of costings that have shown up in the Shipping Schedule — matched either
+  // by direct shipment_id link, or by supplier + product name cross-reference
+  // (most estimates are never explicitly linked to a shipment record).
+  const costingConversion = useMemo(() => {
+    const active = costingEstimates.filter(e => !e.archived);
+    if (active.length === 0) return { convertedCount: 0, totalCount: 0, pct: 0 };
+
+    const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+
+    const shipmentIds = new Set((shipments || []).map(s => s.id).filter(Boolean));
+    const shipmentPairs = new Set();
+    (shipments || []).forEach(s => {
+      const sup = norm(s.supplier);
+      const prod = norm(s.productName);
+      if (sup && prod) shipmentPairs.add(`${sup}|${prod}`);
+    });
+
+    let convertedCount = 0;
+    active.forEach(est => {
+      if (est.shipment_id && shipmentIds.has(est.shipment_id)) {
+        convertedCount++;
+        return;
+      }
+      const sup = norm(est.supplier_name);
+      const products = Array.isArray(est.products) ? est.products : [];
+      const matched = products.some(p => shipmentPairs.has(`${sup}|${norm(p.name)}`));
+      if (matched) convertedCount++;
+    });
+
+    return {
+      convertedCount,
+      totalCount: active.length,
+      pct: (convertedCount / active.length) * 100,
+    };
+  }, [costingEstimates, shipments]);
+
   // Consolidated single-pass computation: stats, percentage deltas, and offsite average
   // Separate international and local shipments
   const internationalShipments = useMemo(() =>
@@ -1405,6 +1441,27 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
               </h3>
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
                 Avg Estimates / Month
+              </p>
+            </div>
+            <div
+              className={`stat-card ${costingConversion.pct >= 50 ? 'ring-success' : 'ring-warning'}`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate('/costing')}
+              title="Costings matched to a shipment in the Shipping Schedule, by shipment link or by supplier + product name"
+            >
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                backgroundColor: costingConversion.pct >= 50 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', marginBottom: 6,
+              }}>%</div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
+                {costingConversion.pct.toFixed(0)}%
+              </h3>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
+                Costings In Shipping Schedule
+              </p>
+              <p style={{ fontSize: 10, color: 'var(--text-500)', margin: '2px 0 0' }}>
+                {costingConversion.convertedCount} of {costingConversion.totalCount}
               </p>
             </div>
           </div>
