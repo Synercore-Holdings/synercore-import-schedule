@@ -14,6 +14,7 @@ export const VIEW_ROUTES = {
   costing:           '/costing',
   'export-costing':  '/export-costing',
   'costing-requests': '/costing-requests',
+  'quote-requests':  '/quote-requests',
   reports:           '/reports',
   'advanced-reports': '/advanced-reports',
   users:             '/users',
