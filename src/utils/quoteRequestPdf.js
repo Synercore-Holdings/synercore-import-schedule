@@ -10,6 +10,7 @@ const MUTED = [107, 114, 128];
 const ROW_ALT = [248, 250, 252];
 
 const TRANSPORT_LABELS = { sea: 'Sea Freight', air: 'Air Freight', road: 'Road Freight' };
+const DG_LABELS = { dg: 'DG (Dangerous Goods)', non_dg: 'Non-DG' };
 
 const fmt = (v, suffix = '') => (v === null || v === undefined || v === '' ? '—' : `${v}${suffix}`);
 const fmtDate = (d) => {
@@ -87,6 +88,7 @@ export function generateQuoteRequestPDF(req) {
       ['Supplier', fmt(req.supplier_name)],
       ['Description', fmt(req.cargo_description)],
       ['HS Code', fmt(req.hs_code)],
+      ['DG Classification', DG_LABELS[req.dg_classification] || DG_LABELS.non_dg],
       ['Gross Weight', fmt(req.gross_weight_kg, ' kg')],
       ['Volume', fmt(req.volume_cbm, ' CBM')],
       ['Pallets / Packages', fmt(req.pallet_count)],

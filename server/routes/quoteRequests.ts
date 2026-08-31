@@ -25,6 +25,7 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
 
 const TRANSPORT_MODES = ['sea', 'air', 'road'];
 const STATUSES = ['draft', 'sent', 'quoted', 'expired', 'cancelled'];
+const DG_CLASSIFICATIONS = ['dg', 'non_dg'];
 
 // ==================== QUOTE REQUEST ROUTES ====================
 
@@ -46,6 +47,7 @@ router.post(
     body('supplier_name').optional({ nullable: true }).trim(),
     body('cargo_description').optional({ nullable: true }).trim(),
     body('hs_code').optional({ nullable: true }).trim(),
+    body('dg_classification').optional().isIn(DG_CLASSIFICATIONS),
     body('gross_weight_kg').optional({ nullable: true }).isFloat({ min: 0 }),
     body('volume_cbm').optional({ nullable: true }).isFloat({ min: 0 }),
     body('pallet_count').optional({ nullable: true }).isInt({ min: 0 }),
@@ -58,7 +60,7 @@ router.post(
     const {
       forwarder_name, forwarder_email, transport_mode = 'sea', incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code,
-      gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes,
+      dg_classification = 'non_dg', gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes,
     } = req.body;
     const userId = req.user!.id;
     const username = req.user!.username;
@@ -67,13 +69,13 @@ router.post(
       `INSERT INTO quote_requests (
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code,
-        gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        dg_classification, gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode,
         incoterm || null, origin || null, destination || null, collection_address || null, supplier_name || null,
-        cargo_description || null, hs_code || null, gross_weight_kg || null, volume_cbm || null,
+        cargo_description || null, hs_code || null, dg_classification, gross_weight_kg || null, volume_cbm || null,
         pallet_count || null, cargo_ready_date || null, required_date || null, notes || null,
       ]
     );
@@ -122,6 +124,7 @@ router.put(
     body('forwarder_name').optional().trim().notEmpty(),
     body('forwarder_email').optional({ nullable: true }).trim().isEmail(),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
+    body('dg_classification').optional().isIn(DG_CLASSIFICATIONS),
     body('notes').optional({ nullable: true }).trim(),
   ],
   validate,
@@ -129,8 +132,8 @@ router.put(
     const { id } = req.params;
     const allowedFields = [
       'forwarder_name', 'forwarder_email', 'transport_mode', 'incoterm', 'origin', 'destination',
-      'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'gross_weight_kg', 'volume_cbm',
-      'pallet_count', 'cargo_ready_date', 'required_date', 'notes', 'status',
+      'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'dg_classification',
+      'gross_weight_kg', 'volume_cbm', 'pallet_count', 'cargo_ready_date', 'required_date', 'notes', 'status',
     ];
 
     const updates: string[] = [];

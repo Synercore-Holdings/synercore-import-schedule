@@ -25,7 +25,7 @@ const RECEIVING_WAREHOUSES = [
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', cargo_description: '', hs_code: '',
-  gross_weight_kg: '', volume_cbm: '', pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
+  dg_classification: 'non_dg', gross_weight_kg: '', volume_cbm: '', pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
 };
 
 const inputStyle = {
@@ -222,6 +222,15 @@ function QuoteRequestForm({ onClose }) {
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>{TRANSPORT_LABELS[req.transport_mode] || req.transport_mode}</td>
                     <td style={{ padding: '12px 16px', maxWidth: '220px' }}>
+                      {req.dg_classification === 'dg' && (
+                        <span style={{
+                          display: 'inline-block', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem',
+                          fontWeight: 700, backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+                          marginBottom: '4px',
+                        }}>
+                          DG
+                        </span>
+                      )}
                       <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{req.cargo_description || '—'}</div>
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -375,6 +384,15 @@ function QuoteRequestForm({ onClose }) {
                   <label style={labelStyle}>HS Code</label>
                   <input style={inputStyle} value={form.hs_code} onChange={e => handleFieldChange('hs_code', e.target.value)} />
                 </div>
+
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>DG Classification</label>
+                  <select style={inputStyle} value={form.dg_classification} onChange={e => handleFieldChange('dg_classification', e.target.value)}>
+                    <option value="non_dg">Non-DG</option>
+                    <option value="dg">DG (Dangerous Goods)</option>
+                  </select>
+                </div>
+                <div />
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Cargo Description</label>
