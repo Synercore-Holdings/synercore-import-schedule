@@ -49,6 +49,9 @@ router.post(
     body('hs_code').optional({ nullable: true }).trim(),
     body('dg_classification').optional().isIn(DG_CLASSIFICATIONS),
     body('gross_weight_kg').optional({ nullable: true }).isFloat({ min: 0 }),
+    body('length_cm').optional({ nullable: true }).isFloat({ min: 0 }),
+    body('width_cm').optional({ nullable: true }).isFloat({ min: 0 }),
+    body('height_cm').optional({ nullable: true }).isFloat({ min: 0 }),
     body('volume_cbm').optional({ nullable: true }).isFloat({ min: 0 }),
     body('pallet_count').optional({ nullable: true }).isInt({ min: 0 }),
     body('cargo_ready_date').optional({ nullable: true }).isISO8601(),
@@ -60,7 +63,8 @@ router.post(
     const {
       forwarder_name, forwarder_email, transport_mode = 'sea', incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code,
-      dg_classification = 'non_dg', gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes,
+      dg_classification = 'non_dg', gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm,
+      pallet_count, cargo_ready_date, required_date, notes,
     } = req.body;
     const userId = req.user!.id;
     const username = req.user!.username;
@@ -69,13 +73,15 @@ router.post(
       `INSERT INTO quote_requests (
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code,
-        dg_classification, gross_weight_kg, volume_cbm, pallet_count, cargo_ready_date, required_date, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
+        cargo_ready_date, required_date, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode,
         incoterm || null, origin || null, destination || null, collection_address || null, supplier_name || null,
-        cargo_description || null, hs_code || null, dg_classification, gross_weight_kg || null, volume_cbm || null,
+        cargo_description || null, hs_code || null, dg_classification, gross_weight_kg || null,
+        length_cm || null, width_cm || null, height_cm || null, volume_cbm || null,
         pallet_count || null, cargo_ready_date || null, required_date || null, notes || null,
       ]
     );
@@ -133,7 +139,8 @@ router.put(
     const allowedFields = [
       'forwarder_name', 'forwarder_email', 'transport_mode', 'incoterm', 'origin', 'destination',
       'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'dg_classification',
-      'gross_weight_kg', 'volume_cbm', 'pallet_count', 'cargo_ready_date', 'required_date', 'notes', 'status',
+      'gross_weight_kg', 'length_cm', 'width_cm', 'height_cm', 'volume_cbm', 'pallet_count',
+      'cargo_ready_date', 'required_date', 'notes', 'status',
     ];
 
     const updates: string[] = [];

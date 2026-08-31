@@ -20,6 +20,9 @@ async function createQuoteRequestsTable() {
         hs_code VARCHAR(50),
         dg_classification VARCHAR(10) DEFAULT 'non_dg',
         gross_weight_kg NUMERIC,
+        length_cm NUMERIC,
+        width_cm NUMERIC,
+        height_cm NUMERIC,
         volume_cbm NUMERIC,
         pallet_count INTEGER,
         cargo_ready_date DATE,
@@ -33,6 +36,9 @@ async function createQuoteRequestsTable() {
 
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS collection_address TEXT;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS dg_classification VARCHAR(10) DEFAULT 'non_dg';`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS length_cm NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS width_cm NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS height_cm NUMERIC;`);
 
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_status ON quote_requests(status);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_quote_requests_user ON quote_requests(requested_by);`);

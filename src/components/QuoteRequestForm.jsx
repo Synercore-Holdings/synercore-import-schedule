@@ -25,7 +25,15 @@ const RECEIVING_WAREHOUSES = [
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', cargo_description: '', hs_code: '',
-  dg_classification: 'non_dg', gross_weight_kg: '', volume_cbm: '', pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
+  dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
+  pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
+};
+
+// CBM = L x W x H (cm) / 1,000,000
+const calcVolumeCbm = (length_cm, width_cm, height_cm) => {
+  const l = parseFloat(length_cm), w = parseFloat(width_cm), h = parseFloat(height_cm);
+  if (!l || !w || !h) return null;
+  return Math.round((l * w * h / 1000000) * 1000) / 1000;
 };
 
 const inputStyle = {
@@ -76,10 +84,11 @@ function QuoteRequestForm({ onClose }) {
     if (!form.forwarder_name.trim()) return;
     setSaving(true);
     try {
+      const payload = { ...form, volume_cbm: calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm) };
       const response = await authFetch(getApiUrl('/api/quote-requests'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (response.ok) {
         const result = await response.json();
@@ -403,9 +412,18 @@ function QuoteRequestForm({ onClose }) {
                   <label style={labelStyle}>Gross Weight (kg)</label>
                   <input type="number" min="0" step="any" style={inputStyle} value={form.gross_weight_kg} onChange={e => handleFieldChange('gross_weight_kg', e.target.value)} />
                 </div>
-                <div style={fieldWrap}>
-                  <label style={labelStyle}>Volume (CBM)</label>
-                  <input type="number" min="0" step="any" style={inputStyle} value={form.volume_cbm} onChange={e => handleFieldChange('volume_cbm', e.target.value)} />
+                <div />
+
+                <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Dimensions (cm) — Length x Width x Height</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'center' }}>
+                    <input type="number" min="0" step="any" style={inputStyle} placeholder="Length" value={form.length_cm} onChange={e => handleFieldChange('length_cm', e.target.value)} />
+                    <input type="number" min="0" step="any" style={inputStyle} placeholder="Width" value={form.width_cm} onChange={e => handleFieldChange('width_cm', e.target.value)} />
+                    <input type="number" min="0" step="any" style={inputStyle} placeholder="Height" value={form.height_cm} onChange={e => handleFieldChange('height_cm', e.target.value)} />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-500)', whiteSpace: 'nowrap' }}>
+                      = {calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm) ?? '—'} CBM
+                    </span>
+                  </div>
                 </div>
 
                 <div style={fieldWrap}>
