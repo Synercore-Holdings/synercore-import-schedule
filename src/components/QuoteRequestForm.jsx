@@ -820,9 +820,13 @@ function QuoteRequestForm({ onClose }) {
   };
 
   const handleWithdrawRate = async (req) => {
+    // "Add Rate" is reachable from both Draft and Sent, so withdrawing must go
+    // back to whichever one it actually was — sent_at only gets set by a real
+    // "Mark Sent"/Withdraw transition, so its absence means it was never sent.
+    const revertStatus = req.sent_at ? 'sent' : 'draft';
     if (!(await confirmAction({
       title: 'Withdraw Rate',
-      message: 'This clears the captured rate and moves the request back to "Sent", as if no rate had been received. Continue?',
+      message: `This clears the captured rate and moves the request back to "${STATUS_LABELS[revertStatus]}", as if no rate had been received. Continue?`,
       type: 'danger',
       confirmText: 'Withdraw',
     }))) return;
@@ -831,13 +835,13 @@ function QuoteRequestForm({ onClose }) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: 'sent',
+          status: revertStatus,
           quoted_rate: '', quoted_rate_non_stackable: '', quote_reference: '', quoted_transit_days: '', quote_notes: '',
         }),
       });
       if (response.ok) {
         await fetchRequests();
-        showSuccess?.('Rate withdrawn — request moved back to Sent');
+        showSuccess?.(`Rate withdrawn — request moved back to ${STATUS_LABELS[revertStatus]}`);
       } else {
         const err = await response.json().catch(() => ({}));
         showError?.(err.error || 'Failed to withdraw rate');

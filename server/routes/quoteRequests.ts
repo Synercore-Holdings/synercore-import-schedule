@@ -206,6 +206,10 @@ router.put(
       // COALESCE so a later rate correction (Edit Rate) doesn't reset the
       // original "time to first quote" — only the first quoted transition counts.
       updates.push('quoted_at = COALESCE(quoted_at, CURRENT_TIMESTAMP)');
+    } else if (req.body.status === 'draft') {
+      // A rate withdrawn back to Draft means it was never actually sent —
+      // clear both timestamps rather than leaving a stale quoted_at behind.
+      updates.push('sent_at = NULL', 'quoted_at = NULL');
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
