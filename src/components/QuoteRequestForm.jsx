@@ -91,7 +91,7 @@ const normalizePortOptions = (ports) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
-const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '' };
+const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', value: '' };
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
@@ -127,8 +127,8 @@ const toFormState = (req) => ({
   collection_address: req.collection_address || '',
   supplier_name: req.supplier_name || '',
   products: (req.products && req.products.length > 0)
-    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '' }))
-    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '' }],
+    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '', value: p.value ?? '' }))
+    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '', value: '' }],
   dg_classification: req.dg_classification || 'non_dg',
   gross_weight_kg: req.gross_weight_kg ?? '',
   length_cm: req.length_cm ?? '',
@@ -1403,11 +1403,19 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Products</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 110px 32px', gap: '0.5rem', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Product</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>HS Code</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Qty</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Value ({form.cargo_value_currency})</span>
+                    <span />
+                  </div>
                   {form.products.map((line, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 90px 32px', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 110px 32px', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
                       <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
                       <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
+                      <input type="number" min="0" step="any" style={inputStyle} placeholder="Value" value={line.value} onChange={e => updateProductLine(idx, 'value', e.target.value)} />
                       <button
                         type="button"
                         onClick={() => removeProductLine(idx)}
@@ -1444,6 +1452,23 @@ function QuoteRequestForm({ onClose }) {
                       {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
+                  {(() => {
+                    const lineSum = form.products.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0);
+                    if (lineSum <= 0) return null;
+                    return (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                        Product lines total {form.cargo_value_currency} {lineSum.toLocaleString()}
+                        {' '}
+                        <button
+                          type="button"
+                          onClick={() => handleFieldChange('cargo_value', String(lineSum))}
+                          style={{ background: 'none', border: 'none', color: 'var(--navy-900)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
+                        >
+                          Use this total
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>

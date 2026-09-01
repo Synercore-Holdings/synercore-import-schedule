@@ -124,8 +124,8 @@ export function generateQuoteRequestPDF(req) {
   if (hasProducts) {
     autoTable(doc, {
       startY: y,
-      head: [['Product', 'HS Code', 'Qty']],
-      body: req.products.map(p => [fmt(p.name), fmt(p.hs_code), fmt(p.qty)]),
+      head: [['Product', 'HS Code', 'Qty', 'Value']],
+      body: req.products.map(p => [fmt(p.name), fmt(p.hs_code), fmt(p.qty), p.value ? `${req.cargo_value_currency || 'USD'} ${Number(p.value).toLocaleString()}` : '—']),
       theme: 'plain',
       styles: { fontSize: 9, cellPadding: 3 },
       headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
