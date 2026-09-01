@@ -3,7 +3,7 @@ import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
 import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
-import { CONTAINER_TYPES } from '../utils/costingCalculations';
+import { CONTAINER_TYPES, PORTS_OF_LOADING, AFRICAN_PORTS } from '../utils/costingCalculations';
 
 const STATUS_STYLES = {
   draft: { backgroundColor: '#f3f4f6', color: '#6b7280' },
@@ -54,6 +54,22 @@ const RECEIVING_WAREHOUSES = [
   'Klapmuts: 58 Main Road, Klapmuts, Cape Town, 7625',
   'Pretoria: Unit 9 Steyns Industrial Park, 433 van Riebeeck Street, Hermanstad, Pretoria, 0001',
 ];
+
+// Same key used by ImportCosting.jsx so a port added there or here shows up in both places.
+const CUSTOM_IMPORT_PORTS_KEY = 'synercore_custom_import_ports';
+
+const normalizePortOptions = (ports) => {
+  const seen = new Set();
+  return (ports || [])
+    .filter(port => port?.value && port?.label)
+    .filter(port => {
+      const key = String(port.value).toUpperCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+};
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
@@ -128,6 +144,30 @@ function QuoteRequestForm({ onClose }) {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [showCustomSupplier, setShowCustomSupplier] = useState(false);
+  const [customPorts, setCustomPorts] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(CUSTOM_IMPORT_PORTS_KEY) || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showCustomOrigin, setShowCustomOrigin] = useState(false);
+  const [showCustomDestination, setShowCustomDestination] = useState(false);
+
+  const originPortOptions = normalizePortOptions([...PORTS_OF_LOADING, ...customPorts]);
+  const destinationPortOptions = normalizePortOptions([...AFRICAN_PORTS, ...customPorts]);
+
+  const addCustomPort = (portName) => {
+    const label = String(portName || '').trim();
+    if (!label) return;
+    setCustomPorts(prev => {
+      const exists = prev.some(p => String(p.value).toUpperCase() === label.toUpperCase());
+      const next = exists ? prev : [...prev, { value: label, label: `${label} (Custom)` }];
+      try { localStorage.setItem(CUSTOM_IMPORT_PORTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchRequests();
@@ -239,6 +279,8 @@ function QuoteRequestForm({ onClose }) {
     setForm(toFormState(req));
     setIsViewMode(false);
     setShowCustomSupplier(false);
+    setShowCustomOrigin(false);
+    setShowCustomDestination(false);
     setShowForm(true);
   };
 
@@ -247,6 +289,8 @@ function QuoteRequestForm({ onClose }) {
     setForm(toFormState(req));
     setIsViewMode(true);
     setShowCustomSupplier(false);
+    setShowCustomOrigin(false);
+    setShowCustomDestination(false);
     setShowForm(true);
   };
 
@@ -255,6 +299,8 @@ function QuoteRequestForm({ onClose }) {
     setForm({ ...toFormState(req), forwarder_name: '', forwarder_email: '' });
     setIsViewMode(false);
     setShowCustomSupplier(false);
+    setShowCustomOrigin(false);
+    setShowCustomDestination(false);
     setShowForm(true);
   };
 
@@ -335,7 +381,7 @@ function QuoteRequestForm({ onClose }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowCustomSupplier(false); setShowForm(true); }}
+            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowCustomSupplier(false); setShowCustomOrigin(false); setShowCustomDestination(false); setShowForm(true); }}
             style={{
               background: 'var(--navy-900)', border: 'none', color: 'white',
               padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
@@ -573,6 +619,8 @@ function QuoteRequestForm({ onClose }) {
                     onChange={e => {
                       const mode = e.target.value;
                       setForm(prev => ({ ...prev, transport_mode: mode, container_type: mode === 'air' ? '' : prev.container_type }));
+                      setShowCustomOrigin(false);
+                      setShowCustomDestination(false);
                     }}
                   >
                     <option value="sea">Sea</option>
@@ -607,6 +655,7 @@ function QuoteRequestForm({ onClose }) {
                         destination: wasExw !== isExw ? '' : prev.destination,
                         collection_address: isExw ? prev.collection_address : '',
                       }));
+                      setShowCustomDestination(false);
                     }}
                   >
                     <option value="">—</option>
@@ -616,7 +665,46 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={{ ...fieldWrap, gridColumn: form.incoterm === 'EXW' ? '1 / -1' : 'auto' }}>
                   <label style={labelStyle}>Origin</label>
-                  <input style={inputStyle} value={form.origin} onChange={e => handleFieldChange('origin', e.target.value)} placeholder="Port / city, country" />
+                  {form.transport_mode === 'sea' ? (
+                    (!editingId && !showCustomOrigin) ? (
+                      <select
+                        style={inputStyle}
+                        value={form.origin}
+                        onChange={e => {
+                          if (e.target.value === 'ADD_NEW') { setShowCustomOrigin(true); handleFieldChange('origin', ''); }
+                          else handleFieldChange('origin', e.target.value);
+                        }}
+                      >
+                        <option value="">Select a port...</option>
+                        {originPortOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        <option value="ADD_NEW">+ Add New Port</option>
+                      </select>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          style={{ ...inputStyle, flex: 1 }}
+                          value={form.origin}
+                          onChange={e => handleFieldChange('origin', e.target.value)}
+                          onBlur={() => { if (!editingId && showCustomOrigin && form.origin.trim()) addCustomPort(form.origin.trim()); }}
+                          placeholder={editingId ? 'Port / city, country' : 'Enter new port name'}
+                          autoFocus={!editingId && showCustomOrigin}
+                        />
+                        {!editingId && showCustomOrigin && (
+                          <button
+                            type="button"
+                            onClick={() => { setShowCustomOrigin(false); handleFieldChange('origin', ''); }}
+                            title="Back to port dropdown"
+                            aria-label="Back to port dropdown"
+                            style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                          >
+                            ↩
+                          </button>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    <input style={inputStyle} value={form.origin} onChange={e => handleFieldChange('origin', e.target.value)} placeholder="Port / city, country" />
+                  )}
                 </div>
 
                 {form.incoterm === 'EXW' && (
@@ -639,6 +727,43 @@ function QuoteRequestForm({ onClose }) {
                       <option value="">— Select warehouse —</option>
                       {RECEIVING_WAREHOUSES.map(addr => <option key={addr} value={addr}>{addr}</option>)}
                     </select>
+                  ) : form.transport_mode === 'sea' ? (
+                    (!editingId && !showCustomDestination) ? (
+                      <select
+                        style={inputStyle}
+                        value={form.destination}
+                        onChange={e => {
+                          if (e.target.value === 'ADD_NEW') { setShowCustomDestination(true); handleFieldChange('destination', ''); }
+                          else handleFieldChange('destination', e.target.value);
+                        }}
+                      >
+                        <option value="">Select a port...</option>
+                        {destinationPortOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        <option value="ADD_NEW">+ Add New Port</option>
+                      </select>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          style={{ ...inputStyle, flex: 1 }}
+                          value={form.destination}
+                          onChange={e => handleFieldChange('destination', e.target.value)}
+                          onBlur={() => { if (!editingId && showCustomDestination && form.destination.trim()) addCustomPort(form.destination.trim()); }}
+                          placeholder={editingId ? 'Port / city, country' : 'Enter new port name'}
+                          autoFocus={!editingId && showCustomDestination}
+                        />
+                        {!editingId && showCustomDestination && (
+                          <button
+                            type="button"
+                            onClick={() => { setShowCustomDestination(false); handleFieldChange('destination', ''); }}
+                            title="Back to port dropdown"
+                            aria-label="Back to port dropdown"
+                            style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                          >
+                            ↩
+                          </button>
+                        )}
+                      </div>
+                    )
                   ) : (
                     <input style={inputStyle} value={form.destination} onChange={e => handleFieldChange('destination', e.target.value)} placeholder="Port / city, country" />
                   )}
