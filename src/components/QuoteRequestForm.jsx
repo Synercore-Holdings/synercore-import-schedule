@@ -126,10 +126,38 @@ function QuoteRequestForm({ onClose }) {
   const [showCompare, setShowCompare] = useState(false);
   const [compareGroups, setCompareGroups] = useState([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const [showCustomSupplier, setShowCustomSupplier] = useState(false);
 
   useEffect(() => {
     fetchRequests();
   }, [statusFilter]);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const response = await authFetch(getApiUrl('/api/suppliers'));
+        if (response.ok) {
+          const result = await response.json();
+          const names = (result.data || result || []).map(s => s?.name).filter(Boolean);
+          setSuppliers([...new Set(names)].sort());
+        }
+      } catch (err) {
+        console.error('Failed to fetch suppliers:', err);
+      }
+    };
+    fetchSuppliers();
+  }, []);
+
+  const handleSupplierChange = (value) => {
+    if (value === 'ADD_NEW') {
+      setShowCustomSupplier(true);
+      handleFieldChange('supplier_name', '');
+    } else {
+      setShowCustomSupplier(false);
+      handleFieldChange('supplier_name', value);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -210,6 +238,7 @@ function QuoteRequestForm({ onClose }) {
     setEditingId(req.id);
     setForm(toFormState(req));
     setIsViewMode(false);
+    setShowCustomSupplier(false);
     setShowForm(true);
   };
 
@@ -217,6 +246,7 @@ function QuoteRequestForm({ onClose }) {
     setEditingId(req.id);
     setForm(toFormState(req));
     setIsViewMode(true);
+    setShowCustomSupplier(false);
     setShowForm(true);
   };
 
@@ -224,6 +254,7 @@ function QuoteRequestForm({ onClose }) {
     setEditingId(null);
     setForm({ ...toFormState(req), forwarder_name: '', forwarder_email: '' });
     setIsViewMode(false);
+    setShowCustomSupplier(false);
     setShowForm(true);
   };
 
@@ -304,7 +335,7 @@ function QuoteRequestForm({ onClose }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowForm(true); }}
+            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowCustomSupplier(false); setShowForm(true); }}
             style={{
               background: 'var(--navy-900)', border: 'none', color: 'white',
               padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
@@ -615,7 +646,34 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Supplier</label>
-                  <input style={inputStyle} value={form.supplier_name} onChange={e => handleFieldChange('supplier_name', e.target.value)} />
+                  {(!editingId && !showCustomSupplier) ? (
+                    <select style={inputStyle} value={form.supplier_name} onChange={e => handleSupplierChange(e.target.value)}>
+                      <option value="">Select a supplier...</option>
+                      {suppliers.map(name => <option key={name} value={name}>{name}</option>)}
+                      <option value="ADD_NEW">+ Add New Supplier</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        style={{ ...inputStyle, flex: 1 }}
+                        value={form.supplier_name}
+                        onChange={e => handleFieldChange('supplier_name', e.target.value)}
+                        placeholder={editingId ? 'Supplier name' : 'Enter new supplier name'}
+                        autoFocus={!editingId && showCustomSupplier}
+                      />
+                      {!editingId && showCustomSupplier && (
+                        <button
+                          type="button"
+                          onClick={() => { setShowCustomSupplier(false); handleFieldChange('supplier_name', ''); }}
+                          title="Back to supplier dropdown"
+                          aria-label="Back to supplier dropdown"
+                          style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          ↩
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>HS Code</label>
