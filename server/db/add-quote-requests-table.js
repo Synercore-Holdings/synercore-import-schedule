@@ -19,6 +19,7 @@ async function createQuoteRequestsTable() {
         supplier_name VARCHAR(255),
         cargo_description TEXT,
         hs_code VARCHAR(50),
+        products JSONB DEFAULT '[]'::jsonb,
         dg_classification VARCHAR(10) DEFAULT 'non_dg',
         gross_weight_kg NUMERIC,
         length_cm NUMERIC,
@@ -65,6 +66,7 @@ async function createQuoteRequestsTable() {
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate_non_stackable NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;`);
     // Allow "TBC" as a value — was DATE, now a free-form string so undecided dates can be recorded
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN cargo_ready_date TYPE VARCHAR(20) USING cargo_ready_date::text;`);
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN required_date TYPE VARCHAR(20) USING required_date::text;`);

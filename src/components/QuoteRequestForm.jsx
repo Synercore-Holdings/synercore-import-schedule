@@ -50,6 +50,15 @@ const getMonthKey = (req) => {
 };
 const monthLabel = (key) => new Date(`${key}-01`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
 
+// Falls back to the legacy single cargo_description/hs_code fields for
+// requests created before the multi-product Products section existed.
+const productSummary = (req) => {
+  if (req.products && req.products.length > 0) {
+    return req.products.map(p => p.hs_code ? `${p.name} (HS ${p.hs_code})` : p.name).join('; ');
+  }
+  return req.cargo_description || '';
+};
+
 // Days since a "sent" request last changed status — approximates when it was sent,
 // since there's no dedicated sent_at column. Used to flag forwarders going quiet.
 const daysSinceSent = (req) => {
@@ -82,9 +91,11 @@ const normalizePortOptions = (ports) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
+const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '' };
+
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
-  origin: '', destination: '', collection_address: '', supplier_name: '', cargo_description: '', hs_code: '',
+  origin: '', destination: '', collection_address: '', supplier_name: '', products: [{ ...EMPTY_PRODUCT_LINE }],
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
   pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
   cargo_ready_date: '', required_date: '', notes: '',
@@ -115,8 +126,9 @@ const toFormState = (req) => ({
   destination: req.destination || '',
   collection_address: req.collection_address || '',
   supplier_name: req.supplier_name || '',
-  cargo_description: req.cargo_description || '',
-  hs_code: req.hs_code || '',
+  products: (req.products && req.products.length > 0)
+    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '' }))
+    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '' }],
   dg_classification: req.dg_classification || 'non_dg',
   gross_weight_kg: req.gross_weight_kg ?? '',
   length_cm: req.length_cm ?? '',
@@ -676,13 +688,29 @@ function QuoteRequestForm({ onClose }) {
 
   const handleFieldChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
+  const updateProductLine = (idx, field, value) => setForm(prev => ({
+    ...prev,
+    products: prev.products.map((p, i) => i === idx ? { ...p, [field]: value } : p),
+  }));
+
+  const addProductLine = () => setForm(prev => ({ ...prev, products: [...prev.products, { ...EMPTY_PRODUCT_LINE }] }));
+
+  const removeProductLine = (idx) => setForm(prev => ({
+    ...prev,
+    products: prev.products.length > 1 ? prev.products.filter((_, i) => i !== idx) : prev.products,
+  }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.forwarder_name.trim()) return;
     setSaving(true);
     const isEdit = editingId !== null;
     try {
-      const payload = { ...form, volume_cbm: calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count) };
+      const payload = {
+        ...form,
+        products: form.products.filter(p => p.name.trim()),
+        volume_cbm: calcVolumeCbm(form.length_cm, form.width_cm, form.height_cm, form.pallet_count),
+      };
       const url = isEdit ? getApiUrl(`/api/quote-requests/${editingId}`) : getApiUrl('/api/quote-requests');
       const response = await authFetch(url, {
         method: isEdit ? 'PUT' : 'POST',
@@ -855,7 +883,7 @@ function QuoteRequestForm({ onClose }) {
       'Mode': TRANSPORT_LABELS[r.transport_mode] || r.transport_mode,
       'Incoterm': r.incoterm || '',
       'Supplier': r.supplier_name || '',
-      'Cargo': r.cargo_description || '',
+      'Cargo': productSummary(r),
       'Status': STATUS_LABELS[r.status] || r.status,
       'Quote Ref': r.quote_reference || '',
       'Rate': r.quoted_rate || '',
@@ -1043,7 +1071,7 @@ function QuoteRequestForm({ onClose }) {
                           DG
                         </span>
                       )}
-                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{req.cargo_description || '—'}</div>
+                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{productSummary(req) || '—'}</div>
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <span style={{
@@ -1365,11 +1393,6 @@ function QuoteRequestForm({ onClose }) {
                   )}
                 </div>
                 <div style={fieldWrap}>
-                  <label style={labelStyle}>HS Code</label>
-                  <input style={inputStyle} value={form.hs_code} onChange={e => handleFieldChange('hs_code', e.target.value)} />
-                </div>
-
-                <div style={fieldWrap}>
                   <label style={labelStyle}>DG Classification</label>
                   <select style={inputStyle} value={form.dg_classification} onChange={e => handleFieldChange('dg_classification', e.target.value)}>
                     <option value="non_dg">Non-DG</option>
@@ -1379,8 +1402,34 @@ function QuoteRequestForm({ onClose }) {
                 <div />
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Cargo Description</label>
-                  <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} value={form.cargo_description} onChange={e => handleFieldChange('cargo_description', e.target.value)} />
+                  <label style={labelStyle}>Products</label>
+                  {form.products.map((line, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 90px 32px', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
+                      <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
+                      <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
+                      <button
+                        type="button"
+                        onClick={() => removeProductLine(idx)}
+                        disabled={form.products.length === 1}
+                        title="Remove product"
+                        style={{
+                          padding: 0, height: '36px', backgroundColor: form.products.length === 1 ? '#f3f4f6' : '#fef2f2',
+                          color: form.products.length === 1 ? '#9ca3af' : 'var(--danger)', border: '1px solid #d1d5db',
+                          borderRadius: '6px', cursor: form.products.length === 1 ? 'not-allowed' : 'pointer', fontSize: '0.9rem',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addProductLine}
+                    style={{ padding: '6px 12px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem' }}
+                  >
+                    + Add Product
+                  </button>
                 </div>
 
                 <div style={fieldWrap}>

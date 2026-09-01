@@ -93,14 +93,15 @@ export function generateQuoteRequestPDF(req) {
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
   });
 
+  const hasProducts = Array.isArray(req.products) && req.products.length > 0;
+
   y = doc.lastAutoTable.finalY + 8;
   autoTable(doc, {
     startY: y,
     head: [['Cargo Details', '']],
     body: [
       ['Supplier', fmt(req.supplier_name)],
-      ['Description', fmt(req.cargo_description)],
-      ['HS Code', fmt(req.hs_code)],
+      ...(hasProducts ? [] : [['Description', fmt(req.cargo_description)], ['HS Code', fmt(req.hs_code)]]),
       ['DG Classification', DG_LABELS[req.dg_classification] || DG_LABELS.non_dg],
       ['Gross Weight', fmt(req.gross_weight_kg, ' kg')],
       ['Dimensions per Pallet/Package (L x W x H)', (req.length_cm && req.width_cm && req.height_cm)
@@ -119,6 +120,19 @@ export function generateQuoteRequestPDF(req) {
   });
 
   y = doc.lastAutoTable.finalY + 8;
+
+  if (hasProducts) {
+    autoTable(doc, {
+      startY: y,
+      head: [['Product', 'HS Code', 'Qty']],
+      body: req.products.map(p => [fmt(p.name), fmt(p.hs_code), fmt(p.qty)]),
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: ROW_ALT },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
 
   if (req.notes) {
     doc.setFont(undefined, 'bold');
