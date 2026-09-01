@@ -374,6 +374,7 @@ function QuoteRequestForm({ onClose }) {
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Route</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Supplier</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Mode</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Incoterm</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Cargo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Rate Received</th>
@@ -394,6 +395,7 @@ function QuoteRequestForm({ onClose }) {
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{req.supplier_name || '—'}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>{TRANSPORT_LABELS[req.transport_mode] || req.transport_mode}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>{req.incoterm || '—'}</td>
                     <td style={{ padding: '12px 16px', maxWidth: '220px' }}>
                       {req.dg_classification === 'dg' && (
                         <span style={{
