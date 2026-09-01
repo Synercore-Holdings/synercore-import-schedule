@@ -1102,25 +1102,34 @@ function QuoteRequestForm({ onClose }) {
 
       {showCompare && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+          position: 'fixed', inset: 0, zIndex: 1100,
+          backgroundColor: 'white', overflow: 'auto',
+          display: 'flex', flexDirection: 'column',
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: '10px', maxWidth: '960px', width: '100%',
-            maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
+            padding: '1rem 1.5rem', borderBottom: '1px solid #e5e7eb',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 10,
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Freight Quote Rates Dashboard</h3>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-500)' }}>
-                  Rates received from forwarders, grouped by origin, destination, and mode
-                </p>
-              </div>
-              <button onClick={() => setShowCompare(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-500)' }}>
-                x
-              </button>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>Freight Quote Rates Dashboard</h2>
+              <p style={{ margin: '0.25rem 0 0', color: 'var(--text-500)', fontSize: '0.8rem' }}>
+                Rates received from forwarders, grouped by origin, destination, and mode
+              </p>
             </div>
+            <button
+              onClick={() => setShowCompare(false)}
+              style={{
+                background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+                color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 500,
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
 
+          <div style={{ padding: '1.5rem', flex: 1, maxWidth: '1400px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
             {loadingCompare ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)' }}>Loading...</div>
             ) : (
@@ -1148,7 +1157,7 @@ function QuoteRequestForm({ onClose }) {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="dash-panel">
                       <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Requests by Status</h4>
-                      <div style={{ height: 180 }}>
+                      <div style={{ height: 260 }}>
                         <Doughnut
                           data={{
                             labels: ['Draft', 'Sent', 'Completed', 'Expired', 'Cancelled'],
@@ -1168,7 +1177,7 @@ function QuoteRequestForm({ onClose }) {
                     </div>
                     <div className="dash-panel">
                       <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Rates Received — Last 6 Months</h4>
-                      <div style={{ height: 180 }}>
+                      <div style={{ height: 260 }}>
                         <BarChart
                           data={{
                             labels: compareDashboard.monthLabels,
