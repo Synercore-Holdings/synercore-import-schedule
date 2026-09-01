@@ -322,6 +322,43 @@ export function computeCostingAlerts(estimates) {
   });
 }
 
+// Freight quote requests sitting in "sent" with no rate back yet — flags
+// forwarders going quiet so it surfaces without someone having to remember
+// to check the Quote Requests screen.
+export function computeQuoteRequestAlerts(quoteRequests) {
+  const alerts = [];
+  const now = Date.now();
+
+  for (const r of (quoteRequests || [])) {
+    if (r.status !== 'sent') continue;
+    const sentDate = new Date(r.updated_at || r.created_at);
+    if (isNaN(sentDate)) continue;
+    const daysWaiting = Math.floor((now - sentDate.getTime()) / 86400000);
+    if (daysWaiting < 3) continue;
+
+    const ref = `QR-${String(r.id).padStart(5, '0')}`;
+    alerts.push({
+      id: `qr-${r.id}-aging`,
+      ts: now,
+      read: false,
+      severity: daysWaiting >= 7 ? 'warning' : 'info',
+      title: 'Forwarder Quote Aging',
+      description: `${r.forwarder_name} - ${ref} sent ${daysWaiting} day${daysWaiting !== 1 ? 's' : ''} ago, no rate received yet.`,
+      meta: {
+        isQuoteRequest: true,
+        orderRef: ref,
+        supplier: r.supplier_name,
+        status: r.status,
+      },
+    });
+  }
+
+  return alerts.sort((a, b) => {
+    const severityOrder = { critical: 3, warning: 2, info: 1 };
+    return severityOrder[b.severity] - severityOrder[a.severity] || b.ts - a.ts;
+  });
+}
+
 // Helper function to create custom alerts
 export function createCustomAlert(severity = 'info', title, description, meta = {}) {
   return {

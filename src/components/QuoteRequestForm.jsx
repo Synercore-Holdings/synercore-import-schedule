@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
 import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
 import { CONTAINER_TYPES, PORTS_OF_LOADING, AFRICAN_PORTS } from '../utils/costingCalculations';
-import { groupRatesByRoute } from '../utils/quoteRequestRates';
+import { groupRatesByRoute, convertToUSD } from '../utils/quoteRequestRates';
 import * as XLSX from 'xlsx';
 import {
   Chart as ChartJS,
@@ -225,8 +226,77 @@ function RowActionsMenu({ items }) {
   );
 }
 
+// Manually-maintained exchange rates, used to compare quotes given in
+// different currencies. Deliberately admin-set rather than a live feed —
+// see server/routes/fxRates.ts for why.
+function FxRatesModal({ fxRateRows, savingFxRate, onSave, onClose }) {
+  const rateMap = Object.fromEntries(fxRateRows.map(r => [r.currency, r]));
+  const [drafts, setDrafts] = useState({});
+
+  const currenciesToMaintain = CURRENCIES.filter(c => c !== 'USD');
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1200, backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+    }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '10px', maxWidth: '480px', width: '100%', maxHeight: '90vh', overflow: 'auto', padding: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>FX Rates</h3>
+        <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-500)' }}>
+          Units of each currency per 1 USD. Used to compare quotes across currencies — set manually, so a rate is only ever what someone deliberately entered.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {currenciesToMaintain.map(currency => {
+            const existing = rateMap[currency];
+            const draft = drafts[currency] ?? (existing ? String(existing.rate_to_usd) : '');
+            return (
+              <div key={currency} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label style={{ ...labelStyle, marginBottom: 0, width: '50px' }}>{currency}</label>
+                  <input
+                    type="number" min="0.0001" step="any" style={{ ...inputStyle, flex: 1 }}
+                    value={draft}
+                    onChange={e => setDrafts(prev => ({ ...prev, [currency]: e.target.value }))}
+                    placeholder={`e.g. 18.50 (1 USD = 18.50 ${currency})`}
+                  />
+                  <button
+                    type="button"
+                    disabled={!draft || Number(draft) <= 0 || savingFxRate === currency}
+                    onClick={() => onSave(currency, draft)}
+                    style={{
+                      padding: '8px 14px', background: 'var(--navy-900)', color: 'white', border: 'none',
+                      borderRadius: '6px', cursor: (!draft || Number(draft) <= 0) ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8rem', fontWeight: 600, opacity: (!draft || Number(draft) <= 0) ? 0.5 : 1,
+                    }}
+                  >
+                    {savingFxRate === currency ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+                {existing && (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '6px' }}>
+                    Last set by {existing.updated_by_username || 'unknown'} on {new Date(existing.updated_at).toLocaleString('en-ZA')}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+          <button type="button" onClick={onClose} style={{
+            padding: '8px 16px', background: 'var(--navy-900)', color: 'white', border: 'none',
+            borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+          }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function QuoteRequestForm({ onClose }) {
   const { confirm: confirmAction, showSuccess, showError } = useNotification();
+  const [searchParams] = useSearchParams();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -235,6 +305,7 @@ function QuoteRequestForm({ onClose }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editingMeta, setEditingMeta] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
   const [rateModalReq, setRateModalReq] = useState(null);
   const [rateForm, setRateForm] = useState(EMPTY_RATE_FORM);
@@ -244,12 +315,15 @@ function QuoteRequestForm({ onClose }) {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [monthFilter, setMonthFilter] = useState('');
   const [dashboardMonthFilter, setDashboardMonthFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
   const [trendRoute, setTrendRoute] = useState('');
   const [bestQuoteIds, setBestQuoteIds] = useState(new Set());
   const [suppliers, setSuppliers] = useState([]);
   const [showCustomSupplier, setShowCustomSupplier] = useState(false);
+  const [fxRateRows, setFxRateRows] = useState([]);
+  const [showFxModal, setShowFxModal] = useState(false);
+  const [savingFxRate, setSavingFxRate] = useState(null);
   const [customPorts, setCustomPorts] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(CUSTOM_IMPORT_PORTS_KEY) || '[]');
@@ -295,6 +369,50 @@ function QuoteRequestForm({ onClose }) {
     fetchSuppliers();
   }, []);
 
+  const fetchFxRates = async () => {
+    try {
+      const response = await authFetch(getApiUrl('/api/fx-rates'));
+      if (response.ok) {
+        const result = await response.json();
+        setFxRateRows(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch FX rates:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchFxRates();
+  }, []);
+
+  const fxRates = useMemo(
+    () => Object.fromEntries(fxRateRows.map(r => [r.currency, Number(r.rate_to_usd)])),
+    [fxRateRows]
+  );
+
+  const handleSaveFxRate = async (currency, rateToUsd) => {
+    setSavingFxRate(currency);
+    try {
+      const response = await authFetch(getApiUrl(`/api/fx-rates/${currency}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rate_to_usd: rateToUsd }),
+      });
+      if (response.ok) {
+        await fetchFxRates();
+        showSuccess?.(`${currency} rate updated`);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showError?.(err.error || 'Failed to save rate');
+      }
+    } catch (err) {
+      console.error('Failed to save FX rate:', err);
+      showError?.('Failed to save rate');
+    } finally {
+      setSavingFxRate(null);
+    }
+  };
+
   const handleSupplierChange = (value) => {
     if (value === 'ADD_NEW') {
       setShowCustomSupplier(true);
@@ -338,7 +456,7 @@ function QuoteRequestForm({ onClose }) {
     if (monthFilter) list = list.filter(r => getMonthKey(r) === monthFilter);
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      list = list.filter(r => [r.forwarder_name, r.supplier_name, r.origin, r.destination, r.quote_reference]
+      list = list.filter(r => [r.forwarder_name, r.supplier_name, r.origin, r.destination, r.quote_reference, `QR-${String(r.id).padStart(5, '0')}`]
         .some(v => (v || '').toLowerCase().includes(q)));
     }
 
@@ -367,7 +485,7 @@ function QuoteRequestForm({ onClose }) {
     const response = await authFetch(getApiUrl('/api/quote-requests?status=quoted'));
     if (!response.ok) throw new Error('Failed to load quoted requests');
     const result = await response.json();
-    return groupRatesByRoute(result.data || []);
+    return groupRatesByRoute(result.data || [], fxRates);
   };
 
   const refreshBestQuoteIds = async () => {
@@ -417,7 +535,7 @@ function QuoteRequestForm({ onClose }) {
       if (statusCounts[r.status] !== undefined) statusCounts[r.status]++;
     });
 
-    const routeGroups = groupRatesByRoute(filtered.filter(r => r.status === 'quoted' && r.quoted_rate));
+    const routeGroups = groupRatesByRoute(filtered.filter(r => r.status === 'quoted' && r.quoted_rate), fxRates);
 
     const monthKeys = [];
     const now = new Date();
@@ -471,19 +589,33 @@ function QuoteRequestForm({ onClose }) {
       .sort((a, b) => b.pct - a.pct);
 
     // Cost savings from picking the cheapest quote vs. the average of the
-    // alternatives on the same route — skipped for mixed-currency routes since
-    // there's no FX conversion here, only totalled where the comparison is
-    // apples-to-apples.
+    // alternatives on the same route. Same-currency routes total directly (no
+    // FX rate needed); mixed-currency routes only count once a manually-set FX
+    // rate makes the comparison apples-to-apples, converted to USD.
     const savingsByCurrency = {};
-    routeGroups.filter(g => g.entries.length > 1 && !g.mixedCurrency).forEach(g => {
-      const best = Number(g.entries[0].quoted_rate);
-      const others = g.entries.slice(1).map(e => Number(e.quoted_rate));
-      const avgOthers = others.reduce((sum, v) => sum + v, 0) / others.length;
-      const savings = avgOthers - best;
-      if (savings > 0) {
-        const currency = g.entries[0].quoted_currency;
-        savingsByCurrency[currency] = (savingsByCurrency[currency] || 0) + savings;
+    let convertedSavingsUsd = 0;
+    let mixedRoutesSkippedForFx = 0;
+    routeGroups.filter(g => g.entries.length > 1).forEach(g => {
+      if (!g.mixedCurrency) {
+        const best = Number(g.entries[0].quoted_rate);
+        const others = g.entries.slice(1).map(e => Number(e.quoted_rate));
+        const avgOthers = others.reduce((sum, v) => sum + v, 0) / others.length;
+        const savings = avgOthers - best;
+        if (savings > 0) {
+          const currency = g.entries[0].quoted_currency;
+          savingsByCurrency[currency] = (savingsByCurrency[currency] || 0) + savings;
+        }
+        return;
       }
+      if (!g.convertedForComparison) {
+        mixedRoutesSkippedForFx++;
+        return;
+      }
+      const bestUsd = convertToUSD(g.entries[0].quoted_rate, g.entries[0].quoted_currency, fxRates);
+      const othersUsd = g.entries.slice(1).map(e => convertToUSD(e.quoted_rate, e.quoted_currency, fxRates));
+      const avgOthersUsd = othersUsd.reduce((sum, v) => sum + v, 0) / othersUsd.length;
+      const savingsUsd = avgOthersUsd - bestUsd;
+      if (savingsUsd > 0) convertedSavingsUsd += savingsUsd;
     });
 
     // Rate trend per route — always all-time regardless of Period, since a
@@ -516,10 +648,12 @@ function QuoteRequestForm({ onClose }) {
       airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
       forwarderWinRates,
       savingsByCurrency,
+      convertedSavingsUsd,
+      mixedRoutesSkippedForFx,
       routeTrendMap,
       routeTrendOptions,
     };
-  }, [compareAllRequests, dashboardMonthFilter]);
+  }, [compareAllRequests, dashboardMonthFilter, fxRates]);
 
   // Rate trend for the selected route — separate memo since it depends on
   // trendRoute without needing to recompute the whole dashboard.
@@ -577,6 +711,7 @@ function QuoteRequestForm({ onClose }) {
 
   const handleEditClick = (req) => {
     setEditingId(req.id);
+    setEditingMeta(req);
     setForm(toFormState(req));
     setIsViewMode(false);
     setShowCustomSupplier(false);
@@ -587,6 +722,7 @@ function QuoteRequestForm({ onClose }) {
 
   const handleViewClick = (req) => {
     setEditingId(req.id);
+    setEditingMeta(req);
     setForm(toFormState(req));
     setIsViewMode(true);
     setShowCustomSupplier(false);
@@ -597,6 +733,7 @@ function QuoteRequestForm({ onClose }) {
 
   const handleCopyClick = (req) => {
     setEditingId(null);
+    setEditingMeta(null);
     setForm({ ...toFormState(req), forwarder_name: '', forwarder_email: '' });
     setIsViewMode(false);
     setShowCustomSupplier(false);
@@ -663,20 +800,25 @@ function QuoteRequestForm({ onClose }) {
     e.preventDefault();
     if (!rateModalReq) return;
 
+    // Number(''/null/undefined) is 0, so this also catches an explicit "0" —
+    // string truthiness alone ("0" is a non-empty, truthy string) let a fake
+    // zero rate slip through before.
     let payload = { ...rateForm };
+    const hasStackable = Number(payload.quoted_rate) > 0;
+    const hasNonStackable = Number(payload.quoted_rate_non_stackable) > 0;
     if (rateModalReq.transport_mode === 'air') {
-      if (!payload.quoted_rate && !payload.quoted_rate_non_stackable) {
-        showError?.('Enter at least one rate (stackable or non-stackable)');
+      if (!hasStackable && !hasNonStackable) {
+        showError?.('Enter at least one rate (stackable or non-stackable), greater than 0');
         return;
       }
       // A forwarder who only quotes one figure isn't necessarily quoting the
       // stackable rate — whichever box it landed in is THE rate for this quote,
       // so it belongs in quoted_rate (the field everything else compares on).
-      if (!payload.quoted_rate) {
+      if (!hasStackable) {
         payload = { ...payload, quoted_rate: payload.quoted_rate_non_stackable, quoted_rate_non_stackable: '' };
       }
-    } else if (!payload.quoted_rate) {
-      showError?.('Enter a rate');
+    } else if (!hasStackable) {
+      showError?.('Enter a rate greater than 0');
       return;
     }
 
@@ -755,7 +897,7 @@ function QuoteRequestForm({ onClose }) {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowCustomSupplier(false); setShowCustomOrigin(false); setShowCustomDestination(false); setShowForm(true); }}
+            onClick={() => { setEditingId(null); setEditingMeta(null); setForm(EMPTY_FORM); setIsViewMode(false); setShowCustomSupplier(false); setShowCustomOrigin(false); setShowCustomDestination(false); setShowForm(true); }}
             style={{
               background: 'var(--navy-900)', border: 'none', color: 'white',
               padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
@@ -1004,11 +1146,19 @@ function QuoteRequestForm({ onClose }) {
             backgroundColor: 'white', borderRadius: '10px', maxWidth: '640px', width: '100%',
             maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
           }}>
-            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: '#0f172a' }}>
+            <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
               {isViewMode
                 ? `View Quote Request QR-${String(editingId).padStart(5, '0')} (Read Only)`
                 : editingId ? `Edit Quote Request QR-${String(editingId).padStart(5, '0')}` : 'New Quote Request'}
             </h3>
+            {editingMeta && (
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.7rem', color: 'var(--text-500)' }}>
+                Created by {editingMeta.requested_by_username || 'unknown'} on {new Date(editingMeta.created_at).toLocaleString('en-ZA')}
+                {editingMeta.updated_by_username && editingMeta.updated_at && editingMeta.updated_at !== editingMeta.created_at && (
+                  <> · last updated by {editingMeta.updated_by_username} on {new Date(editingMeta.updated_at).toLocaleString('en-ZA')}</>
+                )}
+              </p>
+            )}
             {isViewMode && (
               <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 600, borderRadius: '6px', marginBottom: '0.75rem' }}>
                 🔒 Read-only view — this request cannot be edited from here.
@@ -1365,7 +1515,7 @@ function QuoteRequestForm({ onClose }) {
                 <div style={fieldWrap}>
                   <label style={labelStyle}>{rateModalReq.transport_mode === 'air' ? 'Rate (Stackable)' : 'Rate *'}</label>
                   <input
-                    type="number" min="0" step="any" required={rateModalReq.transport_mode !== 'air'} style={inputStyle}
+                    type="number" min="0.01" step="any" required={rateModalReq.transport_mode !== 'air'} style={inputStyle}
                     value={rateForm.quoted_rate}
                     onChange={e => setRateForm(prev => ({ ...prev, quoted_rate: e.target.value }))}
                   />
@@ -1385,7 +1535,7 @@ function QuoteRequestForm({ onClose }) {
                   <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Rate (Non-Stackable)</label>
                     <input
-                      type="number" min="0" step="any" style={inputStyle}
+                      type="number" min="0.01" step="any" style={inputStyle}
                       value={rateForm.quoted_rate_non_stackable}
                       onChange={e => setRateForm(prev => ({ ...prev, quoted_rate_non_stackable: e.target.value }))}
                       placeholder="Only if the forwarder quoted a separate non-stackable rate"
@@ -1450,6 +1600,15 @@ function QuoteRequestForm({ onClose }) {
         </div>
       )}
 
+      {showFxModal && (
+        <FxRatesModal
+          fxRateRows={fxRateRows}
+          savingFxRate={savingFxRate}
+          onSave={handleSaveFxRate}
+          onClose={() => setShowFxModal(false)}
+        />
+      )}
+
       {showCompare && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1100,
@@ -1477,6 +1636,16 @@ function QuoteRequestForm({ onClose }) {
                 <option value="">All Time</option>
                 {dashboardAvailableMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
               </select>
+              <button
+                type="button"
+                onClick={() => setShowFxModal(true)}
+                style={{
+                  background: 'white', border: '1px solid var(--navy-900)', color: 'var(--navy-900)',
+                  padding: '7px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
+                }}
+              >
+                FX Rates
+              </button>
               <button
                 onClick={() => setShowCompare(false)}
                 style={{
@@ -1518,7 +1687,26 @@ function QuoteRequestForm({ onClose }) {
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Saved vs. Avg Alternative</p>
                     </div>
                   ))}
+                  {compareDashboard.convertedSavingsUsd > 0 && (
+                    <div className="stat-card ring-success">
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>USD {compareDashboard.convertedSavingsUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Saved on Mixed-Currency Routes</p>
+                    </div>
+                  )}
                 </div>
+
+                {compareDashboard.mixedRoutesSkippedForFx > 0 && (
+                  <div style={{ marginBottom: '1.25rem', fontSize: '0.75rem', color: 'var(--text-500)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ⚠️ {compareDashboard.mixedRoutesSkippedForFx} mixed-currency route{compareDashboard.mixedRoutesSkippedForFx > 1 ? 's are' : ' is'} excluded from savings — missing an FX rate.
+                    <button
+                      type="button"
+                      onClick={() => setShowFxModal(true)}
+                      style={{ background: 'none', border: 'none', color: 'var(--navy-900)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
+                    >
+                      Set FX Rates
+                    </button>
+                  </div>
+                )}
 
                 {compareAllRequests.length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -1712,8 +1900,10 @@ function QuoteRequestForm({ onClose }) {
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-500)' }}>{group.entries.length} quote{group.entries.length > 1 ? 's' : ''}</span>
                     </div>
                     {group.mixedCurrency && (
-                      <div style={{ padding: '6px 14px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.7rem', fontWeight: 600 }}>
-                        ⚠️ Rates below are in different currencies — compare with care
+                      <div style={{ padding: '6px 14px', backgroundColor: group.convertedForComparison ? '#eff6ff' : '#fef3c7', color: group.convertedForComparison ? '#1e40af' : '#92400e', fontSize: '0.7rem', fontWeight: 600 }}>
+                        {group.convertedForComparison
+                          ? '✓ Different currencies — BEST determined using manually-set FX rates'
+                          : '⚠️ Rates below are in different currencies — set FX Rates to compare accurately'}
                       </div>
                     )}
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>

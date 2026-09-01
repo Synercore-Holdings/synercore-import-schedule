@@ -161,7 +161,8 @@ function App() {
     handleAddSupplier, handleUpdateSupplier, handleDeleteSupplier, handleImportSchedule,
   } = useSuppliers(fetchShipments);
 
-  const { alerts, handleAlertDismiss, handleAlertMarkRead, pushAlert } = useAlerts(shipments);
+  const [quoteRequestsForAlerts, setQuoteRequestsForAlerts] = useState([]);
+  const { alerts, handleAlertDismiss, handleAlertMarkRead, pushAlert } = useAlerts(shipments, quoteRequestsForAlerts);
 
   const { showInfo, isNavigationBlocked, confirm } = useNotification();
   const navigate = useNavigate();
@@ -367,6 +368,28 @@ function App() {
 
     fetchRequestCount();
     const interval = setInterval(fetchRequestCount, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  // Poll for freight quote requests sitting unanswered, so aging alerts
+  // surface app-wide instead of only when the Quote Requests screen is open
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const fetchQuoteRequestsForAlerts = async () => {
+      try {
+        const res = await authFetch(getApiUrl('/api/quote-requests?status=sent'));
+        if (res.ok) {
+          const data = await res.json();
+          setQuoteRequestsForAlerts(data.data || []);
+        }
+      } catch (err) {
+        // Silently fail - not critical
+      }
+    };
+
+    fetchQuoteRequestsForAlerts();
+    const interval = setInterval(fetchQuoteRequestsForAlerts, 300000);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 

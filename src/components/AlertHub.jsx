@@ -240,6 +240,7 @@ export default function AlertHub({
                       : dest === 'workflow' ? 'View in Workflow'
                       : dest === 'archives' ? 'View in Archives'
                       : dest === 'rejections' ? 'View in Rejection Claims'
+                      : dest === 'quote-requests' ? 'View in Quote Requests'
                       : 'View in Shipping';
                     return (
                       <button onClick={() => {
@@ -367,6 +368,7 @@ function DeliveryStatusIcon({ status }) {
 
 function viewForStatus(meta) {
   if (meta?.isClaim) return 'rejections';
+  if (meta?.isQuoteRequest) return 'quote-requests';
   const status = meta?.status;
   if (!status) return 'shipping';
   const postArrival = [

@@ -141,8 +141,15 @@ router.put(
     body('cargo_value').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('cargo_value_currency').optional({ nullable: true }).trim(),
     body('notes').optional({ nullable: true }).trim(),
-    body('quoted_rate').optional({ checkFalsy: true }).isFloat({ min: 0 }),
-    body('quoted_rate_non_stackable').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    // checkFalsy + isFloat({min:0}) would silently accept an explicit 0 (it just
+    // skips validation on falsy values) — custom() instead so 0 is rejected while
+    // '' / null / undefined still pass through as "not set".
+    body('quoted_rate').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || Number(v) > 0)
+      .withMessage('Rate must be greater than 0'),
+    body('quoted_rate_non_stackable').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || Number(v) > 0)
+      .withMessage('Non-stackable rate must be greater than 0'),
     body('quoted_currency').optional({ nullable: true }).trim(),
     body('quote_reference').optional({ nullable: true }).trim(),
     body('quoted_transit_days').optional({ checkFalsy: true }).isInt({ min: 0 }),
@@ -174,6 +181,10 @@ router.put(
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(req.user!.id);
+    updates.push(`updated_by = $${params.length}`);
+    params.push(req.user!.username);
+    updates.push(`updated_by_username = $${params.length}`);
 
     params.push(id);
     const result = await pool.query(

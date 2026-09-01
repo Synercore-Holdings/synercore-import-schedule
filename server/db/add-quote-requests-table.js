@@ -38,6 +38,8 @@ async function createQuoteRequestsTable() {
         quote_reference VARCHAR(100),
         quoted_transit_days INTEGER,
         quote_notes TEXT,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_by_username VARCHAR(255),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -61,6 +63,8 @@ async function createQuoteRequestsTable() {
     // the stackable figure (kept comparable with sea/road's single-rate shape) and this
     // column holds the non-stackable premium alongside it.
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate_non_stackable NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
     // Allow "TBC" as a value — was DATE, now a free-form string so undecided dates can be recorded
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN cargo_ready_date TYPE VARCHAR(20) USING cargo_ready_date::text;`);
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN required_date TYPE VARCHAR(20) USING required_date::text;`);
