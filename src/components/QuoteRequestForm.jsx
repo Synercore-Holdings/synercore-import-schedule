@@ -142,6 +142,7 @@ function QuoteRequestForm({ onClose }) {
   const [showCompare, setShowCompare] = useState(false);
   const [compareGroups, setCompareGroups] = useState([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
+  const [bestQuoteIds, setBestQuoteIds] = useState(new Set());
   const [suppliers, setSuppliers] = useState([]);
   const [showCustomSupplier, setShowCustomSupplier] = useState(false);
   const [customPorts, setCustomPorts] = useState(() => {
@@ -218,19 +219,31 @@ function QuoteRequestForm({ onClose }) {
     } finally {
       setLoading(false);
     }
+    refreshBestQuoteIds();
+  };
+
+  // Shared with Compare Rates — grouped by route so "best" only compares like-for-like quotes.
+  const fetchQuotedGroups = async () => {
+    const response = await authFetch(getApiUrl('/api/quote-requests?status=quoted'));
+    if (!response.ok) throw new Error('Failed to load quoted requests');
+    const result = await response.json();
+    return groupRatesByRoute(result.data || []);
+  };
+
+  const refreshBestQuoteIds = async () => {
+    try {
+      const groups = await fetchQuotedGroups();
+      setBestQuoteIds(new Set(groups.map(g => g.entries[0]?.id).filter(Boolean)));
+    } catch (err) {
+      console.error('Failed to fetch best quotes:', err);
+    }
   };
 
   const handleOpenCompare = async () => {
     setShowCompare(true);
     setLoadingCompare(true);
     try {
-      const response = await authFetch(getApiUrl('/api/quote-requests?status=quoted'));
-      if (response.ok) {
-        const result = await response.json();
-        setCompareGroups(groupRatesByRoute(result.data || []));
-      } else {
-        showError?.('Failed to load rate comparison');
-      }
+      setCompareGroups(await fetchQuotedGroups());
     } catch (err) {
       console.error('Failed to fetch rate comparison:', err);
       showError?.('Failed to load rate comparison');
@@ -456,6 +469,7 @@ function QuoteRequestForm({ onClose }) {
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Incoterm</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Cargo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Quote Ref</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Rate Received</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Date</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Actions</th>
@@ -495,9 +509,20 @@ function QuoteRequestForm({ onClose }) {
                         {STATUS_LABELS[req.status] || req.status}
                       </span>
                     </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-500)' }}>
+                      {req.quote_reference || '—'}
+                    </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>
                       {req.quoted_rate ? (
                         <div>
+                          {bestQuoteIds.has(req.id) && (
+                            <span style={{
+                              display: 'inline-block', fontSize: '0.65rem', fontWeight: 700, color: '#166534',
+                              backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px', marginBottom: '3px',
+                            }}>
+                              BEST
+                            </span>
+                          )}
                           <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{req.quoted_currency} {Number(req.quoted_rate).toLocaleString()}</div>
                           {req.quoted_transit_days && <div style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>{req.quoted_transit_days} days transit</div>}
                         </div>
