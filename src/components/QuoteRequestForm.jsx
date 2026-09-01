@@ -691,9 +691,16 @@ function QuoteRequestForm({ onClose }) {
   // Gross Weight and Value of Goods auto-populate from the product lines once
   // any line carries a weight/value — otherwise they stay plain manually-typed
   // totals, so requests without a line-item breakdown still work as before.
-  const productWeightKey = form.products.map(p => p.weight_kg).join('|');
+  // Weight is per unit (like the L x W x H x Qty volume calc above), so each
+  // line's contribution is weight_kg x qty, not the raw weight_kg alone.
+  const productWeightKey = form.products.map(p => `${p.weight_kg}|${p.qty}`).join('|');
   useEffect(() => {
-    const weightSum = form.products.reduce((sum, p) => sum + (parseFloat(p.weight_kg) || 0), 0);
+    const weightSum = form.products.reduce((sum, p) => {
+      const weight = parseFloat(p.weight_kg) || 0;
+      if (!weight) return sum;
+      const qty = parseFloat(p.qty) || 1;
+      return sum + weight * qty;
+    }, 0);
     if (weightSum > 0) handleFieldChange('gross_weight_kg', String(weightSum));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productWeightKey]);
