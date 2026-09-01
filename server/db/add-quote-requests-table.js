@@ -33,6 +33,7 @@ async function createQuoteRequestsTable() {
         notes TEXT,
         status VARCHAR(20) DEFAULT 'draft',
         quoted_rate NUMERIC,
+        quoted_rate_non_stackable NUMERIC,
         quoted_currency VARCHAR(10) DEFAULT 'USD',
         quote_reference VARCHAR(100),
         quoted_transit_days INTEGER,
@@ -55,6 +56,11 @@ async function createQuoteRequestsTable() {
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS cargo_value NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS cargo_value_currency VARCHAR(10) DEFAULT 'USD';`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_type VARCHAR(30);`);
+    // Air freight only: forwarders often quote a cheaper "stackable" rate and a premium
+    // "non-stackable" rate for cargo that can't be stacked in the hold — quoted_rate holds
+    // the stackable figure (kept comparable with sea/road's single-rate shape) and this
+    // column holds the non-stackable premium alongside it.
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate_non_stackable NUMERIC;`);
     // Allow "TBC" as a value — was DATE, now a free-form string so undecided dates can be recorded
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN cargo_ready_date TYPE VARCHAR(20) USING cargo_ready_date::text;`);
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN required_date TYPE VARCHAR(20) USING required_date::text;`);

@@ -33,7 +33,7 @@ const STATUS_LABELS = {
 };
 
 const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
-const EMPTY_RATE_FORM = { quoted_rate: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
+const EMPTY_RATE_FORM = { quoted_rate: '', quoted_rate_non_stackable: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
 
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
@@ -334,6 +334,19 @@ function QuoteRequestForm({ onClose }) {
         if (monthCounts[key] !== undefined) monthCounts[key]++;
       });
 
+    // Air freight stackability impact — forwarders often quote a premium for cargo
+    // that can't be stacked in the hold; surfaced so the business can see what that
+    // premium is actually costing, route by route.
+    const airStackabilityQuotes = compareAllRequests.filter(r =>
+      r.transport_mode === 'air' && r.status === 'quoted' && r.quoted_rate && r.quoted_rate_non_stackable
+    );
+    const stackabilityPremiums = airStackabilityQuotes.map(r =>
+      ((Number(r.quoted_rate_non_stackable) - Number(r.quoted_rate)) / Number(r.quoted_rate)) * 100
+    );
+    const avgStackabilityPremiumPct = stackabilityPremiums.length
+      ? stackabilityPremiums.reduce((sum, p) => sum + p, 0) / stackabilityPremiums.length
+      : null;
+
     return {
       statusCounts,
       openCount: statusCounts.draft + statusCounts.sent,
@@ -341,6 +354,11 @@ function QuoteRequestForm({ onClose }) {
       multiQuoteRoutes: compareGroups.filter(g => g.entries.length > 1).length,
       monthLabels: monthKeys.map(m => m.label),
       monthCounts: monthKeys.map(m => monthCounts[m.key]),
+      airStackabilityQuotes,
+      avgStackabilityPremiumPct,
+      airChartLabels: airStackabilityQuotes.map(r => `${r.forwarder_name} (${r.origin}→${r.destination})`),
+      airStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate)),
+      airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
     };
   }, [compareAllRequests, compareGroups]);
 
@@ -426,6 +444,7 @@ function QuoteRequestForm({ onClose }) {
     setRateModalReq(req);
     setRateForm({
       quoted_rate: req.quoted_rate ?? '',
+      quoted_rate_non_stackable: req.quoted_rate_non_stackable ?? '',
       quoted_currency: req.quoted_currency || 'USD',
       quote_reference: req.quote_reference || '',
       quoted_transit_days: req.quoted_transit_days ?? '',
@@ -615,7 +634,18 @@ function QuoteRequestForm({ onClose }) {
                               BEST
                             </span>
                           )}
-                          <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>{req.quoted_currency} {Number(req.quoted_rate).toLocaleString()}</div>
+                          <div style={{ fontWeight: 600, color: 'var(--navy-900)' }}>
+                            {req.quoted_currency} {Number(req.quoted_rate).toLocaleString()}
+                            {req.transport_mode === 'air' && req.quoted_rate_non_stackable && (
+                              <span style={{ fontWeight: 500, color: 'var(--text-500)' }}> (stackable)</span>
+                            )}
+                          </div>
+                          {req.transport_mode === 'air' && req.quoted_rate_non_stackable && (
+                            <div style={{ fontSize: '0.75rem', color: '#92400e' }}>
+                              {req.quoted_currency} {Number(req.quoted_rate_non_stackable).toLocaleString()} non-stackable
+                              {' '}(+{(((req.quoted_rate_non_stackable - req.quoted_rate) / req.quoted_rate) * 100).toFixed(0)}%)
+                            </div>
+                          )}
                           {req.quoted_transit_days && <div style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>{req.quoted_transit_days} days transit</div>}
                         </div>
                       ) : '—'}
@@ -1033,7 +1063,7 @@ function QuoteRequestForm({ onClose }) {
             <form onSubmit={handleSaveRate}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0 1rem' }}>
                 <div style={fieldWrap}>
-                  <label style={labelStyle}>Rate *</label>
+                  <label style={labelStyle}>{rateModalReq.transport_mode === 'air' ? 'Stackable Rate *' : 'Rate *'}</label>
                   <input
                     type="number" min="0" step="any" required style={inputStyle}
                     value={rateForm.quoted_rate}
@@ -1050,6 +1080,23 @@ function QuoteRequestForm({ onClose }) {
                     {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+
+                {rateModalReq.transport_mode === 'air' && (
+                  <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Non-Stackable Rate</label>
+                    <input
+                      type="number" min="0" step="any" style={inputStyle}
+                      value={rateForm.quoted_rate_non_stackable}
+                      onChange={e => setRateForm(prev => ({ ...prev, quoted_rate_non_stackable: e.target.value }))}
+                      placeholder="Rate if cargo can't be stacked (leave blank if none quoted)"
+                    />
+                    {rateForm.quoted_rate && rateForm.quoted_rate_non_stackable && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                        {(((rateForm.quoted_rate_non_stackable - rateForm.quoted_rate) / rateForm.quoted_rate) * 100).toFixed(1)}% premium over the stackable rate
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Forwarder's Quote Reference</label>
@@ -1193,6 +1240,33 @@ function QuoteRequestForm({ onClose }) {
                     </div>
                   </div>
                 )}
+
+                {compareDashboard.airStackabilityQuotes.length > 0 && (
+                  <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                      <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Air Freight — Stackability Impact</h4>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>
+                        Avg +{compareDashboard.avgStackabilityPremiumPct.toFixed(0)}% for non-stackable cargo
+                      </span>
+                    </div>
+                    <div style={{ height: 260 }}>
+                      <BarChart
+                        data={{
+                          labels: compareDashboard.airChartLabels,
+                          datasets: [
+                            { label: 'Stackable', data: compareDashboard.airStackableData, backgroundColor: '#3b82f6', borderRadius: 4 },
+                            { label: 'Non-Stackable', data: compareDashboard.airNonStackableData, backgroundColor: '#f59e0b', borderRadius: 4 },
+                          ],
+                        }}
+                        options={{
+                          responsive: true, maintainAspectRatio: false,
+                          plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+                          scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { beginAtZero: true } },
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -1234,6 +1308,11 @@ function QuoteRequestForm({ onClose }) {
                             </td>
                             <td style={{ padding: '8px 14px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'right' }}>
                               {entry.quoted_currency} {Number(entry.quoted_rate).toLocaleString()}
+                              {entry.transport_mode === 'air' && entry.quoted_rate_non_stackable && (
+                                <div style={{ fontSize: '0.7rem', fontWeight: 500, color: '#92400e' }}>
+                                  {entry.quoted_currency} {Number(entry.quoted_rate_non_stackable).toLocaleString()} non-stackable
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
                               {entry.quoted_transit_days ? `${entry.quoted_transit_days} days` : ''}
