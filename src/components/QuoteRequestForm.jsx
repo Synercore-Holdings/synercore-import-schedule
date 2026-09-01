@@ -3,6 +3,7 @@ import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
 import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
+import { CONTAINER_TYPES } from '../utils/costingCalculations';
 
 const STATUS_STYLES = {
   draft: { backgroundColor: '#f3f4f6', color: '#6b7280' },
@@ -55,7 +56,7 @@ const RECEIVING_WAREHOUSES = [
 ];
 
 const EMPTY_FORM = {
-  forwarder_name: '', forwarder_email: '', transport_mode: 'sea', incoterm: '',
+  forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', cargo_description: '', hs_code: '',
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
   pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
@@ -81,6 +82,7 @@ const toFormState = (req) => ({
   forwarder_name: req.forwarder_name || '',
   forwarder_email: req.forwarder_email || '',
   transport_mode: req.transport_mode || 'sea',
+  container_type: req.container_type || '',
   incoterm: req.incoterm || '',
   origin: req.origin || '',
   destination: req.destination || '',
@@ -534,12 +536,29 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Transport Mode</label>
-                  <select style={inputStyle} value={form.transport_mode} onChange={e => handleFieldChange('transport_mode', e.target.value)}>
+                  <select
+                    style={inputStyle}
+                    value={form.transport_mode}
+                    onChange={e => {
+                      const mode = e.target.value;
+                      setForm(prev => ({ ...prev, transport_mode: mode, container_type: mode === 'air' ? '' : prev.container_type }));
+                    }}
+                  >
                     <option value="sea">Sea</option>
                     <option value="air">Air</option>
                     <option value="road">Road</option>
                   </select>
                 </div>
+                {form.transport_mode !== 'air' && (
+                  <div style={fieldWrap}>
+                    <label style={labelStyle}>Container Type</label>
+                    <select style={inputStyle} value={form.container_type} onChange={e => handleFieldChange('container_type', e.target.value)}>
+                      <option value="">— Select —</option>
+                      {CONTAINER_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
+                      <option value="LCL">LCL / Not Containerized</option>
+                    </select>
+                  </div>
+                )}
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Incoterm</label>
                   <select

@@ -78,6 +78,7 @@ export function generateQuoteRequestPDF(req) {
     head: [['Shipment Details', '']],
     body: [
       ['Mode', TRANSPORT_LABELS[req.transport_mode] || fmt(req.transport_mode)],
+      ...(req.container_type ? [['Container Type', req.container_type]] : []),
       ['Incoterm', fmt(req.incoterm)],
       ['Origin', fmt(req.origin)],
       ...(req.collection_address ? [['Collection Address', req.collection_address]] : []),

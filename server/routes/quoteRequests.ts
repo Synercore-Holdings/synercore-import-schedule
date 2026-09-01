@@ -43,6 +43,7 @@ router.post(
     body('forwarder_name').trim().notEmpty().withMessage('Forwarder name is required'),
     body('forwarder_email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Invalid email'),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
+    body('container_type').optional({ nullable: true }).trim(),
     body('incoterm').optional({ nullable: true }).trim(),
     body('origin').optional({ nullable: true }).trim(),
     body('destination').optional({ nullable: true }).trim(),
@@ -66,7 +67,7 @@ router.post(
   validate,
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      forwarder_name, forwarder_email, transport_mode = 'sea', incoterm,
+      forwarder_name, forwarder_email, transport_mode = 'sea', container_type, incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code,
       dg_classification = 'non_dg', gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm,
       pallet_count, cargo_value, cargo_value_currency = 'USD', cargo_ready_date, required_date, notes,
@@ -76,14 +77,14 @@ router.post(
 
     const result = await pool.query(
       `INSERT INTO quote_requests (
-        requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode,
+        requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode, container_type,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code,
         dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
         cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
       RETURNING *`,
       [
-        userId, username, forwarder_name, forwarder_email || null, transport_mode,
+        userId, username, forwarder_name, forwarder_email || null, transport_mode, container_type || null,
         incoterm || null, origin || null, destination || null, collection_address || null, supplier_name || null,
         cargo_description || null, hs_code || null, dg_classification, gross_weight_kg || null,
         length_cm || null, width_cm || null, height_cm || null, volume_cbm || null,
@@ -135,6 +136,7 @@ router.put(
     body('forwarder_name').optional().trim().notEmpty(),
     body('forwarder_email').optional({ checkFalsy: true }).trim().isEmail(),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
+    body('container_type').optional({ nullable: true }).trim(),
     body('dg_classification').optional().isIn(DG_CLASSIFICATIONS),
     body('cargo_value').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('cargo_value_currency').optional({ nullable: true }).trim(),
@@ -149,7 +151,7 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const allowedFields = [
-      'forwarder_name', 'forwarder_email', 'transport_mode', 'incoterm', 'origin', 'destination',
+      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'incoterm', 'origin', 'destination',
       'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'dg_classification',
       'gross_weight_kg', 'length_cm', 'width_cm', 'height_cm', 'volume_cbm', 'pallet_count',
       'cargo_value', 'cargo_value_currency', 'cargo_ready_date', 'required_date', 'notes', 'status',

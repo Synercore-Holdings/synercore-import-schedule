@@ -11,6 +11,7 @@ async function createQuoteRequestsTable() {
         forwarder_name VARCHAR(255) NOT NULL,
         forwarder_email VARCHAR(255),
         transport_mode VARCHAR(20) DEFAULT 'sea',
+        container_type VARCHAR(30),
         incoterm VARCHAR(20),
         origin VARCHAR(255),
         destination VARCHAR(255),
@@ -53,6 +54,7 @@ async function createQuoteRequestsTable() {
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quote_notes TEXT;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS cargo_value NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS cargo_value_currency VARCHAR(10) DEFAULT 'USD';`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_type VARCHAR(30);`);
     // Allow "TBC" as a value — was DATE, now a free-form string so undecided dates can be recorded
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN cargo_ready_date TYPE VARCHAR(20) USING cargo_ready_date::text;`);
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN required_date TYPE VARCHAR(20) USING required_date::text;`);
