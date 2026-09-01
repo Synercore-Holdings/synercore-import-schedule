@@ -91,7 +91,7 @@ const normalizePortOptions = (ports) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
-const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', value: '', value_currency: 'USD' };
+const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', value: '', value_currency: 'USD' };
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
@@ -127,8 +127,8 @@ const toFormState = (req) => ({
   collection_address: req.collection_address || '',
   supplier_name: req.supplier_name || '',
   products: (req.products && req.products.length > 0)
-    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '', value: p.value ?? '', value_currency: p.value_currency || 'USD' }))
-    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '', value: '', value_currency: 'USD' }],
+    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '', weight_kg: p.weight_kg ?? '', value: p.value ?? '', value_currency: p.value_currency || 'USD' }))
+    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '', weight_kg: '', value: '', value_currency: 'USD' }],
   dg_classification: req.dg_classification || 'non_dg',
   gross_weight_kg: req.gross_weight_kg ?? '',
   length_cm: req.length_cm ?? '',
@@ -687,6 +687,24 @@ function QuoteRequestForm({ onClose }) {
   }, [compareDashboard.routeTrendMap, compareDashboard.routeTrendOptions, trendRoute]);
 
   const handleFieldChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  // Gross Weight and Value of Goods auto-populate from the product lines once
+  // any line carries a weight/value — otherwise they stay plain manually-typed
+  // totals, so requests without a line-item breakdown still work as before.
+  const productWeightKey = form.products.map(p => p.weight_kg).join('|');
+  useEffect(() => {
+    const weightSum = form.products.reduce((sum, p) => sum + (parseFloat(p.weight_kg) || 0), 0);
+    if (weightSum > 0) handleFieldChange('gross_weight_kg', String(weightSum));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productWeightKey]);
+
+  const productValueKey = form.products.map(p => `${p.value}|${p.value_currency}`).join('|');
+  useEffect(() => {
+    const matching = form.products.filter(p => p.value_currency === form.cargo_value_currency);
+    const valueSum = matching.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0);
+    if (valueSum > 0) handleFieldChange('cargo_value', String(valueSum));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productValueKey, form.cargo_value_currency]);
 
   const updateProductLine = (idx, field, value) => setForm(prev => ({
     ...prev,
@@ -1403,36 +1421,36 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Products</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 70px 90px 70px 32px', gap: '0.5rem', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Product</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>HS Code</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Qty</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Value</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Currency</span>
-                    <span />
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginBottom: '6px' }}>
+                    Gross Weight and Value of Goods below are calculated automatically from the lines here.
                   </div>
                   {form.products.map((line, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 70px 90px 70px 32px', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
-                      <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
-                      <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
-                      <input type="number" min="0" step="any" style={inputStyle} placeholder="Value" value={line.value} onChange={e => updateProductLine(idx, 'value', e.target.value)} />
-                      <select style={inputStyle} value={line.value_currency} onChange={e => updateProductLine(idx, 'value_currency', e.target.value)}>
-                        {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => removeProductLine(idx)}
-                        disabled={form.products.length === 1}
-                        title="Remove product"
-                        style={{
-                          padding: 0, height: '36px', backgroundColor: form.products.length === 1 ? '#f3f4f6' : '#fef2f2',
-                          color: form.products.length === 1 ? '#9ca3af' : 'var(--danger)', border: '1px solid #d1d5db',
-                          borderRadius: '6px', cursor: form.products.length === 1 ? 'not-allowed' : 'pointer', fontSize: '0.9rem',
-                        }}
-                      >
-                        ×
-                      </button>
+                    <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px', marginBottom: '0.5rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 32px', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                        <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
+                        <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
+                        <button
+                          type="button"
+                          onClick={() => removeProductLine(idx)}
+                          disabled={form.products.length === 1}
+                          title="Remove product"
+                          style={{
+                            padding: 0, height: '36px', backgroundColor: form.products.length === 1 ? '#f3f4f6' : '#fef2f2',
+                            color: form.products.length === 1 ? '#9ca3af' : 'var(--danger)', border: '1px solid #d1d5db',
+                            borderRadius: '6px', cursor: form.products.length === 1 ? 'not-allowed' : 'pointer', fontSize: '0.9rem',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '70px 90px 90px 70px', gap: '0.5rem' }}>
+                        <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
+                        <input type="number" min="0" step="any" style={inputStyle} placeholder="Weight (kg)" value={line.weight_kg} onChange={e => updateProductLine(idx, 'weight_kg', e.target.value)} />
+                        <input type="number" min="0" step="any" style={inputStyle} placeholder="Value" value={line.value} onChange={e => updateProductLine(idx, 'value', e.target.value)} />
+                        <select style={inputStyle} value={line.value_currency} onChange={e => updateProductLine(idx, 'value_currency', e.target.value)}>
+                          {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
                     </div>
                   ))}
                   <button
@@ -1447,6 +1465,11 @@ function QuoteRequestForm({ onClose }) {
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Gross Weight (kg)</label>
                   <input type="number" min="0" step="any" style={inputStyle} value={form.gross_weight_kg} onChange={e => handleFieldChange('gross_weight_kg', e.target.value)} />
+                  {form.products.some(p => parseFloat(p.weight_kg) > 0) && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                      Auto-calculated from product line weights
+                    </div>
+                  )}
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Value of Goods</label>
@@ -1459,26 +1482,12 @@ function QuoteRequestForm({ onClose }) {
                   {(() => {
                     const linesWithValue = form.products.filter(p => parseFloat(p.value) > 0);
                     if (linesWithValue.length === 0) return null;
-                    const matching = linesWithValue.filter(p => p.value_currency === form.cargo_value_currency);
-                    const otherCurrencyCount = linesWithValue.length - matching.length;
-                    const lineSum = matching.reduce((sum, p) => sum + parseFloat(p.value), 0);
+                    const otherCurrencyCount = linesWithValue.filter(p => p.value_currency !== form.cargo_value_currency).length;
                     return (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
-                        {lineSum > 0 && (
-                          <>
-                            Product lines total {form.cargo_value_currency} {lineSum.toLocaleString()}
-                            {' '}
-                            <button
-                              type="button"
-                              onClick={() => handleFieldChange('cargo_value', String(lineSum))}
-                              style={{ background: 'none', border: 'none', color: 'var(--navy-900)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
-                            >
-                              Use this total
-                            </button>
-                          </>
-                        )}
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                        {otherCurrencyCount < linesWithValue.length && <div>Auto-calculated from product line values</div>}
                         {otherCurrencyCount > 0 && (
-                          <div style={{ marginTop: lineSum > 0 ? '2px' : 0 }}>
+                          <div>
                             {otherCurrencyCount} product line{otherCurrencyCount > 1 ? 's' : ''} valued in a different currency, not included above.
                           </div>
                         )}
