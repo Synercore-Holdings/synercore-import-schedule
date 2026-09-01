@@ -1250,7 +1250,7 @@ function QuoteRequestForm({ onClose }) {
               </div>
             )}
             <form onSubmit={isViewMode ? (e) => e.preventDefault() : handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem', ...(isViewMode ? { pointerEvents: 'none', opacity: 0.85 } : {}) }}>
+              <div className="qr-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem', ...(isViewMode ? { pointerEvents: 'none', opacity: 0.85 } : {}) }}>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Forwarder / Agent Name *</label>
                   <input style={inputStyle} value={form.forwarder_name} onChange={e => handleFieldChange('forwarder_name', e.target.value)} required />
@@ -1490,7 +1490,7 @@ function QuoteRequestForm({ onClose }) {
                           ×
                         </button>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '70px 90px 90px 70px', gap: '0.5rem' }}>
+                      <div className="qr-product-row2" style={{ display: 'grid', gridTemplateColumns: '70px 90px 90px 70px', gap: '0.5rem' }}>
                         <div>
                           <label style={miniLabel}>Qty</label>
                           <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
@@ -1874,7 +1874,7 @@ function QuoteRequestForm({ onClose }) {
                 )}
 
                 {compareAllRequests.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div className="qr-chart-grid-2col" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                     <div className="dash-panel">
                       <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Requests by Status</h4>
                       <div style={{ height: 260 }}>
@@ -1951,28 +1951,30 @@ function QuoteRequestForm({ onClose }) {
                         }}
                       />
                     </div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginTop: 16 }}>
-                      <thead>
-                        <tr style={{ textAlign: 'left', color: 'var(--text-500)', borderBottom: '1px solid #eee' }}>
-                          <th style={{ padding: '6px 8px', fontWeight: 600 }}>Forwarder</th>
-                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Win Rate</th>
-                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Quotes</th>
-                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Transit Days</th>
-                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Response Time</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {compareDashboard.forwarderWinRates.map(f => (
-                          <tr key={f.name} style={{ borderTop: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '6px 8px' }}>{f.name}</td>
-                            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{f.pct.toFixed(0)}%</td>
-                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.quotes}</td>
-                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgTransitDays !== null ? f.avgTransitDays.toFixed(1) : '—'}</td>
-                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgResponseDays !== null ? `${f.avgResponseDays.toFixed(1)}d` : '—'}</td>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginTop: 16 }}>
+                        <thead>
+                          <tr style={{ textAlign: 'left', color: 'var(--text-500)', borderBottom: '1px solid #eee' }}>
+                            <th style={{ padding: '6px 8px', fontWeight: 600 }}>Forwarder</th>
+                            <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Win Rate</th>
+                            <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Quotes</th>
+                            <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Transit Days</th>
+                            <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Response Time</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {compareDashboard.forwarderWinRates.map(f => (
+                            <tr key={f.name} style={{ borderTop: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '6px 8px' }}>{f.name}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{f.pct.toFixed(0)}%</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.quotes}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgTransitDays !== null ? f.avgTransitDays.toFixed(1) : '—'}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgResponseDays !== null ? `${f.avgResponseDays.toFixed(1)}d` : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
 
@@ -2073,36 +2075,38 @@ function QuoteRequestForm({ onClose }) {
                           : '⚠️ Rates below are in different currencies — set FX Rates to compare accurately'}
                       </div>
                     )}
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <tbody>
-                        {group.entries.map((entry, idx) => (
-                          <tr key={entry.id} style={{ borderTop: idx > 0 ? '1px solid #eee' : 'none', backgroundColor: idx === 0 ? '#f0fdf4' : 'white' }}>
-                            <td style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
-                              {idx === 0 && (
-                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#166534', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px', marginRight: '6px' }}>
-                                  BEST
-                                </span>
-                              )}
-                              {entry.forwarder_name}
-                            </td>
-                            <td style={{ padding: '8px 14px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'right' }}>
-                              {entry.quoted_currency} {Number(entry.quoted_rate).toLocaleString()}
-                              {entry.transport_mode === 'air' && entry.quoted_rate_non_stackable && (
-                                <div style={{ fontSize: '0.7rem', fontWeight: 500, color: '#92400e' }}>
-                                  {entry.quoted_currency} {Number(entry.quoted_rate_non_stackable).toLocaleString()} non-stackable
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
-                              {entry.quoted_transit_days ? `${entry.quoted_transit_days} days` : ''}
-                            </td>
-                            <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
-                              QR-{String(entry.id).padStart(5, '0')}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {group.entries.map((entry, idx) => (
+                            <tr key={entry.id} style={{ borderTop: idx > 0 ? '1px solid #eee' : 'none', backgroundColor: idx === 0 ? '#f0fdf4' : 'white' }}>
+                              <td style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                                {idx === 0 && (
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#166534', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px', marginRight: '6px' }}>
+                                    BEST
+                                  </span>
+                                )}
+                                {entry.forwarder_name}
+                              </td>
+                              <td style={{ padding: '8px 14px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'right' }}>
+                                {entry.quoted_currency} {Number(entry.quoted_rate).toLocaleString()}
+                                {entry.transport_mode === 'air' && entry.quoted_rate_non_stackable && (
+                                  <div style={{ fontSize: '0.7rem', fontWeight: 500, color: '#92400e' }}>
+                                    {entry.quoted_currency} {Number(entry.quoted_rate_non_stackable).toLocaleString()} non-stackable
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
+                                {entry.quoted_transit_days ? `${entry.quoted_transit_days} days` : ''}
+                              </td>
+                              <td style={{ padding: '8px 14px', fontSize: '0.75rem', color: 'var(--text-500)', textAlign: 'right' }}>
+                                QR-{String(entry.id).padStart(5, '0')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -887,6 +887,17 @@ button:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visi
     gap: 6px;
   }
 
+  /* Freight Quote Requests: form fields, dashboard chart pairs, and product
+     line qty/weight/value/currency rows collapse to a single column so
+     nothing gets crushed on a narrow screen. */
+  .qr-form-grid,
+  .qr-chart-grid-2col {
+    grid-template-columns: 1fr !important;
+  }
+  .qr-product-row2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
   .stat-card {
     padding: 8px;
   }
