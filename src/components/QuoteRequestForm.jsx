@@ -1441,18 +1441,26 @@ function QuoteRequestForm({ onClose }) {
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginBottom: '6px' }}>
                     Gross Weight and Value of Goods below are calculated automatically from the lines here.
                   </div>
-                  {form.products.map((line, idx) => (
+                  {form.products.map((line, idx) => {
+                    const miniLabel = { fontSize: '0.65rem', color: 'var(--text-500)', marginBottom: '2px', display: 'block' };
+                    return (
                     <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px', marginBottom: '0.5rem' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 32px', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                        <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
-                        <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
+                        <div>
+                          <label style={miniLabel}>Product</label>
+                          <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={miniLabel}>HS Code</label>
+                          <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeProductLine(idx)}
                           disabled={form.products.length === 1}
                           title="Remove product"
                           style={{
-                            padding: 0, height: '36px', backgroundColor: form.products.length === 1 ? '#f3f4f6' : '#fef2f2',
+                            padding: 0, height: '36px', alignSelf: 'end', backgroundColor: form.products.length === 1 ? '#f3f4f6' : '#fef2f2',
                             color: form.products.length === 1 ? '#9ca3af' : 'var(--danger)', border: '1px solid #d1d5db',
                             borderRadius: '6px', cursor: form.products.length === 1 ? 'not-allowed' : 'pointer', fontSize: '0.9rem',
                           }}
@@ -1461,15 +1469,28 @@ function QuoteRequestForm({ onClose }) {
                         </button>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '70px 90px 90px 70px', gap: '0.5rem' }}>
-                        <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
-                        <input type="number" min="0" step="any" style={inputStyle} placeholder="Weight (kg)" value={line.weight_kg} onChange={e => updateProductLine(idx, 'weight_kg', e.target.value)} />
-                        <input type="number" min="0" step="any" style={inputStyle} placeholder="Value" value={line.value} onChange={e => updateProductLine(idx, 'value', e.target.value)} />
-                        <select style={inputStyle} value={line.value_currency} onChange={e => updateProductLine(idx, 'value_currency', e.target.value)}>
-                          {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <div>
+                          <label style={miniLabel}>Qty</label>
+                          <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={miniLabel}>Weight (kg)</label>
+                          <input type="number" min="0" step="any" style={inputStyle} placeholder="Weight" value={line.weight_kg} onChange={e => updateProductLine(idx, 'weight_kg', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={miniLabel}>Value</label>
+                          <input type="number" min="0" step="any" style={inputStyle} placeholder="Value" value={line.value} onChange={e => updateProductLine(idx, 'value', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={miniLabel}>Currency</label>
+                          <select style={inputStyle} value={line.value_currency} onChange={e => updateProductLine(idx, 'value_currency', e.target.value)}>
+                            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={addProductLine}
