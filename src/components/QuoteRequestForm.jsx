@@ -91,7 +91,7 @@ const normalizePortOptions = (ports) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
-const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', value: '' };
+const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', value: '', value_currency: 'USD' };
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
@@ -127,8 +127,8 @@ const toFormState = (req) => ({
   collection_address: req.collection_address || '',
   supplier_name: req.supplier_name || '',
   products: (req.products && req.products.length > 0)
-    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '', value: p.value ?? '' }))
-    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '', value: '' }],
+    ? req.products.map(p => ({ name: p.name || '', hs_code: p.hs_code || '', qty: p.qty ?? '', value: p.value ?? '', value_currency: p.value_currency || 'USD' }))
+    : [{ name: req.cargo_description || '', hs_code: req.hs_code || '', qty: '', value: '', value_currency: 'USD' }],
   dg_classification: req.dg_classification || 'non_dg',
   gross_weight_kg: req.gross_weight_kg ?? '',
   length_cm: req.length_cm ?? '',
@@ -1403,19 +1403,23 @@ function QuoteRequestForm({ onClose }) {
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Products</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 110px 32px', gap: '0.5rem', marginBottom: '4px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 70px 90px 70px 32px', gap: '0.5rem', marginBottom: '4px' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Product</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>HS Code</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Qty</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Value ({form.cargo_value_currency})</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Value</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>Currency</span>
                     <span />
                   </div>
                   {form.products.map((line, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px 110px 32px', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 70px 90px 70px 32px', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <input style={inputStyle} placeholder="Product name" value={line.name} onChange={e => updateProductLine(idx, 'name', e.target.value)} />
                       <input style={inputStyle} placeholder="HS Code" value={line.hs_code} onChange={e => updateProductLine(idx, 'hs_code', e.target.value)} />
                       <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
                       <input type="number" min="0" step="any" style={inputStyle} placeholder="Value" value={line.value} onChange={e => updateProductLine(idx, 'value', e.target.value)} />
+                      <select style={inputStyle} value={line.value_currency} onChange={e => updateProductLine(idx, 'value_currency', e.target.value)}>
+                        {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
                       <button
                         type="button"
                         onClick={() => removeProductLine(idx)}
@@ -1453,19 +1457,31 @@ function QuoteRequestForm({ onClose }) {
                     </select>
                   </div>
                   {(() => {
-                    const lineSum = form.products.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0);
-                    if (lineSum <= 0) return null;
+                    const linesWithValue = form.products.filter(p => parseFloat(p.value) > 0);
+                    if (linesWithValue.length === 0) return null;
+                    const matching = linesWithValue.filter(p => p.value_currency === form.cargo_value_currency);
+                    const otherCurrencyCount = linesWithValue.length - matching.length;
+                    const lineSum = matching.reduce((sum, p) => sum + parseFloat(p.value), 0);
                     return (
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
-                        Product lines total {form.cargo_value_currency} {lineSum.toLocaleString()}
-                        {' '}
-                        <button
-                          type="button"
-                          onClick={() => handleFieldChange('cargo_value', String(lineSum))}
-                          style={{ background: 'none', border: 'none', color: 'var(--navy-900)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
-                        >
-                          Use this total
-                        </button>
+                        {lineSum > 0 && (
+                          <>
+                            Product lines total {form.cargo_value_currency} {lineSum.toLocaleString()}
+                            {' '}
+                            <button
+                              type="button"
+                              onClick={() => handleFieldChange('cargo_value', String(lineSum))}
+                              style={{ background: 'none', border: 'none', color: 'var(--navy-900)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}
+                            >
+                              Use this total
+                            </button>
+                          </>
+                        )}
+                        {otherCurrencyCount > 0 && (
+                          <div style={{ marginTop: lineSum > 0 ? '2px' : 0 }}>
+                            {otherCurrencyCount} product line{otherCurrencyCount > 1 ? 's' : ''} valued in a different currency, not included above.
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
