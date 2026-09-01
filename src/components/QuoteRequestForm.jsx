@@ -5,13 +5,14 @@ import { useNotification } from '../contexts/NotificationContext';
 import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
 import { CONTAINER_TYPES, PORTS_OF_LOADING, AFRICAN_PORTS } from '../utils/costingCalculations';
 import { groupRatesByRoute } from '../utils/quoteRequestRates';
+import * as XLSX from 'xlsx';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, ArcElement,
   Title, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Doughnut, Bar as BarChart } from 'react-chartjs-2';
+import { Doughnut, Bar as BarChart, Line as LineChart } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -46,6 +47,14 @@ const getMonthKey = (req) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 const monthLabel = (key) => new Date(`${key}-01`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
+
+// Days since a "sent" request last changed status — approximates when it was sent,
+// since there's no dedicated sent_at column. Used to flag forwarders going quiet.
+const daysSinceSent = (req) => {
+  const d = new Date(req.updated_at || req.created_at);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+};
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
 // EXW: forwarder collects from the supplier's premises, so we need the full
@@ -204,6 +213,9 @@ function QuoteRequestForm({ onClose }) {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [monthFilter, setMonthFilter] = useState('');
   const [dashboardMonthFilter, setDashboardMonthFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
+  const [trendRoute, setTrendRoute] = useState('');
   const [bestQuoteIds, setBestQuoteIds] = useState(new Set());
   const [suppliers, setSuppliers] = useState([]);
   const [showCustomSupplier, setShowCustomSupplier] = useState(false);
@@ -291,9 +303,33 @@ function QuoteRequestForm({ onClose }) {
   }, [requests]);
 
   const displayedRequests = useMemo(() => {
-    if (!monthFilter) return requests;
-    return requests.filter(r => getMonthKey(r) === monthFilter);
-  }, [requests, monthFilter]);
+    let list = requests;
+    if (monthFilter) list = list.filter(r => getMonthKey(r) === monthFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(r => [r.forwarder_name, r.supplier_name, r.origin, r.destination, r.quote_reference]
+        .some(v => (v || '').toLowerCase().includes(q)));
+    }
+
+    const { key, direction } = sortConfig;
+    const dir = direction === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let av = a[key], bv = b[key];
+      if (key === 'quoted_rate') { av = av ? Number(av) : null; bv = bv ? Number(bv) : null; }
+      if (av === null || av === undefined || av === '') return 1;
+      if (bv === null || bv === undefined || bv === '') return -1;
+      if (key === 'created_at') { av = new Date(av).getTime(); bv = new Date(bv).getTime(); }
+      if (av > bv) return dir;
+      if (av < bv) return -dir;
+      return 0;
+    });
+  }, [requests, monthFilter, searchQuery, sortConfig]);
+
+  const toggleSort = (key) => {
+    setSortConfig(prev => prev.key === key
+      ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      : { key, direction: key === 'quoted_rate' ? 'asc' : 'desc' });
+  };
 
   // Shared with Compare Rates — grouped by route so "best" only compares like-for-like quotes.
   const fetchQuotedGroups = async () => {
@@ -381,17 +417,58 @@ function QuoteRequestForm({ onClose }) {
       : null;
 
     // Forwarder win rate — of the routes with a rate on record, what % did each
-    // forwarder come in cheapest on. Respects whatever Period is selected, so
-    // switching between "All Time" and a single month gives the overall and the
-    // per-month view with the same chart.
-    const winCounts = {};
+    // forwarder come in cheapest on (plus their avg quoted transit days, so
+    // "cheapest" can be weighed against "slowest"). Respects whatever Period is
+    // selected, so switching between "All Time" and a single month gives the
+    // overall and the per-month view with the same chart.
+    const forwarderStats = {};
     routeGroups.forEach(g => {
-      const winner = g.entries[0]?.forwarder_name;
-      if (winner) winCounts[winner] = (winCounts[winner] || 0) + 1;
+      g.entries.forEach((entry, idx) => {
+        const name = entry.forwarder_name;
+        if (!forwarderStats[name]) forwarderStats[name] = { wins: 0, quotes: 0, transitDays: [] };
+        forwarderStats[name].quotes++;
+        if (idx === 0) forwarderStats[name].wins++;
+        if (entry.quoted_transit_days) forwarderStats[name].transitDays.push(Number(entry.quoted_transit_days));
+      });
     });
-    const forwarderWinRates = Object.entries(winCounts)
-      .map(([name, wins]) => ({ name, wins, pct: routeGroups.length ? (wins / routeGroups.length) * 100 : 0 }))
+    const forwarderWinRates = Object.entries(forwarderStats)
+      .map(([name, s]) => ({
+        name, wins: s.wins, quotes: s.quotes,
+        pct: routeGroups.length ? (s.wins / routeGroups.length) * 100 : 0,
+        avgTransitDays: s.transitDays.length ? s.transitDays.reduce((a, b) => a + b, 0) / s.transitDays.length : null,
+      }))
       .sort((a, b) => b.pct - a.pct);
+
+    // Cost savings from picking the cheapest quote vs. the average of the
+    // alternatives on the same route — skipped for mixed-currency routes since
+    // there's no FX conversion here, only totalled where the comparison is
+    // apples-to-apples.
+    const savingsByCurrency = {};
+    routeGroups.filter(g => g.entries.length > 1 && !g.mixedCurrency).forEach(g => {
+      const best = Number(g.entries[0].quoted_rate);
+      const others = g.entries.slice(1).map(e => Number(e.quoted_rate));
+      const avgOthers = others.reduce((sum, v) => sum + v, 0) / others.length;
+      const savings = avgOthers - best;
+      if (savings > 0) {
+        const currency = g.entries[0].quoted_currency;
+        savingsByCurrency[currency] = (savingsByCurrency[currency] || 0) + savings;
+      }
+    });
+
+    // Rate trend per route — always all-time regardless of Period, since a
+    // single month rarely has more than one data point to trend against.
+    const routeTrendMap = new Map();
+    compareAllRequests.filter(r => r.status === 'quoted' && r.quoted_rate).forEach(r => {
+      const key = `${(r.origin || '').trim().toLowerCase()}|${(r.destination || '').trim().toLowerCase()}|${r.transport_mode}`;
+      if (!routeTrendMap.has(key)) {
+        routeTrendMap.set(key, { label: `${r.origin || '—'} → ${r.destination || '—'} (${TRANSPORT_LABELS[r.transport_mode] || r.transport_mode})`, entries: [] });
+      }
+      routeTrendMap.get(key).entries.push(r);
+    });
+    const routeTrendOptions = [...routeTrendMap.entries()]
+      .filter(([, v]) => v.entries.length > 1)
+      .map(([key, v]) => ({ key, label: v.label, count: v.entries.length }))
+      .sort((a, b) => b.count - a.count);
 
     return {
       statusCounts,
@@ -407,8 +484,30 @@ function QuoteRequestForm({ onClose }) {
       airStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate)),
       airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
       forwarderWinRates,
+      savingsByCurrency,
+      routeTrendMap,
+      routeTrendOptions,
     };
   }, [compareAllRequests, dashboardMonthFilter]);
+
+  // Rate trend for the selected route — separate memo since it depends on
+  // trendRoute without needing to recompute the whole dashboard.
+  const selectedTrend = useMemo(() => {
+    const key = trendRoute || compareDashboard.routeTrendOptions[0]?.key;
+    const route = key ? compareDashboard.routeTrendMap.get(key) : null;
+    if (!route) return null;
+    const sorted = [...route.entries].sort((a, b) =>
+      new Date(a.updated_at || a.created_at) - new Date(b.updated_at || b.created_at)
+    );
+    return {
+      key,
+      label: route.label,
+      labels: sorted.map(r => new Date(r.updated_at || r.created_at).toLocaleDateString('en-ZA', { month: 'short', day: '2-digit' })),
+      rates: sorted.map(r => Number(r.quoted_rate)),
+      forwarders: sorted.map(r => r.forwarder_name),
+      currency: sorted[0]?.quoted_currency,
+    };
+  }, [compareDashboard.routeTrendMap, compareDashboard.routeTrendOptions, trendRoute]);
 
   const handleFieldChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -526,6 +625,31 @@ function QuoteRequestForm({ onClose }) {
     }
   };
 
+  const handleExportExcel = (list) => {
+    const rows = list.map(r => ({
+      'Ref': `QR-${String(r.id).padStart(5, '0')}`,
+      'Forwarder': r.forwarder_name,
+      'Forwarder Email': r.forwarder_email || '',
+      'Origin': r.origin || '',
+      'Destination': r.destination || '',
+      'Mode': TRANSPORT_LABELS[r.transport_mode] || r.transport_mode,
+      'Incoterm': r.incoterm || '',
+      'Supplier': r.supplier_name || '',
+      'Cargo': r.cargo_description || '',
+      'Status': STATUS_LABELS[r.status] || r.status,
+      'Quote Ref': r.quote_reference || '',
+      'Rate': r.quoted_rate || '',
+      'Non-Stackable Rate': r.quoted_rate_non_stackable || '',
+      'Currency': r.quoted_currency || '',
+      'Transit Days': r.quoted_transit_days || '',
+      'Date': r.created_at ? new Date(r.created_at).toLocaleDateString('en-ZA') : '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Quote Requests');
+    XLSX.writeFile(wb, `freight-quote-requests-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const handleDelete = async (id) => {
     if (!(await confirmAction({ title: 'Delete Quote Request', message: 'Are you sure you want to delete this request?', type: 'danger', confirmText: 'Delete' }))) return;
     try {
@@ -609,7 +733,14 @@ function QuoteRequestForm({ onClose }) {
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search forwarder, supplier, route, ref..."
+              style={{ padding: '7px 10px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #d1d5db', minWidth: '220px' }}
+            />
             <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-500)' }}>Period:</label>
             <select
               value={monthFilter}
@@ -619,6 +750,17 @@ function QuoteRequestForm({ onClose }) {
               <option value="">All Time</option>
               {availableMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
+            <button
+              onClick={() => handleExportExcel(displayedRequests)}
+              disabled={displayedRequests.length === 0}
+              style={{
+                padding: '7px 14px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--navy-900)',
+                backgroundColor: 'white', color: 'var(--navy-900)', fontWeight: 600,
+                cursor: displayedRequests.length === 0 ? 'not-allowed' : 'pointer', opacity: displayedRequests.length === 0 ? 0.5 : 1,
+              }}
+            >
+              Export
+            </button>
           </div>
         </div>
 
@@ -642,8 +784,18 @@ function QuoteRequestForm({ onClose }) {
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Cargo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Quote Ref</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Rate Received</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Date</th>
+                  <th
+                    style={{ padding: '12px 16px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => toggleSort('quoted_rate')}
+                  >
+                    Rate Received {sortConfig.key === 'quoted_rate' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                  </th>
+                  <th
+                    style={{ padding: '12px 16px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => toggleSort('created_at')}
+                  >
+                    Date {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                  </th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
@@ -680,6 +832,14 @@ function QuoteRequestForm({ onClose }) {
                       }}>
                         {STATUS_LABELS[req.status] || req.status}
                       </span>
+                      {req.status === 'sent' && daysSinceSent(req) >= 3 && (
+                        <div style={{
+                          marginTop: '4px', fontSize: '0.65rem', fontWeight: 700,
+                          color: daysSinceSent(req) >= 7 ? '#dc2626' : '#92400e',
+                        }}>
+                          {daysSinceSent(req)}d waiting{daysSinceSent(req) >= 7 ? ' — overdue' : ''}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-500)' }}>
                       {req.quote_reference || '—'}
@@ -1270,6 +1430,12 @@ function QuoteRequestForm({ onClose }) {
                     <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.multiQuoteRoutes}</h3>
                     <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Routes With Multiple Quotes</p>
                   </div>
+                  {Object.entries(compareDashboard.savingsByCurrency).map(([currency, amount]) => (
+                    <div className="stat-card ring-success" key={currency}>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{currency} {amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Saved vs. Avg Alternative</p>
+                    </div>
+                  ))}
                 </div>
 
                 {compareAllRequests.length > 0 && (
@@ -1347,6 +1513,68 @@ function QuoteRequestForm({ onClose }) {
                             x: { grid: { display: false }, ticks: { font: { size: 10 } } },
                             y: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } },
                           },
+                        }}
+                      />
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', marginTop: 16 }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', color: 'var(--text-500)', borderBottom: '1px solid #eee' }}>
+                          <th style={{ padding: '6px 8px', fontWeight: 600 }}>Forwarder</th>
+                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Win Rate</th>
+                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Quotes</th>
+                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Transit Days</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {compareDashboard.forwarderWinRates.map(f => (
+                          <tr key={f.name} style={{ borderTop: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '6px 8px' }}>{f.name}</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{f.pct.toFixed(0)}%</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.quotes}</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgTransitDays !== null ? f.avgTransitDays.toFixed(1) : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {selectedTrend && (
+                  <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: '1rem', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Rate Trend by Route</h4>
+                      <select
+                        value={selectedTrend.key}
+                        onChange={e => setTrendRoute(e.target.value)}
+                        style={{ padding: '5px 8px', fontSize: '0.75rem', borderRadius: '6px', border: '1px solid #d1d5db' }}
+                      >
+                        {compareDashboard.routeTrendOptions.map(o => (
+                          <option key={o.key} value={o.key}>{o.label} ({o.count} quotes)</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ height: 260 }}>
+                      <LineChart
+                        data={{
+                          labels: selectedTrend.labels,
+                          datasets: [{
+                            label: selectedTrend.currency,
+                            data: selectedTrend.rates,
+                            borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)',
+                            fill: true, tension: 0.2, pointRadius: 4,
+                          }],
+                        }}
+                        options={{
+                          responsive: true, maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              callbacks: {
+                                label: (ctx) => `${selectedTrend.forwarders[ctx.dataIndex]}: ${selectedTrend.currency} ${ctx.parsed.y.toLocaleString()}`,
+                              },
+                            },
+                          },
+                          scales: { x: { grid: { display: false } }, y: { beginAtZero: false } },
                         }}
                       />
                     </div>
