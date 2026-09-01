@@ -41,6 +41,8 @@ async function createQuoteRequestsTable() {
         quote_notes TEXT,
         updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
         updated_by_username VARCHAR(255),
+        sent_at TIMESTAMP WITH TIME ZONE,
+        quoted_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
@@ -67,6 +69,11 @@ async function createQuoteRequestsTable() {
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;`);
+    // Dedicated timestamps for the sent->quoted status transitions, so forwarder
+    // response time can be measured accurately — updated_at alone gets clobbered
+    // by any later unrelated edit (e.g. fixing a typo in notes).
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP WITH TIME ZONE;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_at TIMESTAMP WITH TIME ZONE;`);
     // Allow "TBC" as a value — was DATE, now a free-form string so undecided dates can be recorded
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN cargo_ready_date TYPE VARCHAR(20) USING cargo_ready_date::text;`);
     await pool.query(`ALTER TABLE quote_requests ALTER COLUMN required_date TYPE VARCHAR(20) USING required_date::text;`);

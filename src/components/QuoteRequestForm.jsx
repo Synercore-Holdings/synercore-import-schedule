@@ -59,10 +59,9 @@ const productSummary = (req) => {
   return req.cargo_description || '';
 };
 
-// Days since a "sent" request last changed status — approximates when it was sent,
-// since there's no dedicated sent_at column. Used to flag forwarders going quiet.
+// Days since a request was sent. Used to flag forwarders going quiet.
 const daysSinceSent = (req) => {
-  const d = new Date(req.updated_at || req.created_at);
+  const d = new Date(req.sent_at || req.updated_at || req.created_at);
   if (isNaN(d)) return null;
   return Math.floor((Date.now() - d.getTime()) / 86400000);
 };
@@ -578,18 +577,23 @@ function QuoteRequestForm({ onClose }) {
       : null;
 
     // Forwarder win rate — of the routes with a rate on record, what % did each
-    // forwarder come in cheapest on (plus their avg quoted transit days, so
-    // "cheapest" can be weighed against "slowest"). Respects whatever Period is
-    // selected, so switching between "All Time" and a single month gives the
-    // overall and the per-month view with the same chart.
+    // forwarder come in cheapest on (plus their avg quoted transit days and
+    // avg response time, so "cheapest" can be weighed against "slowest to ship"
+    // and "slowest to quote"). Respects whatever Period is selected, so
+    // switching between "All Time" and a single month gives the overall and
+    // the per-month view with the same chart.
     const forwarderStats = {};
     routeGroups.forEach(g => {
       g.entries.forEach((entry, idx) => {
         const name = entry.forwarder_name;
-        if (!forwarderStats[name]) forwarderStats[name] = { wins: 0, quotes: 0, transitDays: [] };
+        if (!forwarderStats[name]) forwarderStats[name] = { wins: 0, quotes: 0, transitDays: [], responseDays: [] };
         forwarderStats[name].quotes++;
         if (idx === 0) forwarderStats[name].wins++;
         if (entry.quoted_transit_days) forwarderStats[name].transitDays.push(Number(entry.quoted_transit_days));
+        if (entry.sent_at && entry.quoted_at) {
+          const days = (new Date(entry.quoted_at) - new Date(entry.sent_at)) / 86400000;
+          if (days >= 0) forwarderStats[name].responseDays.push(days);
+        }
       });
     });
     const forwarderWinRates = Object.entries(forwarderStats)
@@ -597,8 +601,14 @@ function QuoteRequestForm({ onClose }) {
         name, wins: s.wins, quotes: s.quotes,
         pct: routeGroups.length ? (s.wins / routeGroups.length) * 100 : 0,
         avgTransitDays: s.transitDays.length ? s.transitDays.reduce((a, b) => a + b, 0) / s.transitDays.length : null,
+        avgResponseDays: s.responseDays.length ? s.responseDays.reduce((a, b) => a + b, 0) / s.responseDays.length : null,
       }))
       .sort((a, b) => b.pct - a.pct);
+
+    const allResponseDays = Object.values(forwarderStats).flatMap(s => s.responseDays);
+    const avgResponseDaysOverall = allResponseDays.length
+      ? allResponseDays.reduce((a, b) => a + b, 0) / allResponseDays.length
+      : null;
 
     // Cost savings from picking the cheapest quote vs. the average of the
     // alternatives on the same route. Same-currency routes total directly (no
@@ -659,6 +669,7 @@ function QuoteRequestForm({ onClose }) {
       airStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate)),
       airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
       forwarderWinRates,
+      avgResponseDaysOverall,
       savingsByCurrency,
       convertedSavingsUsd,
       mixedRoutesSkippedForFx,
@@ -1825,6 +1836,12 @@ function QuoteRequestForm({ onClose }) {
                     <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.multiQuoteRoutes}</h3>
                     <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Routes With Multiple Quotes</p>
                   </div>
+                  {compareDashboard.avgResponseDaysOverall !== null && (
+                    <div className="stat-card ring-warning">
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.avgResponseDaysOverall.toFixed(1)}d</h3>
+                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Avg Response Time</p>
+                    </div>
+                  )}
                   {Object.entries(compareDashboard.savingsByCurrency).map(([currency, amount]) => (
                     <div className="stat-card ring-success" key={currency}>
                       <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{currency} {amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
@@ -1937,6 +1954,7 @@ function QuoteRequestForm({ onClose }) {
                           <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Win Rate</th>
                           <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Quotes</th>
                           <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Transit Days</th>
+                          <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Avg Response Time</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1946,6 +1964,7 @@ function QuoteRequestForm({ onClose }) {
                             <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{f.pct.toFixed(0)}%</td>
                             <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.quotes}</td>
                             <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgTransitDays !== null ? f.avgTransitDays.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--text-500)' }}>{f.avgResponseDays !== null ? `${f.avgResponseDays.toFixed(1)}d` : '—'}</td>
                           </tr>
                         ))}
                       </tbody>

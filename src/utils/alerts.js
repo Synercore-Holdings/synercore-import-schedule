@@ -331,7 +331,7 @@ export function computeQuoteRequestAlerts(quoteRequests) {
 
   for (const r of (quoteRequests || [])) {
     if (r.status !== 'sent') continue;
-    const sentDate = new Date(r.updated_at || r.created_at);
+    const sentDate = new Date(r.sent_at || r.updated_at || r.created_at);
     if (isNaN(sentDate)) continue;
     const daysWaiting = Math.floor((now - sentDate.getTime()) / 86400000);
     if (daysWaiting < 3) continue;

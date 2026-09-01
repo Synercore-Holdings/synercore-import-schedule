@@ -195,6 +195,19 @@ router.put(
       return res.status(400).json({ error: 'No fields to update' });
     }
 
+    // Dedicated timestamps for measuring forwarder response time — set on the
+    // actual status transition rather than relying on updated_at, which any
+    // later unrelated edit would overwrite. Moving back to "sent" (first send,
+    // or a withdrawn rate) restarts the clock and clears any prior quoted_at,
+    // since that quote no longer stands.
+    if (req.body.status === 'sent') {
+      updates.push('sent_at = CURRENT_TIMESTAMP', 'quoted_at = NULL');
+    } else if (req.body.status === 'quoted') {
+      // COALESCE so a later rate correction (Edit Rate) doesn't reset the
+      // original "time to first quote" — only the first quoted transition counts.
+      updates.push('quoted_at = COALESCE(quoted_at, CURRENT_TIMESTAMP)');
+    }
+
     updates.push('updated_at = CURRENT_TIMESTAMP');
     params.push(req.user!.id);
     updates.push(`updated_by = $${params.length}`);
