@@ -4,6 +4,7 @@ import { authFetch } from '../utils/authFetch';
 import { ShipmentStatus, isDelayedStatus, DELAYED_STATUSES, PRE_ARRIVAL_STATUSES, getCurrentWeek, isOverdue } from '../types/shipment';
 import PostArrivalWorkflowReport from './PostArrivalWorkflowReport';
 import CurrentWeekStoredReport from './CurrentWeekStoredReport';
+import FreightQuoteRatesReport from './FreightQuoteRatesReport';
 import { getApiUrl } from '../config/api';
 import { useNotification } from '../contexts/NotificationContext';
 import FilterPresetBar from './FilterPresetBar';
@@ -1017,6 +1018,9 @@ function ReportsView({ shipments: propShipments }) {
 
       {/* Current Week Stored Shipments Report */}
       <CurrentWeekStoredReport shipments={displayedShipments} />
+
+      {/* Freight Quote Rates Report */}
+      <FreightQuoteRatesReport />
 
       {/* Schedule Report Modal */}
       {showScheduleModal && (

@@ -4,6 +4,7 @@ import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
 import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
 import { CONTAINER_TYPES, PORTS_OF_LOADING, AFRICAN_PORTS } from '../utils/costingCalculations';
+import { groupRatesByRoute } from '../utils/quoteRequestRates';
 
 const STATUS_STYLES = {
   draft: { backgroundColor: '#f3f4f6', color: '#6b7280' },
@@ -20,30 +21,6 @@ const STATUS_LABELS = {
 
 const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
 const EMPTY_RATE_FORM = { quoted_rate: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
-
-const normRoute = (s) => (s || '').toString().trim().toLowerCase();
-
-// Groups completed requests by route (origin + destination + mode) — comparing
-// sea to air rates, or different origins, would be misleading, so each group
-// is a like-for-like set of forwarder quotes.
-const groupRatesByRoute = (completedRequests) => {
-  const groups = new Map();
-  completedRequests.forEach(req => {
-    if (!req.quoted_rate) return;
-    const key = `${normRoute(req.origin)}|${normRoute(req.destination)}|${req.transport_mode}`;
-    if (!groups.has(key)) {
-      groups.set(key, { origin: req.origin || '—', destination: req.destination || '—', transport_mode: req.transport_mode, entries: [] });
-    }
-    groups.get(key).entries.push(req);
-  });
-  return Array.from(groups.values())
-    .map(g => ({
-      ...g,
-      entries: g.entries.sort((a, b) => Number(a.quoted_rate) - Number(b.quoted_rate)),
-      mixedCurrency: new Set(g.entries.map(e => e.quoted_currency)).size > 1,
-    }))
-    .sort((a, b) => b.entries.length - a.entries.length);
-};
 
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
