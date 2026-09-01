@@ -106,6 +106,7 @@ export function generateQuoteRequestPDF(req) {
         ? `${req.length_cm} x ${req.width_cm} x ${req.height_cm} cm`
         : '—'],
       ['Pallets / Packages', fmt(req.pallet_count)],
+      ['Value of Goods', req.cargo_value ? `${req.cargo_value_currency || 'USD'} ${Number(req.cargo_value).toLocaleString()}` : '—'],
       ['Volume (Total)', fmt(req.volume_cbm, ' CBM')],
       ['Volumetric Weight', fmt(calcVolumetricWeight(req.volume_cbm, req.transport_mode), ' kg')],
     ],

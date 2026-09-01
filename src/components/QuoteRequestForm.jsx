@@ -58,7 +58,8 @@ const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', transport_mode: 'sea', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', cargo_description: '', hs_code: '',
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
-  pallet_count: '', cargo_ready_date: '', required_date: '', notes: '',
+  pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
+  cargo_ready_date: '', required_date: '', notes: '',
 };
 
 // Total CBM = L x W x H (cm) / 1,000,000 x quantity of pallets/packages at those dimensions
@@ -93,6 +94,8 @@ const toFormState = (req) => ({
   width_cm: req.width_cm ?? '',
   height_cm: req.height_cm ?? '',
   pallet_count: req.pallet_count ?? '',
+  cargo_value: req.cargo_value ?? '',
+  cargo_value_currency: req.cargo_value_currency || 'USD',
   cargo_ready_date: toDateInput(req.cargo_ready_date),
   required_date: toDateInput(req.required_date),
   notes: req.notes || '',
@@ -616,7 +619,15 @@ function QuoteRequestForm({ onClose }) {
                   <label style={labelStyle}>Gross Weight (kg)</label>
                   <input type="number" min="0" step="any" style={inputStyle} value={form.gross_weight_kg} onChange={e => handleFieldChange('gross_weight_kg', e.target.value)} />
                 </div>
-                <div />
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Value of Goods</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="number" min="0" step="any" style={{ ...inputStyle, flex: 1 }} value={form.cargo_value} onChange={e => handleFieldChange('cargo_value', e.target.value)} />
+                    <select style={{ ...inputStyle, width: '90px' }} value={form.cargo_value_currency} onChange={e => handleFieldChange('cargo_value_currency', e.target.value)}>
+                      {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Dimensions per Pallet/Package (cm) — Length x Width x Height x Qty</label>
