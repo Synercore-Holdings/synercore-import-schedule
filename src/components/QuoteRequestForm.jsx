@@ -380,6 +380,19 @@ function QuoteRequestForm({ onClose }) {
       ? stackabilityPremiums.reduce((sum, p) => sum + p, 0) / stackabilityPremiums.length
       : null;
 
+    // Forwarder win rate — of the routes with a rate on record, what % did each
+    // forwarder come in cheapest on. Respects whatever Period is selected, so
+    // switching between "All Time" and a single month gives the overall and the
+    // per-month view with the same chart.
+    const winCounts = {};
+    routeGroups.forEach(g => {
+      const winner = g.entries[0]?.forwarder_name;
+      if (winner) winCounts[winner] = (winCounts[winner] || 0) + 1;
+    });
+    const forwarderWinRates = Object.entries(winCounts)
+      .map(([name, wins]) => ({ name, wins, pct: routeGroups.length ? (wins / routeGroups.length) * 100 : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+
     return {
       statusCounts,
       openCount: statusCounts.draft + statusCounts.sent,
@@ -393,6 +406,7 @@ function QuoteRequestForm({ onClose }) {
       airChartLabels: airStackabilityQuotes.map(r => `${r.forwarder_name} (${r.origin}→${r.destination})`),
       airStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate)),
       airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
+      forwarderWinRates,
     };
   }, [compareAllRequests, dashboardMonthFilter]);
 
@@ -1295,6 +1309,46 @@ function QuoteRequestForm({ onClose }) {
                           }}
                         />
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {compareDashboard.forwarderWinRates.length > 0 && (
+                  <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                      <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Forwarder Win Rate</h4>
+                      <span style={{ fontSize: 11, color: 'var(--text-500)' }}>
+                        % of routes where they came in with the cheapest rate{dashboardMonthFilter ? ` — ${monthLabel(dashboardMonthFilter)}` : ' — all time'}
+                      </span>
+                    </div>
+                    <div style={{ height: 260 }}>
+                      <BarChart
+                        data={{
+                          labels: compareDashboard.forwarderWinRates.map(f => f.name),
+                          datasets: [{
+                            data: compareDashboard.forwarderWinRates.map(f => f.pct),
+                            backgroundColor: '#22c55e', borderRadius: 4,
+                          }],
+                        }}
+                        options={{
+                          responsive: true, maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              callbacks: {
+                                label: (ctx) => {
+                                  const f = compareDashboard.forwarderWinRates[ctx.dataIndex];
+                                  return `${f.pct.toFixed(0)}% (${f.wins} of ${compareDashboard.routeGroups.length} routes)`;
+                                },
+                              },
+                            },
+                          },
+                          scales: {
+                            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                            y: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } },
+                          },
+                        }}
+                      />
                     </div>
                   </div>
                 )}
