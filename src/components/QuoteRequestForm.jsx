@@ -1,10 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
 import { generateQuoteRequestPDF, VOLUMETRIC_FACTORS, calcVolumetricWeight } from '../utils/quoteRequestPdf';
 import { CONTAINER_TYPES, PORTS_OF_LOADING, AFRICAN_PORTS } from '../utils/costingCalculations';
 import { groupRatesByRoute } from '../utils/quoteRequestRates';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, ArcElement,
+  Title, Tooltip, Legend, Filler,
+} from 'chart.js';
+import { Doughnut, Bar as BarChart } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, ArcElement,
+  Title, Tooltip, Legend, Filler,
+);
 
 const STATUS_STYLES = {
   draft: { backgroundColor: '#f3f4f6', color: '#6b7280' },
@@ -102,6 +115,66 @@ const inputStyle = {
 const labelStyle = { display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-700)', marginBottom: '4px' };
 const fieldWrap = { marginBottom: '0.85rem' };
 
+// Secondary row actions tucked behind a "⋯" menu so the Actions column doesn't
+// wrap across several lines of buttons. Defined at module scope so its open/
+// closed state doesn't reset on every QuoteRequestForm re-render.
+function RowActionsMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutsideClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [open]);
+
+  const visibleItems = items.filter(Boolean);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        title="More actions"
+        aria-label="More actions"
+        style={{
+          padding: '5px 9px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)',
+          border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', lineHeight: 1,
+        }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: 'white',
+          border: '1px solid #d1d5db', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 20, minWidth: 150, overflow: 'hidden',
+        }}>
+          {visibleItems.map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => { item.onClick(); setOpen(false); }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px',
+                border: 'none', borderTop: i > 0 ? '1px solid #f1f5f9' : 'none', backgroundColor: 'white',
+                cursor: 'pointer', fontSize: '0.75rem', color: item.danger ? 'var(--danger)' : 'var(--text-700)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'white'; }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuoteRequestForm({ onClose }) {
   const { confirm: confirmAction, showSuccess, showError } = useNotification();
   const [requests, setRequests] = useState([]);
@@ -118,6 +191,7 @@ function QuoteRequestForm({ onClose }) {
   const [savingRate, setSavingRate] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [compareGroups, setCompareGroups] = useState([]);
+  const [compareAllRequests, setCompareAllRequests] = useState([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [bestQuoteIds, setBestQuoteIds] = useState(new Set());
   const [suppliers, setSuppliers] = useState([]);
@@ -220,7 +294,15 @@ function QuoteRequestForm({ onClose }) {
     setShowCompare(true);
     setLoadingCompare(true);
     try {
-      setCompareGroups(await fetchQuotedGroups());
+      const [groups, allResponse] = await Promise.all([
+        fetchQuotedGroups(),
+        authFetch(getApiUrl('/api/quote-requests')),
+      ]);
+      setCompareGroups(groups);
+      if (allResponse.ok) {
+        const result = await allResponse.json();
+        setCompareAllRequests(result.data || []);
+      }
     } catch (err) {
       console.error('Failed to fetch rate comparison:', err);
       showError?.('Failed to load rate comparison');
@@ -228,6 +310,39 @@ function QuoteRequestForm({ onClose }) {
       setLoadingCompare(false);
     }
   };
+
+  // Dashboard stats for the Compare Rates modal — status mix and a monthly
+  // received-rates trend, on top of the per-route comparison groups.
+  const compareDashboard = useMemo(() => {
+    const statusCounts = { draft: 0, sent: 0, quoted: 0, expired: 0, cancelled: 0 };
+    compareAllRequests.forEach(r => {
+      if (statusCounts[r.status] !== undefined) statusCounts[r.status]++;
+    });
+
+    const monthKeys = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthKeys.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('en-ZA', { month: 'short' }) });
+    }
+    const monthCounts = Object.fromEntries(monthKeys.map(m => [m.key, 0]));
+    compareAllRequests
+      .filter(r => r.status === 'quoted' && r.quoted_rate)
+      .forEach(r => {
+        const d = new Date(r.updated_at || r.created_at);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (monthCounts[key] !== undefined) monthCounts[key]++;
+      });
+
+    return {
+      statusCounts,
+      openCount: statusCounts.draft + statusCounts.sent,
+      routesTracked: compareGroups.length,
+      multiQuoteRoutes: compareGroups.filter(g => g.entries.length > 1).length,
+      monthLabels: monthKeys.map(m => m.label),
+      monthCounts: monthKeys.map(m => monthCounts[m.key]),
+    };
+  }, [compareAllRequests, compareGroups]);
 
   const handleFieldChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -509,40 +624,13 @@ function QuoteRequestForm({ onClose }) {
                       {new Date(req.created_at).toLocaleDateString()}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'flex-start' }}>
                         <button
                           onClick={() => handleViewClick(req)}
                           style={{ padding: '5px 8px', backgroundColor: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
                         >
                           View
                         </button>
-                        <button
-                          onClick={() => handleEditClick(req)}
-                          style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleCopyClick(req)}
-                          title="Reuse this shipment's details for another forwarder"
-                          style={{ padding: '5px 8px', backgroundColor: 'var(--surface-2)', color: 'var(--text-700)', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                        >
-                          Copy
-                        </button>
-                        <button
-                          onClick={() => generateQuoteRequestPDF(req)}
-                          style={{ padding: '5px 8px', backgroundColor: 'var(--navy-900)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                        >
-                          PDF
-                        </button>
-                        {req.status === 'draft' && (
-                          <button
-                            onClick={() => handleUpdateStatus(req.id, 'sent')}
-                            style={{ padding: '5px 8px', backgroundColor: 'var(--info)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                          >
-                            Mark Sent
-                          </button>
-                        )}
                         {(req.status === 'draft' || req.status === 'sent') && (
                           <button
                             onClick={() => handleOpenRateModal(req)}
@@ -559,20 +647,14 @@ function QuoteRequestForm({ onClose }) {
                             Edit Rate
                           </button>
                         )}
-                        {(req.status === 'draft' || req.status === 'sent') && (
-                          <button
-                            onClick={() => handleUpdateStatus(req.id, 'cancelled')}
-                            style={{ padding: '5px 8px', backgroundColor: 'var(--text-500)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(req.id)}
-                          style={{ padding: '5px 8px', backgroundColor: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                        >
-                          Del
-                        </button>
+                        <RowActionsMenu items={[
+                          { label: 'Edit', onClick: () => handleEditClick(req) },
+                          { label: 'Copy to New Request', onClick: () => handleCopyClick(req) },
+                          { label: 'Download PDF', onClick: () => generateQuoteRequestPDF(req) },
+                          req.status === 'draft' ? { label: 'Mark Sent', onClick: () => handleUpdateStatus(req.id, 'sent') } : null,
+                          (req.status === 'draft' || req.status === 'sent') ? { label: 'Cancel', onClick: () => handleUpdateStatus(req.id, 'cancelled') } : null,
+                          { label: 'Delete', onClick: () => handleDelete(req.id), danger: true },
+                        ]} />
                       </div>
                     </td>
                   </tr>
@@ -1024,14 +1106,14 @@ function QuoteRequestForm({ onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: '10px', maxWidth: '760px', width: '100%',
-            maxHeight: '85vh', overflow: 'auto', padding: '1.5rem',
+            backgroundColor: 'white', borderRadius: '10px', maxWidth: '960px', width: '100%',
+            maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Compare Rates by Route</h3>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Freight Quote Rates Dashboard</h3>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-500)' }}>
-                  Completed requests grouped by origin, destination, and mode
+                  Rates received from forwarders, grouped by origin, destination, and mode
                 </p>
               </div>
               <button onClick={() => setShowCompare(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-500)' }}>
@@ -1041,11 +1123,77 @@ function QuoteRequestForm({ onClose }) {
 
             {loadingCompare ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)' }}>Loading...</div>
-            ) : compareGroups.length === 0 ? (
+            ) : (
+              <>
+                <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
+                  <div className="stat-card ring-success">
+                    <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.statusCounts.quoted}</h3>
+                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Rates Received</p>
+                  </div>
+                  <div className="stat-card ring-warning">
+                    <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.openCount}</h3>
+                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Awaiting a Rate</p>
+                  </div>
+                  <div className="stat-card ring-info">
+                    <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.routesTracked}</h3>
+                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Routes Tracked</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>{compareDashboard.multiQuoteRoutes}</h3>
+                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>Routes With Multiple Quotes</p>
+                  </div>
+                </div>
+
+                {compareAllRequests.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="dash-panel">
+                      <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Requests by Status</h4>
+                      <div style={{ height: 180 }}>
+                        <Doughnut
+                          data={{
+                            labels: ['Draft', 'Sent', 'Completed', 'Expired', 'Cancelled'],
+                            datasets: [{
+                              data: [
+                                compareDashboard.statusCounts.draft, compareDashboard.statusCounts.sent,
+                                compareDashboard.statusCounts.quoted, compareDashboard.statusCounts.expired,
+                                compareDashboard.statusCounts.cancelled,
+                              ],
+                              backgroundColor: ['#9ca3af', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444'],
+                              borderWidth: 2,
+                            }],
+                          }}
+                          options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } } }}
+                        />
+                      </div>
+                    </div>
+                    <div className="dash-panel">
+                      <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Rates Received — Last 6 Months</h4>
+                      <div style={{ height: 180 }}>
+                        <BarChart
+                          data={{
+                            labels: compareDashboard.monthLabels,
+                            datasets: [{ data: compareDashboard.monthCounts, backgroundColor: '#3b82f6', borderRadius: 4 }],
+                          }}
+                          options={{
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } },
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#0f172a' }}>Best Rate by Route</h4>
+
+            {!loadingCompare && compareGroups.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)', backgroundColor: 'var(--surface-2)', borderRadius: '8px' }}>
                 No completed requests with a rate yet — add a rate to a request to see it here.
               </div>
-            ) : (
+            ) : !loadingCompare && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {compareGroups.map((group, i) => (
                   <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>

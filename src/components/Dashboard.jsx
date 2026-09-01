@@ -5,7 +5,6 @@ import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { authUtils } from '../utils/auth';
 import { calculateAllTotals, formatCurrency } from '../utils/costingCalculations';
-import { groupRatesByRoute } from '../utils/quoteRequestRates';
 import PerformanceMetrics from './PerformanceMetrics';
 import {
   Chart as ChartJS,
@@ -54,7 +53,6 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
 
   const [storageRates, setStorageRates] = useState({ week1: 43, week2Plus: 53 });
   const [costingEstimates, setCostingEstimates] = useState([]);
-  const [quoteRequests, setQuoteRequests] = useState([]);
 
   const isAdmin = authUtils.getUser()?.role === 'admin';
 
@@ -170,20 +168,6 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       } catch (err) { /* silently ignore */ }
     };
     fetchCosting();
-  }, []);
-
-  // Fetch freight quote requests, so rate activity is visible without opening that screen
-  useEffect(() => {
-    const fetchQuoteRequests = async () => {
-      try {
-        const res = await authFetch(getApiUrl('/api/quote-requests'));
-        if (res.ok) {
-          const json = await res.json();
-          setQuoteRequests(json.data || []);
-        }
-      } catch (err) { /* silently ignore */ }
-    };
-    fetchQuoteRequests();
   }, []);
 
   // Import costing KPI computations
@@ -327,25 +311,6 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       pct: (convertedCount / active.length) * 100,
     };
   }, [costingEstimates, shipments]);
-
-  // Freight quote request rate activity — surfaced here so rates received from
-  // forwarders can be tracked without opening the Quote Requests screen.
-  const quoteKpis = useMemo(() => {
-    const quoted = quoteRequests.filter(r => r.status === 'quoted' && r.quoted_rate);
-    const open = quoteRequests.filter(r => r.status === 'draft' || r.status === 'sent').length;
-    const routeGroups = groupRatesByRoute(quoted);
-    const bestIds = new Set(routeGroups.map(g => g.entries[0]?.id).filter(Boolean));
-    const recent = [...quoted]
-      .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-      .slice(0, 5)
-      .map(r => ({ ...r, isBest: bestIds.has(r.id) }));
-    return {
-      quotedCount: quoted.length,
-      openCount: open,
-      routesTracked: routeGroups.length,
-      recent,
-    };
-  }, [quoteRequests]);
 
   // Consolidated single-pass computation: stats, percentage deltas, and offsite average
   // Separate international and local shipments
@@ -1640,93 +1605,6 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
                 </div>
               </ChartCard>
             </div>
-          )}
-        </>
-      )}
-
-      {/* Freight Quote Rates */}
-      {quoteRequests.length > 0 && (
-        <>
-          <div style={{ marginTop: '2rem', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--navy-900)', letterSpacing: '0.3px' }}>
-                Freight Quote Rates
-              </h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-500)' }}>
-                Rates received from forwarders
-              </p>
-            </div>
-            <button
-              className="btn btn-ghost"
-              style={{ padding: '6px 14px', fontSize: 12 }}
-              onClick={() => navigate('/quote-requests')}
-            >
-              View all →
-            </button>
-          </div>
-
-          <div className="stats-grid">
-            <div className="stat-card ring-success" style={{ cursor: 'pointer' }} onClick={() => navigate('/quote-requests?status=quoted')}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
-                {quoteKpis.quotedCount}
-              </h3>
-              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
-                Rates Received
-              </p>
-            </div>
-            <div className="stat-card ring-warning" style={{ cursor: 'pointer' }} onClick={() => navigate('/quote-requests')}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
-                {quoteKpis.openCount}
-              </h3>
-              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
-                Awaiting a Rate
-              </p>
-            </div>
-            <div className="stat-card ring-info" style={{ cursor: 'pointer' }} onClick={() => navigate('/quote-requests?status=quoted')}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', color: 'var(--navy-900)' }}>
-                {quoteKpis.routesTracked}
-              </h3>
-              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600, color: 'var(--text-500)', margin: 0 }}>
-                Routes Tracked
-              </p>
-            </div>
-          </div>
-
-          {quoteKpis.recent.length > 0 && (
-            <ChartCard title="Recently Received Rates" subtitle="Most recent forwarder quotes" style={{ marginTop: '1.25rem' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', color: 'var(--text-500)' }}>
-                      <th style={{ padding: '6px 8px', fontWeight: 600 }}>Forwarder</th>
-                      <th style={{ padding: '6px 8px', fontWeight: 600 }}>Route</th>
-                      <th style={{ padding: '6px 8px', fontWeight: 600 }}>Quote Ref</th>
-                      <th style={{ padding: '6px 8px', fontWeight: 600, textAlign: 'right' }}>Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {quoteKpis.recent.map(r => (
-                      <tr key={r.id} style={{ borderTop: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => navigate('/quote-requests')}>
-                        <td style={{ padding: '6px 8px' }}>{r.forwarder_name}</td>
-                        <td style={{ padding: '6px 8px', color: 'var(--text-500)' }}>{r.origin || '—'} → {r.destination || '—'}</td>
-                        <td style={{ padding: '6px 8px', color: 'var(--text-500)' }}>{r.quote_reference || '—'}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: 'var(--navy-900)' }}>
-                          {r.isBest && (
-                            <span style={{
-                              display: 'inline-block', fontSize: '0.6rem', fontWeight: 700, color: '#166534',
-                              backgroundColor: '#dcfce7', padding: '1px 5px', borderRadius: '4px', marginRight: 6,
-                            }}>
-                              BEST
-                            </span>
-                          )}
-                          {r.quoted_currency} {Number(r.quoted_rate).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </ChartCard>
           )}
         </>
       )}
