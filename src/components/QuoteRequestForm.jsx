@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { useNotification } from '../contexts/NotificationContext';
@@ -137,26 +138,55 @@ const fieldWrap = { marginBottom: '0.85rem' };
 // Secondary row actions tucked behind a "⋯" menu so the Actions column doesn't
 // wrap across several lines of buttons. Defined at module scope so its open/
 // closed state doesn't reset on every QuoteRequestForm re-render.
+const ROW_MENU_WIDTH = 170;
+
 function RowActionsMenu({ items }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     const handleOutsideClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (btnRef.current?.contains(e.target)) return;
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
     };
+    // Closing on scroll/resize avoids the menu drifting away from its trigger
+    // button, since its position is computed once (in fixed viewport coords)
+    // rather than tracked continuously.
+    const handleDismiss = () => setOpen(false);
     document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('scroll', handleDismiss, true);
+    window.addEventListener('resize', handleDismiss);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('scroll', handleDismiss, true);
+      window.removeEventListener('resize', handleDismiss);
+    };
   }, [open]);
 
   const visibleItems = items.filter(Boolean);
 
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuHeight = visibleItems.length * 33 + 8;
+      const openUpward = window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight;
+      setMenuPos({
+        left: Math.min(Math.max(rect.right - ROW_MENU_WIDTH, 8), window.innerWidth - ROW_MENU_WIDTH - 8),
+        top: openUpward ? rect.top - menuHeight - 4 : rect.bottom + 4,
+      });
+    }
+    setOpen(o => !o);
+  };
+
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleToggle}
         title="More actions"
         aria-label="More actions"
         style={{
@@ -166,11 +196,11 @@ function RowActionsMenu({ items }) {
       >
         ⋯
       </button>
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: 'white',
+      {open && createPortal(
+        <div ref={menuRef} style={{
+          position: 'fixed', top: menuPos.top, left: menuPos.left, backgroundColor: 'white',
           border: '1px solid #d1d5db', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 20, minWidth: 150, overflow: 'hidden',
+          zIndex: 2000, width: ROW_MENU_WIDTH, overflow: 'hidden',
         }}>
           {visibleItems.map((item, i) => (
             <button
@@ -188,9 +218,10 @@ function RowActionsMenu({ items }) {
               {item.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
