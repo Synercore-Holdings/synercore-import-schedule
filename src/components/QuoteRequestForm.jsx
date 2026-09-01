@@ -1185,26 +1185,43 @@ function QuoteRequestForm({ onClose }) {
 
       {showForm && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+          position: 'fixed', inset: 0, zIndex: 1100,
+          backgroundColor: 'white', overflow: 'auto',
+          display: 'flex', flexDirection: 'column',
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: '10px', maxWidth: '640px', width: '100%',
-            maxHeight: '90vh', overflow: 'auto', padding: '1.5rem',
+            padding: '1rem 1.5rem', borderBottom: '1px solid #e5e7eb',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+            position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 10,
           }}>
-            <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', color: '#0f172a' }}>
-              {isViewMode
-                ? `View Quote Request QR-${String(editingId).padStart(5, '0')} (Read Only)`
-                : editingId ? `Edit Quote Request QR-${String(editingId).padStart(5, '0')}` : 'New Quote Request'}
-            </h3>
-            {editingMeta && (
-              <p style={{ margin: '0 0 0.75rem', fontSize: '0.7rem', color: 'var(--text-500)' }}>
-                Created by {editingMeta.requested_by_username || 'unknown'} on {new Date(editingMeta.created_at).toLocaleString('en-ZA')}
-                {editingMeta.updated_by_username && editingMeta.updated_at && editingMeta.updated_at !== editingMeta.created_at && (
-                  <> · last updated by {editingMeta.updated_by_username} on {new Date(editingMeta.updated_at).toLocaleString('en-ZA')}</>
-                )}
-              </p>
-            )}
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>
+                {isViewMode
+                  ? `View Quote Request QR-${String(editingId).padStart(5, '0')} (Read Only)`
+                  : editingId ? `Edit Quote Request QR-${String(editingId).padStart(5, '0')}` : 'New Quote Request'}
+              </h2>
+              {editingMeta && (
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.7rem', color: 'var(--text-500)' }}>
+                  Created by {editingMeta.requested_by_username || 'unknown'} on {new Date(editingMeta.created_at).toLocaleString('en-ZA')}
+                  {editingMeta.updated_by_username && editingMeta.updated_at && editingMeta.updated_at !== editingMeta.created_at && (
+                    <> · last updated by {editingMeta.updated_by_username} on {new Date(editingMeta.updated_at).toLocaleString('en-ZA')}</>
+                  )}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => { setShowForm(false); setEditingId(null); setIsViewMode(false); }}
+              style={{
+                background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+                color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 500,
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          <div style={{ padding: '1.5rem', flex: 1, maxWidth: '800px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
             {isViewMode && (
               <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 600, borderRadius: '6px', marginBottom: '0.75rem' }}>
                 🔒 Read-only view — this request cannot be edited from here.
