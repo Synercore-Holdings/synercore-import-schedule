@@ -602,12 +602,30 @@ function QuoteRequestForm({ onClose }) {
   const handleSaveRate = async (e) => {
     e.preventDefault();
     if (!rateModalReq) return;
+
+    let payload = { ...rateForm };
+    if (rateModalReq.transport_mode === 'air') {
+      if (!payload.quoted_rate && !payload.quoted_rate_non_stackable) {
+        showError?.('Enter at least one rate (stackable or non-stackable)');
+        return;
+      }
+      // A forwarder who only quotes one figure isn't necessarily quoting the
+      // stackable rate — whichever box it landed in is THE rate for this quote,
+      // so it belongs in quoted_rate (the field everything else compares on).
+      if (!payload.quoted_rate) {
+        payload = { ...payload, quoted_rate: payload.quoted_rate_non_stackable, quoted_rate_non_stackable: '' };
+      }
+    } else if (!payload.quoted_rate) {
+      showError?.('Enter a rate');
+      return;
+    }
+
     setSavingRate(true);
     try {
       const response = await authFetch(getApiUrl(`/api/quote-requests/${rateModalReq.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...rateForm, status: 'quoted' }),
+        body: JSON.stringify({ ...payload, status: 'quoted' }),
       });
       if (response.ok) {
         setRateModalReq(null);
@@ -1284,9 +1302,9 @@ function QuoteRequestForm({ onClose }) {
             <form onSubmit={handleSaveRate}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0 1rem' }}>
                 <div style={fieldWrap}>
-                  <label style={labelStyle}>{rateModalReq.transport_mode === 'air' ? 'Stackable Rate *' : 'Rate *'}</label>
+                  <label style={labelStyle}>{rateModalReq.transport_mode === 'air' ? 'Rate (Stackable)' : 'Rate *'}</label>
                   <input
-                    type="number" min="0" step="any" required style={inputStyle}
+                    type="number" min="0" step="any" required={rateModalReq.transport_mode !== 'air'} style={inputStyle}
                     value={rateForm.quoted_rate}
                     onChange={e => setRateForm(prev => ({ ...prev, quoted_rate: e.target.value }))}
                   />
@@ -1304,13 +1322,16 @@ function QuoteRequestForm({ onClose }) {
 
                 {rateModalReq.transport_mode === 'air' && (
                   <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Non-Stackable Rate</label>
+                    <label style={labelStyle}>Rate (Non-Stackable)</label>
                     <input
                       type="number" min="0" step="any" style={inputStyle}
                       value={rateForm.quoted_rate_non_stackable}
                       onChange={e => setRateForm(prev => ({ ...prev, quoted_rate_non_stackable: e.target.value }))}
-                      placeholder="Rate if cargo can't be stacked (leave blank if none quoted)"
+                      placeholder="Only if the forwarder quoted a separate non-stackable rate"
                     />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                      Fill in whichever rate(s) the forwarder actually gave you — if it's just one figure, either box is fine.
+                    </div>
                     {rateForm.quoted_rate && rateForm.quoted_rate_non_stackable && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
                         {(((rateForm.quoted_rate_non_stackable - rateForm.quoted_rate) / rateForm.quoted_rate) * 100).toFixed(1)}% premium over the stackable rate
