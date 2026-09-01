@@ -36,6 +36,16 @@ const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
 const EMPTY_RATE_FORM = { quoted_rate: '', quoted_rate_non_stackable: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
 
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
+
+// Month-bucketing convention shared with ForwarderCarrierReport/WarehouseStored —
+// "YYYY-MM" keyed off when the request was created.
+const getMonthKey = (req) => {
+  if (!req?.created_at) return null;
+  const d = new Date(req.created_at);
+  if (isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+const monthLabel = (key) => new Date(`${key}-01`).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
 // EXW: forwarder collects from the supplier's premises, so we need the full
@@ -190,9 +200,10 @@ function QuoteRequestForm({ onClose }) {
   const [rateForm, setRateForm] = useState(EMPTY_RATE_FORM);
   const [savingRate, setSavingRate] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
-  const [compareGroups, setCompareGroups] = useState([]);
   const [compareAllRequests, setCompareAllRequests] = useState([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
+  const [monthFilter, setMonthFilter] = useState('');
+  const [dashboardMonthFilter, setDashboardMonthFilter] = useState('');
   const [bestQuoteIds, setBestQuoteIds] = useState(new Set());
   const [suppliers, setSuppliers] = useState([]);
   const [showCustomSupplier, setShowCustomSupplier] = useState(false);
@@ -273,6 +284,17 @@ function QuoteRequestForm({ onClose }) {
     refreshBestQuoteIds();
   };
 
+  const availableMonths = useMemo(() => {
+    const months = new Set();
+    requests.forEach(r => { const m = getMonthKey(r); if (m) months.add(m); });
+    return [...months].sort().reverse();
+  }, [requests]);
+
+  const displayedRequests = useMemo(() => {
+    if (!monthFilter) return requests;
+    return requests.filter(r => getMonthKey(r) === monthFilter);
+  }, [requests, monthFilter]);
+
   // Shared with Compare Rates — grouped by route so "best" only compares like-for-like quotes.
   const fetchQuotedGroups = async () => {
     const response = await authFetch(getApiUrl('/api/quote-requests?status=quoted'));
@@ -294,14 +316,12 @@ function QuoteRequestForm({ onClose }) {
     setShowCompare(true);
     setLoadingCompare(true);
     try {
-      const [groups, allResponse] = await Promise.all([
-        fetchQuotedGroups(),
-        authFetch(getApiUrl('/api/quote-requests')),
-      ]);
-      setCompareGroups(groups);
-      if (allResponse.ok) {
-        const result = await allResponse.json();
+      const response = await authFetch(getApiUrl('/api/quote-requests'));
+      if (response.ok) {
+        const result = await response.json();
         setCompareAllRequests(result.data || []);
+      } else {
+        showError?.('Failed to load rate comparison');
       }
     } catch (err) {
       console.error('Failed to fetch rate comparison:', err);
@@ -311,13 +331,26 @@ function QuoteRequestForm({ onClose }) {
     }
   };
 
-  // Dashboard stats for the Compare Rates modal — status mix and a monthly
-  // received-rates trend, on top of the per-route comparison groups.
+  const dashboardAvailableMonths = useMemo(() => {
+    const months = new Set();
+    compareAllRequests.forEach(r => { const m = getMonthKey(r); if (m) months.add(m); });
+    return [...months].sort().reverse();
+  }, [compareAllRequests]);
+
+  // Dashboard stats for the Compare Rates modal — status mix, per-route best-rate
+  // groups, and air stackability impact all respect the selected month; the 6-month
+  // trend chart deliberately doesn't (it exists to show the cross-month picture).
   const compareDashboard = useMemo(() => {
+    const filtered = dashboardMonthFilter
+      ? compareAllRequests.filter(r => getMonthKey(r) === dashboardMonthFilter)
+      : compareAllRequests;
+
     const statusCounts = { draft: 0, sent: 0, quoted: 0, expired: 0, cancelled: 0 };
-    compareAllRequests.forEach(r => {
+    filtered.forEach(r => {
       if (statusCounts[r.status] !== undefined) statusCounts[r.status]++;
     });
+
+    const routeGroups = groupRatesByRoute(filtered.filter(r => r.status === 'quoted' && r.quoted_rate));
 
     const monthKeys = [];
     const now = new Date();
@@ -337,7 +370,7 @@ function QuoteRequestForm({ onClose }) {
     // Air freight stackability impact — forwarders often quote a premium for cargo
     // that can't be stacked in the hold; surfaced so the business can see what that
     // premium is actually costing, route by route.
-    const airStackabilityQuotes = compareAllRequests.filter(r =>
+    const airStackabilityQuotes = filtered.filter(r =>
       r.transport_mode === 'air' && r.status === 'quoted' && r.quoted_rate && r.quoted_rate_non_stackable
     );
     const stackabilityPremiums = airStackabilityQuotes.map(r =>
@@ -350,8 +383,9 @@ function QuoteRequestForm({ onClose }) {
     return {
       statusCounts,
       openCount: statusCounts.draft + statusCounts.sent,
-      routesTracked: compareGroups.length,
-      multiQuoteRoutes: compareGroups.filter(g => g.entries.length > 1).length,
+      routeGroups,
+      routesTracked: routeGroups.length,
+      multiQuoteRoutes: routeGroups.filter(g => g.entries.length > 1).length,
       monthLabels: monthKeys.map(m => m.label),
       monthCounts: monthKeys.map(m => monthCounts[m.key]),
       airStackabilityQuotes,
@@ -360,7 +394,7 @@ function QuoteRequestForm({ onClose }) {
       airStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate)),
       airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
     };
-  }, [compareAllRequests, compareGroups]);
+  }, [compareAllRequests, dashboardMonthFilter]);
 
   const handleFieldChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -543,29 +577,42 @@ function QuoteRequestForm({ onClose }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          {['all', 'draft', 'sent', 'quoted', 'expired', 'cancelled'].map(status => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: statusFilter === status ? 'var(--navy-900)' : 'var(--surface-2)',
-                color: statusFilter === status ? 'white' : 'var(--text-700)',
-                border: 'none', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: statusFilter === status ? '600' : '400',
-              }}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {['all', 'draft', 'sent', 'quoted', 'expired', 'cancelled'].map(status => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: statusFilter === status ? 'var(--navy-900)' : 'var(--surface-2)',
+                  color: statusFilter === status ? 'white' : 'var(--text-700)',
+                  border: 'none', borderRadius: '6px', cursor: 'pointer',
+                  fontSize: '0.85rem', fontWeight: statusFilter === status ? '600' : '400',
+                }}
+              >
+                {STATUS_LABELS[status]}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-500)' }}>Period:</label>
+            <select
+              value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              style={{ padding: '7px 10px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #d1d5db', minWidth: '150px' }}
             >
-              {STATUS_LABELS[status]}
-            </button>
-          ))}
+              <option value="">All Time</option>
+              {availableMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
         </div>
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)' }}>Loading...</div>
-        ) : requests.length === 0 ? (
+        ) : displayedRequests.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)', backgroundColor: 'var(--surface-2)', borderRadius: '8px' }}>
-            No {statusFilter === 'all' ? '' : statusFilter} quote requests found.
+            No {statusFilter === 'all' ? '' : statusFilter} quote requests found{monthFilter ? ` for ${monthLabel(monthFilter)}` : ''}.
           </div>
         ) : (
           <div className="dash-panel" style={{ padding: 0, overflow: 'auto' }}>
@@ -587,7 +634,7 @@ function QuoteRequestForm({ onClose }) {
                 </tr>
               </thead>
               <tbody>
-                {requests.map(req => (
+                {displayedRequests.map(req => (
                   <tr key={req.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.8rem' }}>QR-{String(req.id).padStart(5, '0')}</td>
                     <td style={{ padding: '12px 16px' }}>
@@ -1164,16 +1211,27 @@ function QuoteRequestForm({ onClose }) {
                 Rates received from forwarders, grouped by origin, destination, and mode
               </p>
             </div>
-            <button
-              onClick={() => setShowCompare(false)}
-              style={{
-                background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
-                color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: 500,
-              }}
-            >
-              ✕ Close
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-500)' }}>Period:</label>
+              <select
+                value={dashboardMonthFilter}
+                onChange={e => setDashboardMonthFilter(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #d1d5db', minWidth: '150px' }}
+              >
+                <option value="">All Time</option>
+                {dashboardAvailableMonths.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+              <button
+                onClick={() => setShowCompare(false)}
+                style={{
+                  background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+                  color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
+                  fontSize: '0.85rem', fontWeight: 500,
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
           </div>
 
           <div style={{ padding: '1.5rem', flex: 1, maxWidth: '1400px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
@@ -1272,13 +1330,13 @@ function QuoteRequestForm({ onClose }) {
 
             <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#0f172a' }}>Best Rate by Route</h4>
 
-            {!loadingCompare && compareGroups.length === 0 ? (
+            {!loadingCompare && compareDashboard.routeGroups.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-500)', backgroundColor: 'var(--surface-2)', borderRadius: '8px' }}>
-                No completed requests with a rate yet — add a rate to a request to see it here.
+                No completed requests with a rate yet{dashboardMonthFilter ? ' for this month' : ' — add a rate to a request to see it here'}.
               </div>
             ) : !loadingCompare && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {compareGroups.map((group, i) => (
+                {compareDashboard.routeGroups.map((group, i) => (
                   <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
                     <div style={{ padding: '10px 14px', backgroundColor: '#f8f9fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--navy-900)' }}>
