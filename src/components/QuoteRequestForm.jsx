@@ -587,6 +587,35 @@ function QuoteRequestForm({ onClose }) {
     }
   };
 
+  const handleWithdrawRate = async (req) => {
+    if (!(await confirmAction({
+      title: 'Withdraw Rate',
+      message: 'This clears the captured rate and moves the request back to "Sent", as if no rate had been received. Continue?',
+      type: 'danger',
+      confirmText: 'Withdraw',
+    }))) return;
+    try {
+      const response = await authFetch(getApiUrl(`/api/quote-requests/${req.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'sent',
+          quoted_rate: '', quoted_rate_non_stackable: '', quote_reference: '', quoted_transit_days: '', quote_notes: '',
+        }),
+      });
+      if (response.ok) {
+        await fetchRequests();
+        showSuccess?.('Rate withdrawn — request moved back to Sent');
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showError?.(err.error || 'Failed to withdraw rate');
+      }
+    } catch (err) {
+      console.error('Failed to withdraw rate:', err);
+      showError?.('Failed to withdraw rate');
+    }
+  };
+
   const handleOpenRateModal = (req) => {
     setRateModalReq(req);
     setRateForm({
@@ -922,6 +951,7 @@ function QuoteRequestForm({ onClose }) {
                           { label: 'Download PDF', onClick: () => generateQuoteRequestPDF(req) },
                           req.status === 'draft' ? { label: 'Mark Sent', onClick: () => handleUpdateStatus(req.id, 'sent') } : null,
                           (req.status === 'draft' || req.status === 'sent') ? { label: 'Cancel', onClick: () => handleUpdateStatus(req.id, 'cancelled') } : null,
+                          req.status === 'quoted' ? { label: 'Withdraw Rate', onClick: () => handleWithdrawRate(req), danger: true } : null,
                           { label: 'Delete', onClick: () => handleDelete(req.id), danger: true },
                         ]} />
                       </div>
