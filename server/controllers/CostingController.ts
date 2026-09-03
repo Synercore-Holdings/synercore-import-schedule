@@ -283,6 +283,7 @@ export class CostingController {
       (Number(data.local_cartage_dbn_whs_pretoria_6m_zar) || 0) +
       (Number(data.local_cartage_dbn_whs_pretoria_12m_zar) || 0) +
       (Number(data.transport_pe_coega_to_pretoria_zar) || 0) +
+      (Number(data.transport_plz_to_east_london_zar) || 0) +
       warehouseChargesSubtotalZar;
 
     // Destination charges subtotal (Port/Shipping)
@@ -295,6 +296,7 @@ export class CostingController {
       (Number(data.daff_inspection_zar) || 0) +
       (Number(data.state_vet_cancellation_fee_zar) || 0) +
       (Number(data.jnb_turn_in_zar) || 0) +
+      (Number(data.plz_turn_in_zar) || 0) +
       (Number(data.bill_of_lading_fee_zar) || 0) +
       (Number(data.manifest_filing_zar) || 0) +
       (Number(data.currency_adjustment_factor_zar) || 0) +

@@ -874,6 +874,7 @@ export function generateEstimatePDF(estimate) {
       [isExport ? 'Local Cartage: PTA to DBN WHS (6M Deck)' : 'Local Cartage: DBN WHS to PTA (6M Deck)', formatCurrency(estimate.local_cartage_dbn_whs_pretoria_6m_zar)],
       [isExport ? 'Local Cartage: PTA to DBN WHS (12M Deck)' : 'Local Cartage: DBN WHS to PTA (12M Deck)', formatCurrency(estimate.local_cartage_dbn_whs_pretoria_12m_zar)],
       [isExport ? 'Transport: Pretoria to PE/Coega Port' : 'Transport: PE/Coega Port to Pretoria', formatCurrency(estimate.transport_pe_coega_to_pretoria_zar)],
+      [isExport ? 'Transport: East London to PLZ Port' : 'Transport: PLZ Port to East London', formatCurrency(estimate.transport_plz_to_east_london_zar)],
     ]);
     const localChargesExcludingWarehouse = Math.max((totals.local_charges_subtotal_zar || 0) - (totals.warehouse_charges_subtotal_zar || 0), 0);
     if (localChargesExcludingWarehouse > 0) {
@@ -947,6 +948,7 @@ export function generateEstimatePDF(estimate) {
         ['DAFF Inspection', formatCurrency(estimate.daff_inspection_zar)],
         ['State Vet Cancellation Fee', formatCurrency(estimate.state_vet_cancellation_fee_zar)],
         ['JNB Turn In (At Cost)', formatCurrency(estimate.jnb_turn_in_zar)],
+        ['PLZ Turn In (At Cost)', formatCurrency(estimate.plz_turn_in_zar)],
         ['Bill of Lading Fee', formatCurrency(estimate.bill_of_lading_fee_zar)],
         ['RCG Manifest Filing', formatCurrency(estimate.manifest_filing_zar)],
         ['Currency Adjustment Factor (CAF)', formatCurrency(estimate.currency_adjustment_factor_zar)],
@@ -1404,6 +1406,7 @@ export function generateEstimatePDFBase64(estimate) {
       ['DAFF Inspection', formatCurrency(estimate.daff_inspection_zar)],
       ['State Vet Cancellation Fee', formatCurrency(estimate.state_vet_cancellation_fee_zar)],
       ['JNB Turn In (At Cost)', formatCurrency(estimate.jnb_turn_in_zar)],
+      ['PLZ Turn In (At Cost)', formatCurrency(estimate.plz_turn_in_zar)],
       ['Bill of Lading Fee', formatCurrency(estimate.bill_of_lading_fee_zar)],
       ['RCG Manifest Filing', formatCurrency(estimate.manifest_filing_zar)],
       ['Currency Adjustment Factor (CAF)', formatCurrency(estimate.currency_adjustment_factor_zar)],

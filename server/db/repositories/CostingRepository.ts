@@ -87,6 +87,7 @@ export interface ImportCostEstimate {
   local_cartage_dbn_whs_pretoria_6m_zar: number;
   local_cartage_dbn_whs_pretoria_12m_zar: number;
   transport_pe_coega_to_pretoria_zar: number;
+  transport_plz_to_east_london_zar?: number;
   local_charges_subtotal_zar: number;
   // Destination Charges (Port/Shipping)
   shipping_line_charges_zar: number;
@@ -97,6 +98,7 @@ export interface ImportCostEstimate {
   daff_inspection_zar: number;
   state_vet_cancellation_fee_zar: number;
   jnb_turn_in_zar: number;
+  plz_turn_in_zar?: number;
   handover_fee_zar?: number;
   destination_charges_subtotal_zar: number;
   // Customs & Duties
@@ -199,11 +201,11 @@ const COST_ESTIMATE_COLUMNS = [
   'warehouse_storage_fee_zar', 'warehouse_charges_subtotal_zar',
   'local_cartage_dbn_whs_pretoria_opt_a_zar', 'local_cartage_dbn_whs_pretoria_opt_b_zar',
   'local_cartage_dbn_whs_pretoria_6m_zar', 'local_cartage_dbn_whs_pretoria_12m_zar',
-  'transport_pe_coega_to_pretoria_zar', 'local_charges_subtotal_zar',
+  'transport_pe_coega_to_pretoria_zar', 'transport_plz_to_east_london_zar', 'local_charges_subtotal_zar',
   // Destination Charges
   'shipping_line_charges_zar', 'cargo_dues_20ft_zar', 'cargo_dues_40ft_zar', 'cto_fee_zar',
   'port_health_inspection_zar', 'daff_inspection_zar', 'state_vet_cancellation_fee_zar',
-  'jnb_turn_in_zar', 'bill_of_lading_fee_zar', 'manifest_filing_zar',
+  'jnb_turn_in_zar', 'plz_turn_in_zar', 'bill_of_lading_fee_zar', 'manifest_filing_zar',
   'currency_adjustment_factor_zar', 'degrouping_zar', 'edi_fee_zar', 'communication_dest_zar',
   'documentation_fee_dest_zar', 'cfs_lcl_handling_out_zar', 'delivery_release_order_zar',
   'cartage_dest_zar', 'fuel_surcharge_dest_zar', 'agency_fee_dest_zar', 'handover_fee_zar', 'facility_fee_zar',
@@ -381,6 +383,7 @@ export class CostingRepository {
       local_cartage_dbn_whs_pretoria_6m_zar: data.local_cartage_dbn_whs_pretoria_6m_zar || 0,
       local_cartage_dbn_whs_pretoria_12m_zar: data.local_cartage_dbn_whs_pretoria_12m_zar || 0,
       transport_pe_coega_to_pretoria_zar: data.transport_pe_coega_to_pretoria_zar || 0,
+      transport_plz_to_east_london_zar: data.transport_plz_to_east_london_zar || 0,
       local_charges_subtotal_zar: data.local_charges_subtotal_zar || 0,
       // Destination Charges
       shipping_line_charges_zar: data.shipping_line_charges_zar || 0,
@@ -391,6 +394,7 @@ export class CostingRepository {
       daff_inspection_zar: data.daff_inspection_zar || 0,
       state_vet_cancellation_fee_zar: data.state_vet_cancellation_fee_zar || 0,
       jnb_turn_in_zar: data.jnb_turn_in_zar || 0,
+      plz_turn_in_zar: data.plz_turn_in_zar || 0,
       handover_fee_zar: data.handover_fee_zar || 0,
       destination_charges_subtotal_zar: data.destination_charges_subtotal_zar || 0,
       // Customs & Duties

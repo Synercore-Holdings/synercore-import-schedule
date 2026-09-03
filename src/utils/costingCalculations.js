@@ -206,7 +206,8 @@ export const calculateLocalChargesSubtotal = (data) => {
     (parseFloat(data.local_cartage_dbn_whs_pretoria_opt_b_zar) || 0) +
     (parseFloat(data.local_cartage_dbn_whs_pretoria_6m_zar) || 0) +
     (parseFloat(data.local_cartage_dbn_whs_pretoria_12m_zar) || 0) +
-    (parseFloat(data.transport_pe_coega_to_pretoria_zar) || 0)
+    (parseFloat(data.transport_pe_coega_to_pretoria_zar) || 0) +
+    (parseFloat(data.transport_plz_to_east_london_zar) || 0)
   );
 };
 
@@ -240,6 +241,7 @@ export const calculateDestinationSubtotal = (data) => {
     (parseFloat(data.daff_inspection_zar) || 0) +
     (parseFloat(data.state_vet_cancellation_fee_zar) || 0) +
     (parseFloat(data.jnb_turn_in_zar) || 0) +
+    (parseFloat(data.plz_turn_in_zar) || 0) +
     (parseFloat(data.bill_of_lading_fee_zar) || 0) +
     (parseFloat(data.manifest_filing_zar) || 0) +
     (parseFloat(data.currency_adjustment_factor_zar) || 0) +

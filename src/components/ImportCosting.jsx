@@ -72,6 +72,7 @@ const INITIAL_FORM_STATE = {
   local_cartage_dbn_whs_pretoria_6m_zar: 10370,
   local_cartage_dbn_whs_pretoria_12m_zar: 14330,
   transport_pe_coega_to_pretoria_zar: 0,
+  transport_plz_to_east_london_zar: 0,
   // Destination Charges (Port/Shipping) - Default rates from AFI rate sheet
   shipping_line_charges_zar: 0,
   cargo_dues_20ft_zar: 1879.72,
@@ -81,6 +82,7 @@ const INITIAL_FORM_STATE = {
   daff_inspection_zar: 620,
   state_vet_cancellation_fee_zar: 290,
   jnb_turn_in_zar: 0,
+  plz_turn_in_zar: 0,
   bill_of_lading_fee_zar: 0,
   manifest_filing_zar: 0,
   currency_adjustment_factor_zar: 0,

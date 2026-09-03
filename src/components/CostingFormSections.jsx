@@ -689,6 +689,7 @@ function CostingFormSections({
           {currencyInput(isExport ? 'Local Cartage: PTA to DBN WHS (6M Deck)' : 'Local Cartage: DBN WHS to PTA (6M Deck)', 'local_cartage_dbn_whs_pretoria_6m_zar')}
           {currencyInput(isExport ? 'Local Cartage: PTA to DBN WHS (12M Deck)' : 'Local Cartage: DBN WHS to PTA (12M Deck)', 'local_cartage_dbn_whs_pretoria_12m_zar')}
           {currencyInput(isExport ? 'Transport: Pretoria to PE/Coega Port' : 'Transport: PE/Coega Port to Pretoria', 'transport_pe_coega_to_pretoria_zar')}
+          {currencyInput(isExport ? 'Transport: East London to PLZ Port' : 'Transport: PLZ Port to East London', 'transport_plz_to_east_london_zar')}
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
               Local Charges Sub-Total - Auto
@@ -770,6 +771,7 @@ function CostingFormSections({
             {currencyInput('DAFF Inspection', 'daff_inspection_zar')}
             {currencyInput('State Vet Cancellation Fee', 'state_vet_cancellation_fee_zar')}
             {currencyInput('JNB Turn In (At Cost)', 'jnb_turn_in_zar')}
+            {currencyInput('PLZ Turn In (At Cost)', 'plz_turn_in_zar')}
             {currencyInput('Bill of Lading Fee', 'bill_of_lading_fee_zar')}
             {currencyInput('RCG Manifest Filing', 'manifest_filing_zar')}
             {currencyInput('Currency Adjustment Factor (CAF)', 'currency_adjustment_factor_zar')}

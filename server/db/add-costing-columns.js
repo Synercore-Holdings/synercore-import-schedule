@@ -138,6 +138,7 @@ export default async function addCostingColumns() {
     'local_cartage_dbn_whs_pretoria_6m_zar NUMERIC(12,2) DEFAULT 0',
     'local_cartage_dbn_whs_pretoria_12m_zar NUMERIC(12,2) DEFAULT 0',
     'transport_pe_coega_to_pretoria_zar NUMERIC(12,2) DEFAULT 0',
+    'transport_plz_to_east_london_zar NUMERIC(12,2) DEFAULT 0',
     'local_charges_subtotal_zar NUMERIC(14,2) DEFAULT 0',
   ];
 
@@ -155,6 +156,7 @@ export default async function addCostingColumns() {
     'daff_inspection_zar NUMERIC(12,2) DEFAULT 0',
     'state_vet_cancellation_fee_zar NUMERIC(12,2) DEFAULT 0',
     'jnb_turn_in_zar NUMERIC(12,2) DEFAULT 0',
+    'plz_turn_in_zar NUMERIC(12,2) DEFAULT 0',
     'handover_fee_zar NUMERIC(12,2) DEFAULT 0',
     'destination_charges_subtotal_zar NUMERIC(14,2) DEFAULT 0',
   ];

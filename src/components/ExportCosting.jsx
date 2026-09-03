@@ -74,6 +74,7 @@ const INITIAL_FORM_STATE = {
   local_cartage_dbn_whs_pretoria_6m_zar: 10370,
   local_cartage_dbn_whs_pretoria_12m_zar: 14330,
   transport_pe_coega_to_pretoria_zar: 0,
+  transport_plz_to_east_london_zar: 0,
   // Export Charges (replaces Destination Charges in export mode).
   // Defaults seeded from the AQ-1122 40FT PTA → Durban quote.
   export_landside_charges_zar: 0,
