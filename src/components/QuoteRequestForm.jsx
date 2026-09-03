@@ -326,6 +326,7 @@ function QuoteRequestForm({ onClose }) {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [monthFilter, setMonthFilter] = useState('');
   const [dashboardMonthFilter, setDashboardMonthFilter] = useState('');
+  const [winRateModeFilter, setWinRateModeFilter] = useState('sea');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
   const [trendRoute, setTrendRoute] = useState('');
@@ -582,8 +583,9 @@ function QuoteRequestForm({ onClose }) {
     // and "slowest to quote"). Respects whatever Period is selected, so
     // switching between "All Time" and a single month gives the overall and
     // the per-month view with the same chart.
+    const winRateRouteGroups = routeGroups.filter(g => g.transport_mode === winRateModeFilter);
     const forwarderStats = {};
-    routeGroups.forEach(g => {
+    winRateRouteGroups.forEach(g => {
       g.entries.forEach((entry, idx) => {
         const name = entry.forwarder_name;
         if (!forwarderStats[name]) forwarderStats[name] = { wins: 0, quotes: 0, transitDays: [], responseDays: [] };
@@ -599,7 +601,7 @@ function QuoteRequestForm({ onClose }) {
     const forwarderWinRates = Object.entries(forwarderStats)
       .map(([name, s]) => ({
         name, wins: s.wins, quotes: s.quotes,
-        pct: routeGroups.length ? (s.wins / routeGroups.length) * 100 : 0,
+        pct: winRateRouteGroups.length ? (s.wins / winRateRouteGroups.length) * 100 : 0,
         avgTransitDays: s.transitDays.length ? s.transitDays.reduce((a, b) => a + b, 0) / s.transitDays.length : null,
         avgResponseDays: s.responseDays.length ? s.responseDays.reduce((a, b) => a + b, 0) / s.responseDays.length : null,
       }))
@@ -669,6 +671,7 @@ function QuoteRequestForm({ onClose }) {
       airStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate)),
       airNonStackableData: airStackabilityQuotes.map(r => Number(r.quoted_rate_non_stackable)),
       forwarderWinRates,
+      winRateRoutesTracked: winRateRouteGroups.length,
       avgResponseDaysOverall,
       savingsByCurrency,
       convertedSavingsUsd,
@@ -676,7 +679,7 @@ function QuoteRequestForm({ onClose }) {
       routeTrendMap,
       routeTrendOptions,
     };
-  }, [compareAllRequests, dashboardMonthFilter, fxRates]);
+  }, [compareAllRequests, dashboardMonthFilter, winRateModeFilter, fxRates]);
 
   // Rate trend for the selected route — separate memo since it depends on
   // trendRoute without needing to recompute the whole dashboard.
@@ -1914,14 +1917,33 @@ function QuoteRequestForm({ onClose }) {
                   </div>
                 )}
 
-                {compareDashboard.forwarderWinRates.length > 0 && (
-                  <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-                      <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Forwarder Win Rate</h4>
+                <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Forwarder Win Rate</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', borderRadius: '6px', border: '1px solid #d1d5db', overflow: 'hidden' }}>
+                        {['sea', 'air'].map(mode => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setWinRateModeFilter(mode)}
+                            style={{
+                              padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, border: 'none', cursor: 'pointer',
+                              backgroundColor: winRateModeFilter === mode ? '#22c55e' : 'transparent',
+                              color: winRateModeFilter === mode ? '#fff' : 'var(--text-500)',
+                            }}
+                          >
+                            {TRANSPORT_LABELS[mode]}
+                          </button>
+                        ))}
+                      </div>
                       <span style={{ fontSize: 11, color: 'var(--text-500)' }}>
                         % of routes where they came in with the cheapest rate{dashboardMonthFilter ? ` — ${monthLabel(dashboardMonthFilter)}` : ' — all time'}
                       </span>
                     </div>
+                  </div>
+                  {compareDashboard.forwarderWinRates.length > 0 ? (
+                  <>
                     <div style={{ height: 260 }}>
                       <BarChart
                         data={{
@@ -1939,7 +1961,7 @@ function QuoteRequestForm({ onClose }) {
                               callbacks: {
                                 label: (ctx) => {
                                   const f = compareDashboard.forwarderWinRates[ctx.dataIndex];
-                                  return `${f.pct.toFixed(0)}% (${f.wins} of ${compareDashboard.routeGroups.length} routes)`;
+                                  return `${f.pct.toFixed(0)}% (${f.wins} of ${compareDashboard.winRateRoutesTracked} routes)`;
                                 },
                               },
                             },
@@ -1975,8 +1997,13 @@ function QuoteRequestForm({ onClose }) {
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                )}
+                  </>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-500)', margin: 0 }}>
+                      No completed {TRANSPORT_LABELS[winRateModeFilter].toLowerCase()} freight quotes with a rate yet{dashboardMonthFilter ? ' for this month' : ''}.
+                    </p>
+                  )}
+                </div>
 
                 {selectedTrend && (
                   <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
