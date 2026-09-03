@@ -81,7 +81,7 @@ function ShipmentTableToolbar({
         {/* Search */}
         <input
           type="text"
-          placeholder="Search orders, suppliers, products..."
+          placeholder="Search orders, suppliers, products, BOL, container..."
           aria-label="Search shipments"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}

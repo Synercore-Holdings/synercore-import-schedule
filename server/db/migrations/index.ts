@@ -1372,6 +1372,66 @@ export const migrations: Migration[] = [
       return true;
     },
   },
+
+  // Phase 16: Include BOL/container numbers in full-text search
+  {
+    name: 'add-bol-container-to-search-vector',
+    version: '025',
+    description: 'Include bol_number and container_number in the shipments search_vector so they are searchable',
+    depends_on: ['add-fulltext-search'],
+    execute: async () => {
+      const client = await getPool().connect();
+      try {
+        await client.query('BEGIN');
+
+        await client.query(`
+          UPDATE shipments SET search_vector =
+            to_tsvector('english',
+              COALESCE(order_ref, '') || ' ' ||
+              COALESCE(supplier, '') || ' ' ||
+              COALESCE(product_name, '') || ' ' ||
+              COALESCE(final_pod, '') || ' ' ||
+              COALESCE(vessel_name, '') || ' ' ||
+              COALESCE(forwarding_agent, '') || ' ' ||
+              COALESCE(notes, '') || ' ' ||
+              COALESCE(receiving_warehouse, '') || ' ' ||
+              COALESCE(bol_number, '') || ' ' ||
+              COALESCE(container_number, '')
+            )
+        `);
+
+        await client.query(`
+          CREATE OR REPLACE FUNCTION shipments_search_vector_update() RETURNS trigger AS $$
+          BEGIN
+            NEW.search_vector :=
+              to_tsvector('english',
+                COALESCE(NEW.order_ref, '') || ' ' ||
+                COALESCE(NEW.supplier, '') || ' ' ||
+                COALESCE(NEW.product_name, '') || ' ' ||
+                COALESCE(NEW.final_pod, '') || ' ' ||
+                COALESCE(NEW.vessel_name, '') || ' ' ||
+                COALESCE(NEW.forwarding_agent, '') || ' ' ||
+                COALESCE(NEW.notes, '') || ' ' ||
+                COALESCE(NEW.receiving_warehouse, '') || ' ' ||
+                COALESCE(NEW.bol_number, '') || ' ' ||
+                COALESCE(NEW.container_number, '')
+              );
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        `);
+
+        await client.query('COMMIT');
+        logInfo('BOL/container numbers added to shipments search_vector');
+        return true;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  },
 ];
 
 /**

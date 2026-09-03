@@ -70,7 +70,9 @@ function GlobalSearch({ shipments }) {
           s.supplier?.toLowerCase().includes(q) ||
           s.finalPod?.toLowerCase().includes(q) ||
           s.vesselName?.toLowerCase().includes(q) ||
-          s.productName?.toLowerCase().includes(q);
+          s.productName?.toLowerCase().includes(q) ||
+          s.bolNumber?.toLowerCase().includes(q) ||
+          s.containerNumber?.toLowerCase().includes(q);
         if (!match || seen.has(s.orderRef)) return false;
         seen.add(s.orderRef);
         return true;
@@ -88,6 +90,8 @@ function GlobalSearch({ shipments }) {
         vesselName: r.vessel_name,
         latestStatus: r.latest_status,
         productName: r.product_name,
+        bolNumber: r.bol_number,
+        containerNumber: r.container_number,
       }))
     : localResults;
 
@@ -243,6 +247,8 @@ function GlobalSearch({ shipments }) {
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {highlight(shipment.supplier, query)}{shipment.productName ? <> &mdash; {highlight(shipment.productName, query)}</> : ''}{shipment.finalPod ? <> &mdash; {highlight(shipment.finalPod, query)}</> : ''}
+                      {shipment.bolNumber?.toLowerCase().includes(query.toLowerCase()) ? <> &mdash; BOL {highlight(shipment.bolNumber, query)}</> : ''}
+                      {shipment.containerNumber?.toLowerCase().includes(query.toLowerCase()) ? <> &mdash; Container {highlight(shipment.containerNumber, query)}</> : ''}
                     </div>
                   </div>
                   <span className={pill.cls} style={{ fontSize: '0.65rem', whiteSpace: 'nowrap' }}>

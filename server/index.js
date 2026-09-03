@@ -555,7 +555,7 @@ async function start() {
     try {
       await getPool().query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS search_vector tsvector`);
       await getPool().query(`CREATE INDEX IF NOT EXISTS idx_shipments_search_vector ON shipments USING gin(search_vector)`);
-      // Backfill any rows that have no vector yet
+      // Backfill rows missing a vector, or still built from the pre-BOL/container field set
       await getPool().query(`
         UPDATE shipments SET search_vector =
           to_tsvector('english',
@@ -566,9 +566,13 @@ async function start() {
             COALESCE(vessel_name, '') || ' ' ||
             COALESCE(forwarding_agent, '') || ' ' ||
             COALESCE(notes, '') || ' ' ||
-            COALESCE(receiving_warehouse, '')
+            COALESCE(receiving_warehouse, '') || ' ' ||
+            COALESCE(bol_number, '') || ' ' ||
+            COALESCE(container_number, '')
           )
         WHERE search_vector IS NULL
+           OR (bol_number IS NOT NULL AND NOT (search_vector @@ plainto_tsquery('english', bol_number)))
+           OR (container_number IS NOT NULL AND NOT (search_vector @@ plainto_tsquery('english', container_number)))
       `);
       // Keep the vector in sync on insert / update
       await getPool().query(`
@@ -583,7 +587,9 @@ async function start() {
               COALESCE(NEW.vessel_name, '') || ' ' ||
               COALESCE(NEW.forwarding_agent, '') || ' ' ||
               COALESCE(NEW.notes, '') || ' ' ||
-              COALESCE(NEW.receiving_warehouse, '')
+              COALESCE(NEW.receiving_warehouse, '') || ' ' ||
+              COALESCE(NEW.bol_number, '') || ' ' ||
+              COALESCE(NEW.container_number, '')
             );
           RETURN NEW;
         END;
