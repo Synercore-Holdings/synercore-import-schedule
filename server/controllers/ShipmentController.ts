@@ -1254,6 +1254,7 @@ export class ShipmentController {
           OR vessel_name ILIKE $2
           OR bol_number ILIKE $2
           OR container_number ILIKE $2
+          OR forwarding_agent ILIKE $2
        ORDER BY rank DESC, updated_at DESC
        LIMIT $3 OFFSET $4`,
       [q, `%${q}%`, cappedLimit, offset]
@@ -1267,7 +1268,8 @@ export class ShipmentController {
           OR product_name ILIKE $2
           OR vessel_name ILIKE $2
           OR bol_number ILIKE $2
-          OR container_number ILIKE $2`,
+          OR container_number ILIKE $2
+          OR forwarding_agent ILIKE $2`,
       [q, `%${q}%`]
     );
 

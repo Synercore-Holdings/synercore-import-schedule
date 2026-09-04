@@ -72,7 +72,8 @@ function GlobalSearch({ shipments }) {
           s.vesselName?.toLowerCase().includes(q) ||
           s.productName?.toLowerCase().includes(q) ||
           s.bolNumber?.toLowerCase().includes(q) ||
-          s.containerNumber?.toLowerCase().includes(q);
+          s.containerNumber?.toLowerCase().includes(q) ||
+          s.forwardingAgent?.toLowerCase().includes(q);
         if (!match || seen.has(s.orderRef)) return false;
         seen.add(s.orderRef);
         return true;
@@ -92,6 +93,7 @@ function GlobalSearch({ shipments }) {
         productName: r.product_name,
         bolNumber: r.bol_number,
         containerNumber: r.container_number,
+        forwardingAgent: r.forwarding_agent,
       }))
     : localResults;
 
@@ -249,6 +251,7 @@ function GlobalSearch({ shipments }) {
                       {highlight(shipment.supplier, query)}{shipment.productName ? <> &mdash; {highlight(shipment.productName, query)}</> : ''}{shipment.finalPod ? <> &mdash; {highlight(shipment.finalPod, query)}</> : ''}
                       {shipment.bolNumber?.toLowerCase().includes(query.toLowerCase()) ? <> &mdash; BOL {highlight(shipment.bolNumber, query)}</> : ''}
                       {shipment.containerNumber?.toLowerCase().includes(query.toLowerCase()) ? <> &mdash; Container {highlight(shipment.containerNumber, query)}</> : ''}
+                      {shipment.forwardingAgent?.toLowerCase().includes(query.toLowerCase()) ? <> &mdash; Agent {highlight(shipment.forwardingAgent, query)}</> : ''}
                     </div>
                   </div>
                   <span className={pill.cls} style={{ fontSize: '0.65rem', whiteSpace: 'nowrap' }}>
