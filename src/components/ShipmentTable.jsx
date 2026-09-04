@@ -63,7 +63,8 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
         shipment.finalPod?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shipment.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         shipment.bolNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        shipment.containerNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+        shipment.containerNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        shipment.vesselName?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter.includes('all') ||
         statusFilter.includes(shipment.latestStatus) ||
