@@ -14,6 +14,7 @@ export const AIRFREIGHT_AGENTS = [
   { value: 'Ethiopian Airlines Cargo', label: 'Ethiopian Airlines Cargo' },
   { value: 'SAA Cargo', label: 'SAA Cargo' },
   { value: 'Kenya Airways Cargo', label: 'Kenya Airways Cargo' },
+  { value: 'Investec', label: 'Investec' },
 ];
 
 // Forwarding agent options for sea freight and other modes
@@ -31,6 +32,7 @@ export const SEAFREIGHT_AGENTS = [
   { value: 'Yang Ming', label: 'Yang Ming' },
   { value: 'HMM', label: 'HMM' },
   { value: 'OOCL', label: 'OOCL' },
+  { value: 'Investec', label: 'Investec' },
 ];
 
 // Freight forwarders in SEAFREIGHT_AGENTS above who book space on someone
@@ -40,7 +42,7 @@ export const SEAFREIGHT_AGENTS = [
 // A Shipping Line only makes sense for these — if the Forwarding Agent is
 // already an actual carrier (MSC, Maersk, ONE, ...), booked directly, that
 // value IS the carrier; there's nothing separate to record.
-export const SEA_FORWARDER_ONLY_VALUES = ['DHL', 'DSV', 'Afrigistics'];
+export const SEA_FORWARDER_ONLY_VALUES = ['DHL', 'DSV', 'Afrigistics', 'Investec'];
 
 export const isPureSeaForwarder = (forwardingAgent) => SEA_FORWARDER_ONLY_VALUES.includes(forwardingAgent);
 
