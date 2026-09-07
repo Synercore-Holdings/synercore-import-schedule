@@ -65,6 +65,24 @@ const daysSinceSent = (req) => {
   if (isNaN(d)) return null;
   return Math.floor((Date.now() - d.getTime()) / 86400000);
 };
+
+// Working days (Mon–Fri) between two dates — a forwarder quoting Friday
+// afternoon and getting a reply entered Monday morning shouldn't look like
+// a 3-day turnaround, so weekends don't count against response time.
+const businessDaysBetween = (start, end) => {
+  const cur = new Date(start);
+  const endDate = new Date(end);
+  cur.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  if (endDate <= cur) return 0;
+  let days = 0;
+  while (cur < endDate) {
+    cur.setDate(cur.getDate() + 1);
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) days++;
+  }
+  return days;
+};
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
 // EXW: forwarder collects from the supplier's premises, so we need the full
@@ -593,8 +611,7 @@ function QuoteRequestForm({ onClose }) {
         if (idx === 0) forwarderStats[name].wins++;
         if (entry.quoted_transit_days) forwarderStats[name].transitDays.push(Number(entry.quoted_transit_days));
         if (entry.sent_at && entry.quoted_at) {
-          const days = (new Date(entry.quoted_at) - new Date(entry.sent_at)) / 86400000;
-          if (days >= 0) forwarderStats[name].responseDays.push(days);
+          forwarderStats[name].responseDays.push(businessDaysBetween(entry.sent_at, entry.quoted_at));
         }
       });
     });
