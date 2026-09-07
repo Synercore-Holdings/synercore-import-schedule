@@ -582,6 +582,15 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                       <span style={{ fontWeight: 700, color: a.onTime ? '#28a745' : '#dc3545' }}>
                         {a.onTime ? 'On-Time' : 'Late'}
                       </span>
+                      {!a.onTime && (
+                        <span style={{
+                          marginLeft: 6, padding: '1px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+                          backgroundColor: a.lateConfirmed ? '#dcfce7' : '#fef3c7',
+                          color: a.lateConfirmed ? '#166534' : '#92400e',
+                        }} title={a.lateConfirmed ? 'Reviewed and confirmed late' : 'Not yet reviewed — see Late Shipments'}>
+                          {a.lateConfirmed ? 'Confirmed' : 'Needs Review'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

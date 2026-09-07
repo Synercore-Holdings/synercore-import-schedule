@@ -494,6 +494,18 @@ async function start() {
       logWarn('Container number column migration warning', { error: error.message });
     }
 
+    // Add late-delivery review tracking columns to shipments (Late Shipments tracker)
+    try {
+      await getPool().query(`
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS late_confirmed BOOLEAN DEFAULT false;
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS late_confirmed_at TIMESTAMP;
+        ALTER TABLE shipments ADD COLUMN IF NOT EXISTS late_confirmed_by TEXT;
+      `);
+      logger.info('Late-review tracking columns ready');
+    } catch (error) {
+      logWarn('Late-review tracking columns migration warning', { error: error.message });
+    }
+
     // Add shipping line column to shipments — the actual ocean carrier,
     // distinct from forwarding_agent (who the shipment was booked through).
     try {

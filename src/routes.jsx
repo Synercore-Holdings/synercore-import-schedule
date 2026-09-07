@@ -21,6 +21,7 @@ export const VIEW_ROUTES = {
   audit:             '/audit',
   'bol-audit':       '/bol-audit',
   'supplier-performance': '/supplier-performance',
+  'late-shipments':       '/late-shipments',
   'forwarder-carrier':    '/forwarder-carrier',
   receiving:             '/receiving',
   'dock-management':     '/dock-management',

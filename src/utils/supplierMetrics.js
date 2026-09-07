@@ -22,9 +22,18 @@ export class SupplierMetrics {
       return shipmentSupplier === normalizedName;
     });
 
+    return this.dedupeByOrder(matched);
+  }
+
+  /**
+   * Helper: Dedupe shipments by orderRef (falling back to id) — the
+   * shipments table stores one row per product line, so a single
+   * multi-line order appears as many rows sharing the same orderRef.
+   */
+  static dedupeByOrder(shipments) {
     const seen = new Set();
     const deduped = [];
-    for (const s of matched) {
+    for (const s of shipments) {
       const key = s.orderRef || s.id;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -231,9 +240,20 @@ export class SupplierMetrics {
    * with a receivingDate, matching the population used by the KPIs above.
    */
   static getShipmentAudit(shipments, supplierName) {
-    const supplierShipments = this.getSupplierShipments(shipments, supplierName);
+    return this.buildShipmentAudit(this.getSupplierShipments(shipments, supplierName));
+  }
 
-    return supplierShipments
+  /**
+   * Same audit as getShipmentAudit, but across every supplier at once —
+   * used by the Late Shipments tracker to review lateness in one place
+   * instead of per-supplier.
+   */
+  static getAllShipmentAudit(shipments) {
+    return this.buildShipmentAudit(this.dedupeByOrder(shipments || []));
+  }
+
+  static buildShipmentAudit(shipmentList) {
+    return shipmentList
       .filter(s => {
         const isInWarehouse = [
           ShipmentStatus.STORED,
@@ -251,6 +271,7 @@ export class SupplierMetrics {
         const diffDays = Math.ceil((new Date(actualDate) - new Date(scheduledDate)) / (1000 * 60 * 60 * 24));
         return {
           orderRef: s.orderRef || s.id,
+          supplierName: s.supplier,
           productName: s.productName,
           scheduledDate,
           actualDate,
@@ -260,6 +281,7 @@ export class SupplierMetrics {
           // True when actualDate came from the manually-entered arrival date
           // rather than falling back to the receiving-workflow timestamp
           isVerifiedArrival: !!s.actualArrivalDate,
+          lateConfirmed: !!s.lateConfirmed,
           // Full shipment, so callers can open it for editing (e.g. to
           // enter the actual arrival date) straight from the audit row
           shipment: s,

@@ -38,6 +38,7 @@ const VIEW_TO_SECTION = {
   reports: 'reports',
   'advanced-reports': 'reports',
   'supplier-performance': 'reports',
+  'late-shipments': 'reports',
   'forwarder-carrier': 'reports',
   audit: 'reports',
 };
@@ -65,6 +66,7 @@ const VIEW_TITLES = {
   reports: 'Reports',
   'advanced-reports': 'Advanced Reports',
   'supplier-performance': 'Supplier Performance',
+  'late-shipments': 'Late Shipments',
   'forwarder-carrier': 'Forwarder vs Carrier',
   'costing-requests': 'Cost Requests',
   'quote-requests': 'Quote Requests',
@@ -103,6 +105,7 @@ const DockManagement = lazy(() => import('./components/DockManagement'));
 const LocalReceivingSchedule = lazy(() => import('./components/LocalReceivingSchedule'));
 const IWTIncoming = lazy(() => import('./components/IWTIncoming'));
 const RejectionsTracker = lazy(() => import('./components/RejectionsTracker'));
+const LateShipmentsTracker = lazy(() => import('./components/LateShipmentsTracker'));
 
 import SupplierLogin from './pages/SupplierLogin';
 import ForgotPassword from './pages/ForgotPassword';
@@ -116,13 +119,14 @@ import { authFetch } from './utils/authFetch';
 import { getApiUrl } from './config/api';
 import { authUtils } from './utils/auth';
 import { POST_ARRIVAL_STATUSES } from './types/shipment';
+import { SupplierMetrics } from './utils/supplierMetrics';
 import { initWebVitals, logWebVitalsToConsole } from './utils/webVitals';
 import { initializeAnalytics } from './config/analytics';
 import {
   LayoutDashboard, Building2, Ship, Truck, Repeat, ClipboardList, Factory, Store,
   Package, Wallet, BarChart3, TrendingUp, Target, Inbox, ScrollText, FileText,
   Users, LogOut, Moon, Sun, BookOpen, Bell, Globe, Newspaper, MapPin, Settings as SettingsIcon,
-  Waves, ShieldAlert, Send,
+  Waves, ShieldAlert, Send, Clock,
 } from 'lucide-react';
 import './theme.css';
 
@@ -487,6 +491,7 @@ function App() {
     if (path === '/reports') return 'reports';
     if (path === '/advanced-reports') return 'advanced-reports';
     if (path === '/supplier-performance') return 'supplier-performance';
+    if (path === '/late-shipments') return 'late-shipments';
     if (path === '/forwarder-carrier') return 'forwarder-carrier';
     if (path === '/users') return 'users';
     if (path === '/audit') return 'audit';
@@ -549,6 +554,15 @@ function App() {
       />
     );
   };
+
+  const LateShipmentsWrapper = () => (
+    <LateShipmentsTracker
+      shipments={shipments}
+      onUpdateShipment={handleUpdateShipment}
+      onRefresh={fetchShipments}
+      loading={loading}
+    />
+  );
 
   const AccessDenied = () => (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
@@ -646,6 +660,8 @@ function App() {
             if (claimStatus === 'credited' || claimStatus === 'closed') return false;
             return isRejectionClaim(s);
           }).length;
+          const lateShipmentsCount = SupplierMetrics.getAllShipmentAudit(shipments)
+            .filter(a => !a.onTime && !a.lateConfirmed).length;
 
           const navItems = {
             dashboard: { label: 'Dashboard', icon: LayoutDashboard, view: 'dashboard' },
@@ -669,6 +685,7 @@ function App() {
             reports: { label: 'Reports', icon: BarChart3, view: 'reports' },
             advancedReports: { label: 'Advanced Reports', icon: TrendingUp, view: 'advanced-reports' },
             supplierPerformance: { label: 'Supplier Performance', icon: Target, view: 'supplier-performance' },
+            lateShipments: { label: 'Late Shipments', icon: Clock, view: 'late-shipments', badge: lateShipmentsCount, badgeType: 'danger' },
             forwarderCarrier: { label: 'Forwarder vs Carrier', icon: Waves, view: 'forwarder-carrier' },
             receiving: { label: 'Goods Receiving', icon: Inbox, view: 'receiving' },
             dockManagement: { label: 'Dock Management', icon: Truck, view: 'dock-management' },
@@ -781,7 +798,7 @@ function App() {
               {renderSection('Warehouse', 'warehouse', ['receiving', 'dockManagement', 'stored', 'rejections'])}
               {renderSection('Warehouse Capacity per site', 'warehouseCapacitySites', ['capacityPretoria', 'capacityKlapmuts', 'capacityOffsite'])}
               {renderSection('Finance', 'finance', ['rates', 'costing', 'exportCosting', 'costingRequests', 'quoteRequests'])}
-              {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'forwarderCarrier', 'audit'])}
+              {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'lateShipments', 'forwarderCarrier', 'audit'])}
 
               {!sidebarCollapsed && (!q || resourcesVisible.length > 0) && (
                 <div className="sidebar-resources">
@@ -1112,6 +1129,9 @@ function App() {
             } />
             <Route path="/supplier-performance" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><SupplierPerformance shipments={shipments} onUpdateShipment={handleUpdateShipment} /></ErrorBoundary></Suspense>
+            } />
+            <Route path="/late-shipments" element={
+              <Suspense fallback={<PageLoader />}><ErrorBoundary><LateShipmentsWrapper /></ErrorBoundary></Suspense>
             } />
             <Route path="/forwarder-carrier" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><ForwarderCarrierReport shipments={shipments} suppliers={suppliers} /></ErrorBoundary></Suspense>

@@ -1000,6 +1000,31 @@ router.patch(
 );
 
 /**
+ * PATCH /api/shipments/:id/late-review
+ * Confirm (or un-confirm) that a shipment which arrived late is genuinely
+ * late, as opposed to a scheduling/data-entry mistake (see the Late
+ * Shipments tracker).
+ */
+router.patch(
+  '/:id/late-review',
+  body('lateConfirmed').isBoolean().withMessage('lateConfirmed must be a boolean'),
+  asyncHandler(async (req: BodyRequest<{ lateConfirmed: boolean }>, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const shipment = await ShipmentController.updateLateReview(
+      req.params.id!,
+      req.body.lateConfirmed,
+      req.user?.username || req.user?.email
+    );
+
+    res.status(200).json({
+      data: shipment,
+      message: 'Late-review status updated successfully'
+    });
+  })
+);
+
+/**
  * POST /api/shipments/:id/damage-photos
  * Upload one or more photos of damaged goods for a failed-inspection shipment
  */

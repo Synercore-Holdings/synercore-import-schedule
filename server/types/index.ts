@@ -137,6 +137,10 @@ export interface Shipment {
   claim_notes?: string;
   claim_updated_at?: Date;
   claim_updated_by?: string;
+  // Late-delivery review tracking (Late Shipments tracker)
+  late_confirmed?: boolean;
+  late_confirmed_at?: Date;
+  late_confirmed_by?: string;
   // Reminder fields
   reminder_date?: string | null;
   reminder_note?: string | null;

@@ -77,7 +77,10 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'claim_reference',
     'claim_notes',
     'claim_updated_at',
-    'claim_updated_by'
+    'claim_updated_by',
+    'late_confirmed',
+    'late_confirmed_at',
+    'late_confirmed_by'
   ];
 
   /**

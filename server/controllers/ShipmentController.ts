@@ -481,6 +481,26 @@ export class ShipmentController {
   }
 
   /**
+   * Mark a shipment that arrived late as reviewed — either confirmed as
+   * genuinely late, or un-confirmed after the underlying data was corrected
+   * (see the Late Shipments tracker).
+   */
+  static async updateLateReview(
+    id: string,
+    lateConfirmed: boolean,
+    updatedBy?: string
+  ): Promise<Shipment> {
+    await this.getShipment(id);
+
+    return shipmentRepository.update(id, {
+      late_confirmed: lateConfirmed,
+      late_confirmed_at: new Date(),
+      late_confirmed_by: updatedBy || '',
+      updated_at: new Date()
+    } as Partial<Shipment>);
+  }
+
+  /**
    * Unarchive shipment
    */
   static async unarchiveShipment(id: string): Promise<Shipment> {
