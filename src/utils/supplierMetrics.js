@@ -71,6 +71,21 @@ export class SupplierMetrics {
   }
 
   /**
+   * Helper: Number of calendar days between two dates, ignoring
+   * time-of-day. scheduledDate is often midnight while actualArrivalDate/
+   * receivingDate carries the time the action was actually performed —
+   * comparing raw timestamps would flag a same-day arrival as "late"
+   * whenever it happened after midnight.
+   */
+  static diffCalendarDays(laterDate, earlierDate) {
+    const toDateOnly = (d) => {
+      const date = new Date(d);
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    };
+    return Math.round((toDateOnly(laterDate) - toDateOnly(earlierDate)) / (1000 * 60 * 60 * 24));
+  }
+
+  /**
    * Calculate on-time delivery percentage for a supplier
    * On-time = shipments received/stored in or before their scheduled week
    * Uses warehouse storage data for metrics
@@ -102,9 +117,8 @@ export class SupplierMetrics {
       if (!arrivedDate || !s.weekNumber) return true; // Assume on-time if missing data
 
       const scheduledDate = this.getScheduledDate(s);
-      const actualDate = new Date(arrivedDate);
 
-      return actualDate <= new Date(scheduledDate);
+      return this.diffCalendarDays(arrivedDate, scheduledDate) <= 0;
     });
 
     // Only calculate percentage based on warehouse/stored shipments
@@ -209,11 +223,7 @@ export class SupplierMetrics {
     if (warehouseWithDates.length === 0) return null;
 
     const leadTimes = warehouseWithDates.map(s => {
-      const scheduledDate = new Date(this.getScheduledDate(s));
-      const actualDate = new Date(this.getActualArrivalDate(s));
-      const diffMs = actualDate - scheduledDate;
-      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      return diffDays;
+      return this.diffCalendarDays(this.getActualArrivalDate(s), this.getScheduledDate(s));
     });
 
     const avgLeadTime = Math.round(
@@ -268,7 +278,7 @@ export class SupplierMetrics {
       .map(s => {
         const scheduledDate = this.getScheduledDate(s);
         const actualDate = this.getActualArrivalDate(s);
-        const diffDays = Math.ceil((new Date(actualDate) - new Date(scheduledDate)) / (1000 * 60 * 60 * 24));
+        const diffDays = this.diffCalendarDays(actualDate, scheduledDate);
         return {
           orderRef: s.orderRef || s.id,
           supplierName: s.supplier,
@@ -276,7 +286,7 @@ export class SupplierMetrics {
           scheduledDate,
           actualDate,
           diffDays,
-          onTime: new Date(actualDate) <= new Date(scheduledDate),
+          onTime: diffDays <= 0,
           usedFallbackBenchmark: !(s.originalSelectedWeekDate || s.originalWeekNumber),
           // True when actualDate came from the manually-entered arrival date
           // rather than falling back to the receiving-workflow timestamp
@@ -413,7 +423,7 @@ export class SupplierMetrics {
     if (!arrivedDate || !shipment.weekNumber) return true;
 
     const scheduledDate = this.getScheduledDate(shipment);
-    return new Date(arrivedDate) <= new Date(scheduledDate);
+    return this.diffCalendarDays(arrivedDate, scheduledDate) <= 0;
   }
 
   /**
