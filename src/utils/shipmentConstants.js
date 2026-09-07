@@ -161,7 +161,7 @@ export const AGENT_TRACKING_URLS = {
   'CMA CGM': 'https://www.cma-cgm.com/ebusiness/tracking',
   'Yang Ming': 'https://www.yangming.com/e-service/Cargo_Tracking/CargoTracking.aspx',
   'HMM': 'https://www.hmm21.com/e-service/general/trackNTrace/TrackNTrace.jsp',
-  'OOCL': 'https://www.oocl.com/eng/ourservices/eservices/cargotracking/Pages/cargotracking.aspx',
+  'OOCL': 'https://pbcontroltower.digital.oocl.com/scct/public/moc/cargoTracking?language=en',
 };
 
 // Returns the selected forwarding agent's own tracking page, or null if none
