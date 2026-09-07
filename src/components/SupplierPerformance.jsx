@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { SupplierMetrics } from '../utils/supplierMetrics';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
@@ -76,11 +77,23 @@ const TrendArrow = ({ trend }) => {
 const LINE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 function SupplierPerformance({ shipments, onUpdateShipment }) {
+  const [searchParams] = useSearchParams();
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [sortCol, setSortCol] = useState('onTimePercent');
   const [sortDir, setSortDir] = useState('desc');
   const [costingData, setCostingData] = useState(null);
   const [editingShipment, setEditingShipment] = useState(null);
+  const [highlightRef, setHighlightRef] = useState(null);
+  const highlightRowRef = useRef(null);
+
+  // Jump straight to a supplier's audit trail when arriving from a global
+  // search hit (e.g. searching an order ref while already on this page).
+  useEffect(() => {
+    const supplierParam = searchParams.get('supplier');
+    const highlightParam = searchParams.get('highlight');
+    if (supplierParam) setSelectedSupplier(supplierParam);
+    if (highlightParam) setHighlightRef(highlightParam);
+  }, [searchParams]);
 
   // Fetch costing estimates (optional — non-blocking)
   useEffect(() => {
@@ -335,6 +348,14 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     return SupplierMetrics.getShipmentAudit(shipments, selectedSupplier);
   }, [shipments, selectedSupplier]);
 
+  useEffect(() => {
+    if (highlightRef && highlightRowRef.current) {
+      highlightRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const timer = setTimeout(() => setHighlightRef(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightRef, shipmentAudit]);
+
   // ---- Render ----
   return (
     <div style={{ padding: '0 8px 32px' }}>
@@ -513,9 +534,13 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                 {shipmentAudit.map((a, idx) => (
                   <tr
                     key={a.orderRef}
+                    ref={a.orderRef === highlightRef ? highlightRowRef : null}
                     style={{
                       borderBottom: '1px solid var(--border)',
-                      backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                      backgroundColor: a.orderRef === highlightRef
+                        ? 'rgba(59, 130, 246, 0.15)'
+                        : idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                      transition: 'background-color 0.5s ease',
                     }}
                   >
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>

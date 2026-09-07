@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { POST_ARRIVAL_STATUSES } from '../types/shipment';
@@ -15,6 +15,7 @@ const targetPathForStatus = (status) => {
 
 function GlobalSearch({ shipments }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -140,6 +141,12 @@ function GlobalSearch({ shipments }) {
     setOpen(false);
     setQuery('');
     const searchValue = shipment.orderRef || query;
+    // Already on Supplier Performance — stay put and drill into that
+    // supplier's audit trail instead of jumping to the shipment's status page.
+    if (location.pathname === '/supplier-performance' && shipment.supplier) {
+      navigate(`/supplier-performance?supplier=${encodeURIComponent(shipment.supplier)}&highlight=${encodeURIComponent(searchValue)}`);
+      return;
+    }
     const targetPath = targetPathForStatus(shipment.latestStatus);
     navigate(`${targetPath}?search=${encodeURIComponent(searchValue)}`);
   };
