@@ -82,13 +82,19 @@ router.post(
     const userId = req.user!.id;
     const username = req.user!.username;
 
+    // Creating a request here IS sending it to the forwarder in practice — the
+    // team logs it the moment it goes out, not as a separate later step — so
+    // default straight to 'sent' (with sent_at captured) rather than 'draft'.
+    // Otherwise sent_at never gets recorded and "Awaiting a Rate" / response
+    // time tracking can never work, since "Add Rate" is reachable from Draft
+    // too and skips the sent transition entirely.
     const result = await pool.query(
       `INSERT INTO quote_requests (
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode, container_type,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
         dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
-        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', CURRENT_TIMESTAMP)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode, container_type || null,
