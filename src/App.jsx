@@ -555,15 +555,6 @@ function App() {
     );
   };
 
-  const LateShipmentsWrapper = () => (
-    <LateShipmentsTracker
-      shipments={shipments}
-      onUpdateShipment={handleUpdateShipment}
-      onRefresh={fetchShipments}
-      loading={loading}
-    />
-  );
-
   const AccessDenied = () => (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <h2>Access Denied</h2>
@@ -1131,7 +1122,9 @@ function App() {
               <Suspense fallback={<PageLoader />}><ErrorBoundary><SupplierPerformance shipments={shipments} onUpdateShipment={handleUpdateShipment} /></ErrorBoundary></Suspense>
             } />
             <Route path="/late-shipments" element={
-              <Suspense fallback={<PageLoader />}><ErrorBoundary><LateShipmentsWrapper /></ErrorBoundary></Suspense>
+              <Suspense fallback={<PageLoader />}><ErrorBoundary>
+                <LateShipmentsTracker shipments={shipments} onUpdateShipment={handleUpdateShipment} onRefresh={fetchShipments} loading={loading} />
+              </ErrorBoundary></Suspense>
             } />
             <Route path="/forwarder-carrier" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><ForwarderCarrierReport shipments={shipments} suppliers={suppliers} /></ErrorBoundary></Suspense>
