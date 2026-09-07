@@ -356,6 +356,16 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             <option value="arrived_pta">Arrived PTA</option>
             <option value="arrived_klm">Arrived KLM</option>
             <option value="arrived_offsite">Arrived OffSite</option>
+            <optgroup label="Post-Arrival">
+              <option value="unloading">Unloading</option>
+              <option value="inspection_pending">Inspection Pending</option>
+              <option value="inspecting">Inspecting</option>
+              <option value="inspection_passed">Inspection Passed</option>
+              <option value="inspection_failed">Inspection Failed</option>
+              <option value="receiving">Receiving</option>
+              <option value="received">Received</option>
+              <option value="stored">Stored</option>
+            </optgroup>
             <optgroup label="Delayed">
               <option value="delayed_port">Delayed - Port</option>
               <option value="delayed_customs">Delayed - Customs</option>

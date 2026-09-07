@@ -95,8 +95,13 @@ export const isAirfreight = (status, forwardingAgent, vesselOrAwb) => {
   if (AIRFREIGHT_STATUSES.includes(status)) return true;
   if (SEAFREIGHT_STATUSES.includes(status)) return false;
   if (forwardingAgent) {
-    if (AIRFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return true;
-    if (SEAFREIGHT_AGENTS.some(a => a.value === forwardingAgent)) return false;
+    const inAirList = AIRFREIGHT_AGENTS.some(a => a.value === forwardingAgent);
+    const inSeaList = SEAFREIGHT_AGENTS.some(a => a.value === forwardingAgent);
+    // An agent listed under both (e.g. Investec, which books either mode)
+    // can't disambiguate on its own — fall through to the vessel/AWB shape
+    // check instead of defaulting to air just because it's checked first.
+    if (inAirList && !inSeaList) return true;
+    if (inSeaList && !inAirList) return false;
   }
   return looksLikeAwbNumber(vesselOrAwb);
 };
