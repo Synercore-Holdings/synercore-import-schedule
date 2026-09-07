@@ -1,4 +1,5 @@
 import { ShipmentStatus, InspectionStatus } from '../types/shipment';
+import { isAirfreight } from './shipmentConstants';
 
 /**
  * Calculate supplier KPI metrics
@@ -86,6 +87,17 @@ export class SupplierMetrics {
   }
 
   /**
+   * Helper: Grace period (in days) before a late arrival counts against
+   * on-time %. Sea freight ETAs carry more inherent slack than air (port
+   * congestion, berth availability, last-mile trucking) — holding it to
+   * the same zero-tolerance bar as air isn't a fair comparison, so sea
+   * shipments get a small buffer; air freight stays at zero.
+   */
+  static lateBufferDays(shipment) {
+    return isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) ? 0 : 2;
+  }
+
+  /**
    * Calculate on-time delivery percentage for a supplier
    * On-time = shipments received/stored in or before their scheduled week
    * Uses warehouse storage data for metrics
@@ -118,7 +130,7 @@ export class SupplierMetrics {
 
       const scheduledDate = this.getScheduledDate(s);
 
-      return this.diffCalendarDays(arrivedDate, scheduledDate) <= 0;
+      return this.diffCalendarDays(arrivedDate, scheduledDate) <= this.lateBufferDays(s);
     });
 
     // Only calculate percentage based on warehouse/stored shipments
@@ -286,7 +298,7 @@ export class SupplierMetrics {
           scheduledDate,
           actualDate,
           diffDays,
-          onTime: diffDays <= 0,
+          onTime: diffDays <= this.lateBufferDays(s),
           usedFallbackBenchmark: !(s.originalSelectedWeekDate || s.originalWeekNumber),
           // True when actualDate came from the manually-entered arrival date
           // rather than falling back to the receiving-workflow timestamp
@@ -423,7 +435,7 @@ export class SupplierMetrics {
     if (!arrivedDate || !shipment.weekNumber) return true;
 
     const scheduledDate = this.getScheduledDate(shipment);
-    return this.diffCalendarDays(arrivedDate, scheduledDate) <= 0;
+    return this.diffCalendarDays(arrivedDate, scheduledDate) <= this.lateBufferDays(shipment);
   }
 
   /**
