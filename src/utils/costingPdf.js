@@ -242,6 +242,27 @@ const buildLastMileRows = (totals) => {
   return cleanZeroCurrencyRows(rows);
 };
 
+// Last mile charges are excluded from Landed Cost/KG (they're costed against
+// whatever partial weight they actually moved, not the full shipment — see
+// calculateAllTotals). Without a pointer, a reader could take that figure as
+// the full delivered cost and miss the extra per-kg cost for the weight a
+// last mile leg actually covered. One line, one leg: name the rate and
+// weight directly. Multiple/unweighted legs: point at the table below
+// instead of guessing which rate applies to what.
+const buildLastMileNote = (totals) => {
+  const lines = (totals._last_mile_charge_lines || []).filter(
+    (l) => (l?.calculated?.subtotal_zar || 0) > 0
+  );
+  if (lines.length === 0) return null;
+
+  if (lines.length === 1 && (lines[0].calculated.weight_kg || 0) > 0) {
+    const { subtotal_zar, weight_kg } = lines[0].calculated;
+    return `+ ${formatCurrency(subtotal_zar / weight_kg)}/kg for ${formatNumber(weight_kg)}kg via last mile (see below)`;
+  }
+
+  return '+ last mile charges apply to part of this shipment (see below)';
+};
+
 const buildWarehouseChargeRows = (estimate, totals) => {
   const weight = totals._warehouse_chargeable_weight_kg || 0;
   const handlingRate = parseFloat(estimate.warehouse_handling_rate_per_kg_zar) || 0;
@@ -1057,10 +1078,12 @@ export function generateEstimatePDF(estimate) {
     ? (incoTerm ? `${incoTerm} Cost/KG` : 'Landed Cost/KG')
     : 'Landed Cost/KG';
 
+  const lastMileNote = buildLastMileNote(totals);
+
   const summaryRows = [
     { label: 'Total Shipping Cost', zar: totals.total_shipping_cost_zar, kind: 'sub' },
     { label: totalLandedLabel,      zar: totals.total_landed_cost_zar,   kind: 'hero' },
-    { label: costPerKgLabel,        zar: totals.all_in_warehouse_cost_per_kg_zar, kind: 'mid' },
+    { label: costPerKgLabel,        zar: totals.all_in_warehouse_cost_per_kg_zar, kind: 'mid', note: lastMileNote },
   ].filter(r => r.zar && parseFloat(r.zar) !== 0);
 
   if (summaryRows.length > 0) {
@@ -1125,6 +1148,7 @@ export function generateEstimatePDF(estimate) {
       bodyH += 11 * LH + 1;   // support label
       bodyH += 15 * LH;       // support ZAR
       if (isExport) bodyH += 1 + 11 * LH; // foreign line
+      if (supportRows.some(r => r.note)) bodyH += 1 + 7 * LH; // last-mile note
     }
     const totalH = padTop + bodyH + padBottom;
 
@@ -1265,6 +1289,19 @@ export function generateEstimatePDF(estimate) {
               supForeignY,
               { baseline: 'top' },
             );
+          });
+          scy += 11 * LH + 1;
+        } else {
+          scy += 15 * LH + 1;
+        }
+
+        if (row.note) {
+          doc.setFontSize(7);
+          doc.setFont(undefined, 'normal');
+          doc.setTextColor(255, 255, 255);
+          const noteY = scy;
+          withOpacity(0.7, () => {
+            doc.text(row.note, colX, noteY, { baseline: 'top', maxWidth: colW - 4 });
           });
         }
       });
