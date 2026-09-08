@@ -4,7 +4,7 @@ import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { useNotification } from '../contexts/NotificationContext';
 import { SupplierMetrics } from '../utils/supplierMetrics';
-import ShipmentFormModal from './ShipmentFormModal';
+import ShipmentFormModal, { extractOrderLevelFields } from './ShipmentFormModal';
 
 function fmtDate(d) {
   return d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
@@ -27,6 +27,13 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
     (shipments || []).forEach(s => { if (s.supplier) names.add(s.supplier.trim()); });
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [shipments]);
+
+  // Other product lines sharing the order currently being corrected — lets
+  // the modal offer to copy the same schedule/logistics fix to all of them.
+  const editingSiblings = useMemo(() => {
+    if (!editingShipment) return [];
+    return (shipments || []).filter(s => s.orderRef === editingShipment.orderRef && s.id !== editingShipment.id);
+  }, [shipments, editingShipment]);
 
   // Every warehouse-confirmed shipment that arrived after its scheduled
   // date, across all suppliers — the same population Supplier Performance's
@@ -92,9 +99,30 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
     }
   };
 
-  const handleSaveShipmentEdit = async (shipmentData) => {
+  const handleSaveShipmentEdit = async (shipmentData, applyToAllLines) => {
     if (!onUpdateShipment || !editingShipment) return;
     const { id, orderRef } = editingShipment;
+
+    if (applyToAllLines && editingSiblings.length > 0) {
+      const patch = extractOrderLevelFields(shipmentData);
+      try {
+        const results = await Promise.all(editingSiblings.map(sib =>
+          authFetch(getApiUrl(`/api/shipments/${sib.id}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          })
+        ));
+        if (results.some(r => !r.ok)) {
+          showError(`Failed to update some of the other ${editingSiblings.length} line item(s) — check them individually.`);
+        }
+      } catch (err) {
+        showError('Failed to apply the change to the other line items. Please try again.');
+      }
+    }
+
+    // Primary line goes through the normal update path last, so its
+    // built-in refresh picks up both this edit and the sibling patches above.
     await onUpdateShipment(id, shipmentData);
     setEditingShipment(null);
     setHighlight({ id, orderRef });
@@ -286,6 +314,7 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
           onSubmit={handleSaveShipmentEdit}
           initialData={editingShipment}
           uniqueSuppliers={uniqueSuppliers}
+          siblingCount={editingSiblings.length}
         />
       )}
     </div>

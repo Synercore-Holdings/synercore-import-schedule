@@ -4,7 +4,8 @@ import { SupplierMetrics } from '../utils/supplierMetrics';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { calculateAllTotals } from '../utils/costingCalculations';
-import ShipmentFormModal from './ShipmentFormModal';
+import ShipmentFormModal, { extractOrderLevelFields } from './ShipmentFormModal';
+import { useNotification } from '../contexts/NotificationContext';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -78,6 +79,7 @@ const LINE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 function SupplierPerformance({ shipments, onUpdateShipment }) {
   const [searchParams] = useSearchParams();
+  const { showError } = useNotification();
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [sortCol, setSortCol] = useState('onTimePercent');
   const [sortDir, setSortDir] = useState('desc');
@@ -335,9 +337,37 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
 
   const sortIcon = (col) => sortCol === col ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
 
+  // Other product lines sharing the order currently being corrected — lets
+  // the modal offer to copy the same schedule/logistics fix to all of them.
+  const editingSiblings = useMemo(() => {
+    if (!editingShipment) return [];
+    return (shipments || []).filter(s => s.orderRef === editingShipment.orderRef && s.id !== editingShipment.id);
+  }, [shipments, editingShipment]);
+
   // ---- Edit a shipment directly from the audit trail ----
-  const handleSaveShipmentEdit = async (shipmentData) => {
+  const handleSaveShipmentEdit = async (shipmentData, applyToAllLines) => {
     if (!onUpdateShipment || !editingShipment) return;
+
+    if (applyToAllLines && editingSiblings.length > 0) {
+      const patch = extractOrderLevelFields(shipmentData);
+      try {
+        const results = await Promise.all(editingSiblings.map(sib =>
+          authFetch(getApiUrl(`/api/shipments/${sib.id}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          })
+        ));
+        if (results.some(r => !r.ok)) {
+          showError(`Failed to update some of the other ${editingSiblings.length} line item(s) — check them individually.`);
+        }
+      } catch (err) {
+        showError('Failed to apply the change to the other line items. Please try again.');
+      }
+    }
+
+    // Primary line goes through the normal update path last, so its
+    // built-in refresh picks up both this edit and the sibling patches above.
     await onUpdateShipment(editingShipment.id, shipmentData);
     setEditingShipment(null);
   };
@@ -611,6 +641,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           onSubmit={handleSaveShipmentEdit}
           initialData={editingShipment}
           uniqueSuppliers={supplierNames}
+          siblingCount={editingSiblings.length}
         />
       )}
     </div>

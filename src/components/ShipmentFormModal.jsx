@@ -28,6 +28,25 @@ const EMPTY_FORM = {
   actualArrivalDate: '',
 };
 
+// Fields that make sense to copy across every product line of the same
+// order at once — logistics/schedule data. Deliberately excludes
+// productName/quantity/cbm/palletQty, which legitimately differ line to
+// line, so "apply to all lines" can't silently overwrite each line's own
+// identity.
+export const ORDER_LEVEL_FIELDS = [
+  'latestStatus', 'weekNumber', 'selectedWeekDate', 'actualArrivalDate',
+  'receivingWarehouse', 'forwardingAgent', 'vesselName', 'bolNumber',
+  'containerNumber', 'shippingLine', 'incoterm',
+];
+
+export function extractOrderLevelFields(shipmentData) {
+  const patch = {};
+  ORDER_LEVEL_FIELDS.forEach(field => {
+    if (field in shipmentData) patch[field] = shipmentData[field];
+  });
+  return patch;
+}
+
 function validateShipmentForm(data) {
   const errors = {};
   if (!data.orderRef?.trim()) errors.orderRef = 'Order reference is required';
@@ -70,12 +89,15 @@ function parseProductLines(initialData) {
  *
  * @param {boolean} isOpen
  * @param {function} onClose
- * @param {function} onSubmit - (shipmentData) => Promise<void>
+ * @param {function} onSubmit - (shipmentData, applyToAllLines) => Promise<void>
  * @param {function|null} onDelete - (id) => void — only shown in edit mode
  * @param {object|null} initialData - null = create mode, object = edit mode
  * @param {string[]} uniqueSuppliers - for supplier dropdown
+ * @param {number} siblingCount - other shipment rows sharing this order's
+ *   orderRef (other product lines on the same multi-line order). When > 0
+ *   in edit mode, offers to copy schedule/logistics fields to all of them.
  */
-function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, uniqueSuppliers }) {
+function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, uniqueSuppliers, siblingCount = 0 }) {
   const isEditMode = !!initialData;
   const { showWarning, confirm: confirmAction } = useNotification();
 
@@ -84,6 +106,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
   const [formErrors, setFormErrors] = useState({});
   const [showCustomSupplier, setShowCustomSupplier] = useState(false);
   const [selectedWeekDate, setSelectedWeekDate] = useState(null);
+  const [applyToAllLines, setApplyToAllLines] = useState(false);
 
   // Form draft — create mode only
   const { clearDraft, confirmClose } = useFormDraft(
@@ -107,6 +130,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
       setShowCustomSupplier(false);
     }
     setFormErrors({});
+    setApplyToAllLines(false);
   }, [isOpen, initialData, isEditMode]);
 
   // --- Handlers ---
@@ -198,7 +222,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
     }
     shipmentData.updatedAt = new Date().toISOString();
 
-    await onSubmit(shipmentData);
+    await onSubmit(shipmentData, applyToAllLines);
 
     // On success — clean up
     if (!isEditMode) {
@@ -209,7 +233,8 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
       setSelectedWeekDate(null);
     }
     setFormErrors({});
-  }, [formData, productLines, selectedWeekDate, isEditMode, onSubmit, clearDraft, showWarning]);
+    setApplyToAllLines(false);
+  }, [formData, productLines, selectedWeekDate, isEditMode, onSubmit, clearDraft, showWarning, applyToAllLines]);
 
   const handleDelete = useCallback(async () => {
     if (!initialData?.id || !onDelete) return;
@@ -745,6 +770,27 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
           />
         </div>
       </div>
+
+      {isEditMode && siblingCount > 0 && (
+        <label style={{
+          display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginTop: '1.25rem',
+          padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border)',
+          background: 'var(--surface-2)', cursor: 'pointer',
+        }}>
+          <input
+            type="checkbox"
+            checked={applyToAllLines}
+            onChange={(e) => setApplyToAllLines(e.target.checked)}
+            style={{ marginTop: '3px' }}
+          />
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-900)' }}>
+            Apply status/schedule/logistics changes to all {siblingCount} other line item{siblingCount !== 1 ? 's' : ''} of order {formData.orderRef}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '2px', fontWeight: 400 }}>
+              Copies status, week/date, actual arrival date, warehouse, forwarding agent, vessel/AWB, BOL, container, shipping line and incoterm to every other line on this order. Product name and quantity are never touched.
+            </div>
+          </span>
+        </label>
+      )}
 
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
