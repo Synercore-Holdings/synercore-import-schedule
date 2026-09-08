@@ -12,7 +12,7 @@ function fmtDate(d) {
 
 function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading }) {
   const navigate = useNavigate();
-  const { showError, showSuccess } = useNotification();
+  const { showError, showSuccess, showCelebrate } = useNotification();
   const [statusFilter, setStatusFilter] = useState('needs-review');
   const [searchTerm, setSearchTerm] = useState('');
   const [savingId, setSavingId] = useState(null);
@@ -65,10 +65,10 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
   useEffect(() => {
     if (!highlight) return;
     if (!lateRows.some(r => r.shipment.id === highlight.id)) {
-      showSuccess(`${highlight.orderRef} is now on-time and no longer appears in Late Shipments.`);
+      showCelebrate(`${highlight.orderRef} is now on-time and no longer appears in Late Shipments.`);
       setHighlight(null);
     }
-  }, [lateRows, highlight, showSuccess]);
+  }, [lateRows, highlight, showCelebrate]);
 
   useEffect(() => {
     if (highlight && highlightRowRef.current) {

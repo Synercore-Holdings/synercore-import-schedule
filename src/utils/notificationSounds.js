@@ -65,6 +65,41 @@ class NotificationSounds {
     }
   }
 
+  // Generate celebrate sound (brighter, playful upward flourish — reserved
+  // for milestones worth extra delight, e.g. a shipment clearing on-time
+  // review, rather than every routine save)
+  async playCelebrate() {
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
+
+    try {
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+
+      // Playful four-note upward run, brighter and quicker than playSuccess
+      oscillator.frequency.setValueAtTime(523.25, this.audioContext.currentTime); // C5
+      oscillator.frequency.setValueAtTime(659.25, this.audioContext.currentTime + 0.08); // E5
+      oscillator.frequency.setValueAtTime(783.99, this.audioContext.currentTime + 0.16); // G5
+      oscillator.frequency.setValueAtTime(1046.5, this.audioContext.currentTime + 0.24); // C6
+
+      oscillator.type = 'triangle';
+
+      gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.04);
+      gainNode.gain.linearRampToValueAtTime(0.12, this.audioContext.currentTime + 0.24);
+      gainNode.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + 0.28);
+      gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.55);
+
+      oscillator.start(this.audioContext.currentTime);
+      oscillator.stop(this.audioContext.currentTime + 0.55);
+    } catch (error) {
+      console.warn('Could not play celebrate sound:', error);
+    }
+  }
+
   // Generate error sound (lower, attention-grabbing)
   async playError() {
     await this.ensureAudioContext();

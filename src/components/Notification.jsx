@@ -63,6 +63,14 @@ const typeConfig = {
       </svg>
     ),
   },
+  // A more celebratory variant of 'success', reserved for milestones worth
+  // a little extra delight (e.g. a shipment clearing on-time review) rather
+  // than every routine save.
+  celebrate: {
+    color: '#f59e0b',
+    title: 'On Time! 🎉',
+    icon: <span style={{ fontSize: '18px', lineHeight: 1 }}>🎉</span>,
+  },
 };
 
 const Notification = ({ type, message, onClose, autoClose = true, duration = 5000 }) => {
@@ -82,6 +90,9 @@ const Notification = ({ type, message, onClose, autoClose = true, duration = 500
           break;
         case 'warning':
           await notificationSounds.playWarning();
+          break;
+        case 'celebrate':
+          await notificationSounds.playCelebrate();
           break;
         case 'dark':
           await notificationSounds.playDark();
@@ -123,13 +134,21 @@ const Notification = ({ type, message, onClose, autoClose = true, duration = 500
   };
 
   return (
+    <>
+      {type === 'celebrate' && (
+        <style>{`@keyframes toast-celebrate-pop {
+          0% { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+          60% { transform: scale(1.15) rotate(8deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }`}</style>
+      )}
     <div style={{
       position: 'relative',
       display: 'flex',
       alignItems: 'flex-start',
       padding: '10px 36px 10px 16px',
       borderRadius: '8px',
-      backgroundColor: '#ffffff',
+      backgroundColor: type === 'celebrate' ? '#fffbeb' : '#ffffff',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
       marginBottom: '8px',
       minHeight: '48px',
@@ -160,6 +179,7 @@ const Notification = ({ type, message, onClose, autoClose = true, duration = 500
         justifyContent: 'center',
         marginRight: '10px',
         marginTop: '1px',
+        animation: type === 'celebrate' ? 'toast-celebrate-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : undefined,
       }}>
         {config.icon}
       </div>
@@ -235,6 +255,7 @@ const Notification = ({ type, message, onClose, autoClose = true, duration = 500
         />
       )}
     </div>
+    </>
   );
 };
 

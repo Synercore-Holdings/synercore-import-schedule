@@ -21,10 +21,11 @@ export function NotificationProvider({ children }) {
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
-  const showSuccess = useCallback((m, o = {}) => addNotification('success', m, o), [addNotification]);
-  const showError   = useCallback((m, o = {}) => addNotification('error', m, o), [addNotification]);
-  const showWarning = useCallback((m, o = {}) => addNotification('warning', m, o), [addNotification]);
-  const showInfo    = useCallback((m, o = {}) => addNotification('info', m, o), [addNotification]);
+  const showSuccess   = useCallback((m, o = {}) => addNotification('success', m, o), [addNotification]);
+  const showError     = useCallback((m, o = {}) => addNotification('error', m, o), [addNotification]);
+  const showWarning   = useCallback((m, o = {}) => addNotification('warning', m, o), [addNotification]);
+  const showInfo      = useCallback((m, o = {}) => addNotification('info', m, o), [addNotification]);
+  const showCelebrate = useCallback((m, o = {}) => addNotification('celebrate', m, o), [addNotification]);
 
   const confirm = useCallback(({
     title = 'Confirm Action',
@@ -69,6 +70,7 @@ export function NotificationProvider({ children }) {
     showError,
     showWarning,
     showInfo,
+    showCelebrate,
     confirm,
     blockNavigation,
     isNavigationBlocked,
@@ -104,6 +106,7 @@ export function NotificationProvider({ children }) {
  * @property {(message: string, options?: Object) => void} showError
  * @property {(message: string, options?: Object) => void} showWarning
  * @property {(message: string, options?: Object) => void} showInfo
+ * @property {(message: string, options?: Object) => void} showCelebrate
  * @property {(opts: {title?: string, message?: string, confirmText?: string, cancelText?: string, type?: 'default'|'warning'|'danger'|'success'}) => Promise<boolean>} confirm
  */
 /** @returns {NotificationAPI} */
