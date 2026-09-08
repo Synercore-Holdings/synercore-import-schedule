@@ -12,7 +12,7 @@ function fmtDate(d) {
 
 function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading }) {
   const navigate = useNavigate();
-  const { showError, showSuccess, showCelebrate } = useNotification();
+  const { showError, showCelebrate } = useNotification();
   const [statusFilter, setStatusFilter] = useState('needs-review');
   const [searchTerm, setSearchTerm] = useState('');
   const [savingId, setSavingId] = useState(null);
