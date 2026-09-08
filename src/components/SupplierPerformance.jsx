@@ -531,13 +531,16 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                 {shipmentAudit.length === 0 && (
                   <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No warehouse-confirmed shipments yet</td></tr>
                 )}
-                {shipmentAudit.map((a, idx) => (
+                {(() => { let highlightMatched = false; return shipmentAudit.map((a, idx) => {
+                  const isHighlighted = a.orderRef === highlightRef && !highlightMatched;
+                  if (isHighlighted) highlightMatched = true;
+                  return (
                   <tr
-                    key={a.orderRef}
-                    ref={a.orderRef === highlightRef ? highlightRowRef : null}
+                    key={a.shipment.id}
+                    ref={isHighlighted ? highlightRowRef : null}
                     style={{
                       borderBottom: '1px solid var(--border)',
-                      backgroundColor: a.orderRef === highlightRef
+                      backgroundColor: isHighlighted
                         ? 'rgba(59, 130, 246, 0.15)'
                         : idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
                       transition: 'background-color 0.5s ease',
@@ -593,7 +596,8 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                }); })()}
               </tbody>
             </table>
           </div>

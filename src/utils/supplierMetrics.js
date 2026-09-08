@@ -15,15 +15,28 @@ export class SupplierMetrics {
    * shipments instead of 1.
    */
   static getSupplierShipments(shipments, supplierName) {
+    return this.dedupeByOrder(this.getSupplierShipmentLines(shipments, supplierName));
+  }
+
+  /**
+   * Helper: Filter shipments by supplier name (case-insensitive) WITHOUT
+   * deduping by order. A single purchase order can arrive in genuinely
+   * separate batches across different weeks (e.g. one PO with 13 product
+   * lines split across 4 scheduled weeks) — collapsing it to one row for
+   * on-time/lead-time purposes would judge the whole order by whichever
+   * line happened to be picked, hiding batches that were actually late (or
+   * making an on-time order look late because of one delayed line). Use
+   * this for anything measuring delivery timing; use the deduped version
+   * only for counting distinct orders.
+   */
+  static getSupplierShipmentLines(shipments, supplierName) {
     if (!supplierName) return [];
 
     const normalizedName = supplierName.toLowerCase().trim();
-    const matched = shipments.filter(s => {
+    return shipments.filter(s => {
       const shipmentSupplier = s.supplier?.toLowerCase().trim();
       return shipmentSupplier === normalizedName;
     });
-
-    return this.dedupeByOrder(matched);
   }
 
   /**
@@ -107,7 +120,7 @@ export class SupplierMetrics {
    * Uses warehouse storage data for metrics
    */
   static calculateOnTimeDelivery(shipments, supplierName) {
-    const supplierShipments = this.getSupplierShipments(shipments, supplierName);
+    const supplierShipments = this.getSupplierShipmentLines(shipments, supplierName);
 
     if (supplierShipments.length === 0) return 0;
 
@@ -220,7 +233,7 @@ export class SupplierMetrics {
    * Only counts shipments that made it to warehouse (stored/received/inspection_passed)
    */
   static calculateAverageLeadTime(shipments, supplierName) {
-    const supplierShipments = this.getSupplierShipments(shipments, supplierName);
+    const supplierShipments = this.getSupplierShipmentLines(shipments, supplierName);
 
     // Filter to warehouse shipments with receiving dates and week numbers
     const warehouseWithDates = supplierShipments.filter(s => {
@@ -266,7 +279,7 @@ export class SupplierMetrics {
    * with a receivingDate, matching the population used by the KPIs above.
    */
   static getShipmentAudit(shipments, supplierName) {
-    return this.buildShipmentAudit(this.getSupplierShipments(shipments, supplierName));
+    return this.buildShipmentAudit(this.getSupplierShipmentLines(shipments, supplierName));
   }
 
   /**
@@ -275,7 +288,7 @@ export class SupplierMetrics {
    * instead of per-supplier.
    */
   static getAllShipmentAudit(shipments) {
-    return this.buildShipmentAudit(this.dedupeByOrder(shipments || []));
+    return this.buildShipmentAudit(shipments || []);
   }
 
   static buildShipmentAudit(shipmentList) {
@@ -325,7 +338,7 @@ export class SupplierMetrics {
     const now = new Date();
     const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const supplierShipments = this.getSupplierShipments(shipments, supplierName);
+    const supplierShipments = this.getSupplierShipmentLines(shipments, supplierName);
 
     // Group warehouse shipments by week
     const weeklyData = {};

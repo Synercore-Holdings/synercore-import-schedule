@@ -17,7 +17,9 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
   const [searchTerm, setSearchTerm] = useState('');
   const [savingId, setSavingId] = useState(null);
   const [editingShipment, setEditingShipment] = useState(null);
-  const [highlightRef, setHighlightRef] = useState(null);
+  // Tracks the specific line just corrected — an order can have several
+  // late lines, so matching by id (not orderRef) points at the exact one.
+  const [highlight, setHighlight] = useState(null); // { id, orderRef }
   const highlightRowRef = useRef(null);
 
   const uniqueSuppliers = useMemo(() => {
@@ -54,20 +56,20 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
   // making the user hunt for it again. If the correction made it on-time,
   // it drops out of the late list entirely, so say so instead.
   useEffect(() => {
-    if (!highlightRef) return;
-    if (!lateRows.some(r => r.orderRef === highlightRef)) {
-      showSuccess(`${highlightRef} is now on-time and no longer appears in Late Shipments.`);
-      setHighlightRef(null);
+    if (!highlight) return;
+    if (!lateRows.some(r => r.shipment.id === highlight.id)) {
+      showSuccess(`${highlight.orderRef} is now on-time and no longer appears in Late Shipments.`);
+      setHighlight(null);
     }
-  }, [lateRows, highlightRef, showSuccess]);
+  }, [lateRows, highlight, showSuccess]);
 
   useEffect(() => {
-    if (highlightRef && highlightRowRef.current) {
+    if (highlight && highlightRowRef.current) {
       highlightRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const timer = setTimeout(() => setHighlightRef(null), 3000);
+      const timer = setTimeout(() => setHighlight(null), 3000);
       return () => clearTimeout(timer);
     }
-  }, [highlightRef, rows]);
+  }, [highlight, rows]);
 
   const updateLateReview = async (row, lateConfirmed) => {
     setSavingId(row.shipment.id);
@@ -92,10 +94,10 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
 
   const handleSaveShipmentEdit = async (shipmentData) => {
     if (!onUpdateShipment || !editingShipment) return;
-    const orderRef = editingShipment.orderRef;
-    await onUpdateShipment(editingShipment.id, shipmentData);
+    const { id, orderRef } = editingShipment;
+    await onUpdateShipment(id, shipmentData);
     setEditingShipment(null);
-    setHighlightRef(orderRef);
+    setHighlight({ id, orderRef });
   };
 
   const goToSupplierPerformance = (row) => {
@@ -205,11 +207,11 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
             <tbody>
               {rows.map((row) => (
                 <tr
-                  key={row.orderRef}
-                  ref={row.orderRef === highlightRef ? highlightRowRef : null}
+                  key={row.shipment.id}
+                  ref={row.shipment.id === highlight?.id ? highlightRowRef : null}
                   style={{
                     borderBottom: '1px solid #eee',
-                    backgroundColor: row.orderRef === highlightRef ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                    backgroundColor: row.shipment.id === highlight?.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
                     transition: 'background-color 0.5s ease',
                   }}
                 >
