@@ -71,7 +71,13 @@ export abstract class BaseRepository<T extends { id: string }> {
       }
     }
 
-    // Apply sorting (validated against column whitelist)
+    // Apply sorting (validated against column whitelist). Always break ties
+    // on id so results are deterministic across requests — without this,
+    // rows with an identical value on the sort field (e.g. a batch import
+    // where every row shares the same created_at) can come back in a
+    // different order each time, which silently changes which row a
+    // client-side "first one wins" dedup (LIMIT/OFFSET pagination, or the
+    // Supplier Performance / Late Shipments per-order dedup) ends up using.
     if (options?.sort) {
       const sortField = options.sort.field;
       const sortDirection = options.sort.direction?.toUpperCase();
@@ -81,7 +87,9 @@ export abstract class BaseRepository<T extends { id: string }> {
       if (sortDirection !== 'ASC' && sortDirection !== 'DESC') {
         throw new Error(`Invalid sort direction: ${sortDirection}`);
       }
-      sql += ` ORDER BY ${sortField} ${sortDirection}`;
+      sql += ` ORDER BY ${sortField} ${sortDirection}, id ASC`;
+    } else if (options?.pagination) {
+      sql += ` ORDER BY id ASC`;
     }
 
     // Apply pagination (parameterized)
