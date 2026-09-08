@@ -76,12 +76,16 @@ export class SupplierMetrics {
    * time-of-day. scheduledDate is often midnight while actualArrivalDate/
    * receivingDate carries the time the action was actually performed —
    * comparing raw timestamps would flag a same-day arrival as "late"
-   * whenever it happened after midnight.
+   * whenever it happened after midnight. Uses UTC date components (not the
+   * viewer's local timezone) so a pair of timestamps a couple of hours
+   * apart — e.g. 20:00 and 22:00 UTC — can't get bumped onto different
+   * calendar days just because the browser viewing it happens to sit in a
+   * timezone (like SAST, UTC+2) where 22:00 UTC rolls past local midnight.
    */
   static diffCalendarDays(laterDate, earlierDate) {
     const toDateOnly = (d) => {
       const date = new Date(d);
-      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
     };
     return Math.round((toDateOnly(laterDate) - toDateOnly(earlierDate)) / (1000 * 60 * 60 * 24));
   }
