@@ -6,6 +6,18 @@ import { isAirfreight } from './shipmentConstants';
  * Returns on-time delivery %, inspection pass rate %, avg lead time, and supplier grade
  */
 
+// Suppliers excluded from on-time/lead-time tracking by request — SACCO's
+// per-line scheduled/arrival dates are too unreliable (staggered multi-week
+// orders, receiving-date lag) to judge fairly, and the business considers
+// them a reliably on-time supplier regardless. Matches the same exclusion
+// already applied to SACCO for the Pretoria warehouse cost cards. This only
+// hides them from on-time/lead-time figures — shipment counts and
+// inspection pass rate are untouched, and no underlying dates are changed.
+const EXCLUDED_ONTIME_SUPPLIERS = ['SACCO'];
+
+const isExcludedFromOnTimeTracking = (shipment) =>
+  EXCLUDED_ONTIME_SUPPLIERS.some(name => (shipment.supplier || '').toUpperCase().includes(name));
+
 export class SupplierMetrics {
   /**
    * Helper: Filter shipments by supplier name (case-insensitive), then
@@ -138,6 +150,8 @@ export class SupplierMetrics {
       ].includes(s.latestStatus);
 
       if (!isInWarehouse) return false;
+
+      if (isExcludedFromOnTimeTracking(s)) return true;
 
       // Check if arrived on time
       // Prefer the manually-entered actual arrival date; fall back to
@@ -315,7 +329,7 @@ export class SupplierMetrics {
           scheduledDate,
           actualDate,
           diffDays,
-          onTime: diffDays <= this.lateBufferDays(s),
+          onTime: isExcludedFromOnTimeTracking(s) || diffDays <= this.lateBufferDays(s),
           usedFallbackBenchmark: !(s.originalSelectedWeekDate || s.originalWeekNumber),
           // True when actualDate came from the manually-entered arrival date
           // rather than falling back to the receiving-workflow timestamp
@@ -447,6 +461,7 @@ export class SupplierMetrics {
     ].includes(shipment.latestStatus);
 
     if (!isInWarehouse) return false;
+    if (isExcludedFromOnTimeTracking(shipment)) return true;
 
     const arrivedDate = this.getActualArrivalDate(shipment) || shipment.updatedAt;
     if (!arrivedDate || !shipment.weekNumber) return true;
