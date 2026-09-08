@@ -553,10 +553,17 @@ export const calculateAllTotals = (data) => {
   // Total in warehouse cost (shipping + customs overhead) - VAT excluded
   const totalInWarehouseCostZar = shippingToAllocateZar + customsSubtotalZar;
 
-  // Total landed cost (product value + duties + allocated shipping) - true all-in cost
-  const totalLandedCostZar = customsItemsTotals.totalCustomsValue + customsItemsTotals.totalDuties + customsItemsTotals.totalSchedule1Duty + shippingToAllocateZar;
+  // Total landed cost (product value + duties + allocated shipping) - true all-in cost.
+  // Last mile charges are excluded here: they're only ever entered against the
+  // specific (often partial) weight they actually moved — e.g. one outlying
+  // delivery leg covering 5,000kg of a 25,000kg shipment — so folding them into
+  // a blended landed cost divided by the FULL shipment weight would dilute a
+  // charge that never applied to most of that weight. They're still counted in
+  // total_shipping_cost_zar and reported at their own per-kg rate in the Last
+  // Mile Charges table.
+  const totalLandedCostZar = customsItemsTotals.totalCustomsValue + customsItemsTotals.totalDuties + customsItemsTotals.totalSchedule1Duty + shippingToAllocateZar - lastMileChargesSubtotalZar;
 
-  // Cost per KG (based on total landed cost including product value)
+  // Cost per KG (based on total landed cost including product value, excluding last mile)
   const allInWarehouseCostPerKgZar = totalGrossWeightKg > 0
     ? totalLandedCostZar / totalGrossWeightKg
     : 0;

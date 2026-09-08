@@ -478,6 +478,24 @@ describe('calculateAllTotals', () => {
     expect(fobResult.total_shipping_cost_zar).toBe(37500);
     expect(fobResult.total_landed_cost_zar).toBe(235500);
   });
+
+  it('keeps last mile charges out of total_landed_cost_zar even though total_shipping_cost_zar carries them', () => {
+    // Last mile charges are entered against whatever (often partial) weight
+    // they actually moved, so folding them into the landed cost and dividing
+    // by the FULL shipment weight would dilute a charge that never applied
+    // to most of it.
+    const withoutLastMile = calculateAllTotals(sampleData);
+    const withLastMile = calculateAllTotals({
+      ...sampleData,
+      last_mile_service_type: 'manual',
+      last_mile_manual_charge_zar: '1000',
+      last_mile_weight_kg: '500',
+    });
+
+    expect(withLastMile.last_mile_charges_subtotal_zar).toBe(1000);
+    expect(withLastMile.total_shipping_cost_zar).toBe(withoutLastMile.total_shipping_cost_zar + 1000);
+    expect(withLastMile.total_landed_cost_zar).toBe(withoutLastMile.total_landed_cost_zar);
+  });
 });
 
 // ── formatCurrency ──
