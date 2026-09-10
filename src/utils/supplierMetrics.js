@@ -290,6 +290,50 @@ export class SupplierMetrics {
   }
 
   /**
+   * Calculate average freight lead time in days for warehouse shipments
+   * Freight lead time = actual arrival date - shipment created date (the
+   * closest proxy we have to a ship/departure date, since no such field is
+   * stored). Distinct from calculateAverageLeadTime, which measures
+   * schedule variance (actual vs scheduled week) rather than a duration.
+   */
+  static calculateAverageFreightLeadTime(shipments, supplierName) {
+    const supplierShipments = this.getSupplierShipmentLines(shipments, supplierName);
+
+    const warehouseWithDates = supplierShipments.filter(s => {
+      const isInWarehouse = [
+        ShipmentStatus.STORED,
+        ShipmentStatus.RECEIVED,
+        ShipmentStatus.INSPECTION_PASSED,
+        'stored',
+        'received',
+        'inspection_passed'
+      ].includes(s.latestStatus);
+
+      return isInWarehouse && this.getActualArrivalDate(s) && s.createdAt;
+    });
+
+    if (warehouseWithDates.length === 0) return null;
+
+    const leadTimes = warehouseWithDates.map(s =>
+      this.diffCalendarDays(this.getActualArrivalDate(s), s.createdAt)
+    );
+
+    const avgFreightLeadTime = Math.round(
+      leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length
+    );
+
+    // eslint-disable-next-line no-console
+    console.log(`[SupplierMetrics] Freight Lead Time (Warehouse): ${supplierName}`, {
+      totalShipments: supplierShipments.length,
+      warehouseShipments: warehouseWithDates.length,
+      avgDays: avgFreightLeadTime,
+      sample: leadTimes.slice(0, 3)
+    });
+
+    return avgFreightLeadTime;
+  }
+
+  /**
    * Build a per-shipment audit trail for a supplier: original scheduled
    * date vs actual receiving date, and whether it graded on-time. Lets
    * users verify the OTD/lead-time numbers against individual shipments
@@ -515,6 +559,7 @@ export class SupplierMetrics {
     const onTimePercent = this.calculateOnTimeDelivery(shipments, supplierName);
     const passRatePercent = this.calculateInspectionPassRate(shipments, supplierName);
     const avgLeadTime = this.calculateAverageLeadTime(shipments, supplierName);
+    const avgFreightLeadTime = this.calculateAverageFreightLeadTime(shipments, supplierName);
     const totalShipments = this.getTotalShipments(shipments, supplierName);
     const trend = this.calculateMetricTrend(shipments, supplierName, 'onTime');
     const grade = this.getSupplierGrade(onTimePercent, passRatePercent);
@@ -524,6 +569,7 @@ export class SupplierMetrics {
       onTimePercent,
       passRatePercent,
       avgLeadTime,
+      avgFreightLeadTime,
       totalShipments,
       trend,
       grade

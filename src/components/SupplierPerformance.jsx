@@ -137,7 +137,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
   // ---- Aggregated KPIs ----
   const kpis = useMemo(() => {
     const active = filteredMetrics.filter(m => m.totalShipments > 0);
-    if (active.length === 0) return { avgOnTime: 0, avgPassRate: 0, avgLeadTime: null, grades: { A: 0, B: 0, C: 0 } };
+    if (active.length === 0) return { avgOnTime: 0, avgPassRate: 0, avgLeadTime: null, avgFreightLeadTime: null, grades: { A: 0, B: 0, C: 0 } };
 
     const avgOnTime = Math.round(active.reduce((s, m) => s + m.onTimePercent, 0) / active.length);
     const withPassRate = active.filter(m => m.passRatePercent !== null);
@@ -148,11 +148,15 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     const avgLeadTime = withLead.length > 0
       ? Math.round(withLead.reduce((s, m) => s + m.avgLeadTime, 0) / withLead.length)
       : null;
+    const withFreightLead = active.filter(m => m.avgFreightLeadTime !== null);
+    const avgFreightLeadTime = withFreightLead.length > 0
+      ? Math.round(withFreightLead.reduce((s, m) => s + m.avgFreightLeadTime, 0) / withFreightLead.length)
+      : null;
 
     const grades = { A: 0, B: 0, C: 0 };
     active.forEach(m => { if (m.grade?.grade) grades[m.grade.grade] = (grades[m.grade.grade] || 0) + 1; });
 
-    return { avgOnTime, avgPassRate, avgLeadTime, grades };
+    return { avgOnTime, avgPassRate, avgLeadTime, avgFreightLeadTime, grades };
   }, [filteredMetrics]);
 
   // ---- On-time color helper ----
@@ -438,6 +442,13 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           subtext="Scheduled vs actual arrival"
         />
         <KpiCard
+          label="Avg Freight Lead Time"
+          value={kpis.avgFreightLeadTime !== null ? kpis.avgFreightLeadTime : '--'}
+          suffix={kpis.avgFreightLeadTime !== null ? ' days' : ''}
+          color="var(--text-900)"
+          subtext="Shipment date to actual arrival"
+        />
+        <KpiCard
           label="Grade Distribution"
           value={`${kpis.grades.A}A / ${kpis.grades.B}B / ${kpis.grades.C}C`}
           suffix=""
@@ -485,6 +496,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                   { key: 'onTimePercent', label: 'On-Time %' },
                   { key: 'passRatePercent', label: 'Pass Rate %' },
                   { key: 'avgLeadTime', label: 'Avg Lead Time' },
+                  { key: 'avgFreightLeadTime', label: 'Avg Freight Lead Time' },
                   { key: 'grade', label: 'Grade' },
                   { key: 'trend', label: 'Trend' },
                 ].map(col => (
@@ -505,7 +517,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
             </thead>
             <tbody>
               {sortedTableData.length === 0 && (
-                <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No supplier data available</td></tr>
+                <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No supplier data available</td></tr>
               )}
               {sortedTableData.map((m, idx) => (
                 <tr
@@ -525,6 +537,9 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                   </td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
                     {m.avgLeadTime !== null ? `${m.avgLeadTime} days` : '--'}
+                  </td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                    {m.avgFreightLeadTime !== null ? `${m.avgFreightLeadTime} days` : '--'}
                   </td>
                   <td style={{ padding: '10px 12px' }}><GradeBadge grade={m.grade?.grade} /></td>
                   <td style={{ padding: '10px 12px' }}><TrendArrow trend={m.trend} /></td>
