@@ -160,7 +160,9 @@ const filterZeroRows = (rows) => cleanZeroCurrencyRows(rows.filter(row => {
   if (value === '-' || value === '' || value === null || value === undefined) return false;
   if (typeof value === 'string') {
     if (value.trim() === '-') return false;
-    const numericValue = parseFloat(value.replace(/[^0-9.-]/g, ''));
+    const stripped = value.replace(/[^0-9.-]/g, '');
+    if (stripped === '' || stripped === '-') return true; // non-numeric text (e.g. a currency code) — not a zero amount
+    const numericValue = parseFloat(stripped);
     return !isNaN(numericValue) && numericValue !== 0;
   }
   return value !== 0;
