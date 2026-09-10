@@ -641,6 +641,7 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
           p.name || '-',
           formatNumber(bd.weight, 0),
           `${(bd.weightRatio * 100).toFixed(1)}%`,
+          `${formatNumber(parseFloat(p.rate_per_kg) || 0, 2)} ${bd.currency}`,
           `${formatNumber(bd.invoiceValue, 2)} ${bd.currency}`,
           formatCurrency(bd.customsValue),
           formatCurrency(bd.importDuty),
@@ -666,6 +667,7 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
         formatNumber(sumWeight, 0),
         '100.0%',
         '',
+        '',
         formatCurrency(sumCustomsValue),
         formatCurrency(sumImportDuty),
         formatCurrency(sumSchedule1Duty),
@@ -686,8 +688,8 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
 
         const landedHeader = isExport ? `Total\nLanded\n(${presCur})` : 'Total\nLanded';
         const costPerKgHeader = isExport ? `Cost/kg\n(${presCur})` : 'Cost/kg';
-        const allocHead = [['Product', 'Weight kg', 'Wt %', 'Invoice Value', 'Customs Val\n(ZAR)', 'Import Duty', 'Sch1 Duty', 'Cost/kg\n(ZAR)', shippingLabel, landedHeader, costPerKgHeader]];
-        const visibleAllocation = removeEmptyColumns(allocHead, allocationRows, [0, 1, 2, 9, 10]);
+        const allocHead = [['Product', 'Weight kg', 'Wt %', 'Rate/kg', 'Invoice Value', 'Customs Val\n(ZAR)', 'Import Duty', 'Sch1 Duty', 'Cost/kg\n(ZAR)', shippingLabel, landedHeader, costPerKgHeader]];
+        const visibleAllocation = removeEmptyColumns(allocHead, allocationRows, [0, 1, 2, 3, 10, 11]);
         const pageWidth = doc.internal.pageSize.getWidth();
         const dynamicOverrides = {};
         visibleAllocation.keepIndexes.forEach((originalIndex, newIndex) => {
@@ -695,7 +697,7 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
           dynamicOverrides[newIndex] = {
             halign: originalIndex === 0 ? 'left' : 'right',
             overflow: originalIndex === 0 ? 'linebreak' : undefined,
-            minWidth: originalIndex === 0 ? 24 : originalIndex === 1 ? 14 : originalIndex === 5 ? 17 : 10,
+            minWidth: originalIndex === 0 ? 24 : originalIndex === 1 ? 14 : originalIndex === 6 ? 17 : 10,
             fontStyle: /Total|Cost\/kg/.test(header) ? 'bold' : undefined,
           };
         });
