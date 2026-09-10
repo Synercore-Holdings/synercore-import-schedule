@@ -510,6 +510,12 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
   const pageWidth = doc.internal.pageSize.width;
   const { currency: presCur, toPresentation } = getPresentation(estimate);
 
+  // Currency products were costed in (rate/kg entered per product) — surfaced
+  // separately from the per-product Invoice Value column since that column
+  // silently disappears from the table whenever every product's invoice
+  // value happens to be zero, which shouldn't also hide which currency was used.
+  const costingCurrencies = [...new Set(products.map(p => p.currency || 'USD'))].join(' / ');
+
   // === FULL-WIDTH COLOR BAR ===
   const barColor = isAir ? THEME.panelDarkAir : THEME.panelDark;
   doc.setFillColor(barColor[0], barColor[1], barColor[2]);
@@ -575,6 +581,7 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
         ['Airline', estimate.airline_name || '-'],
         ['Flight Number', estimate.flight_number || '-'],
         ['INCO Terms', estimate.inco_terms || '-'],
+        ['Costing Currency', costingCurrencies || '-'],
         ['Transit Time', estimate.transit_time_days ? `${estimate.transit_time_days} days` : '-'],
         ['Actual Weight', `${formatNumber(estimate.actual_weight_kg || 0)} kg`],
         ['Chargeable Weight', `${formatNumber(totals.chargeable_weight_kg || 0)} kg`],
@@ -588,6 +595,7 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
         ['Container Type', estimate.container_type || '-'],
         ['Shipping Line', estimate.shipping_line || '-'],
         ['INCO Terms', estimate.inco_terms || '-'],
+        ['Costing Currency', costingCurrencies || '-'],
         ['Transit Time', estimate.transit_time_days ? `${estimate.transit_time_days} days` : '-'],
         ['Total Weight', `${formatNumber(productTotals.totalWeight || estimate.total_gross_weight_kg)} kg`],
       ]);
