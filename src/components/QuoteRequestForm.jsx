@@ -2066,6 +2066,53 @@ function QuoteRequestForm({ onClose }) {
                   )}
                 </div>
 
+                {(() => {
+                  const responseTimeForwarders = compareDashboard.forwarderWinRates
+                    .filter(f => f.avgResponseDays !== null)
+                    .sort((a, b) => b.avgResponseDays - a.avgResponseDays);
+                  return responseTimeForwarders.length > 0 && (
+                    <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-900)' }}>Avg Response Time by Forwarder</h4>
+                        <span style={{ fontSize: 11, color: 'var(--text-500)' }}>
+                          Business days from Quote Date to rate captured, slowest first{dashboardMonthFilter ? ` — ${monthLabel(dashboardMonthFilter)}` : ' — all time'}
+                        </span>
+                      </div>
+                      <div style={{ height: Math.max(160, responseTimeForwarders.length * 32) }}>
+                        <BarChart
+                          data={{
+                            labels: responseTimeForwarders.map(f => f.name),
+                            datasets: [{
+                              data: responseTimeForwarders.map(f => f.avgResponseDays),
+                              backgroundColor: responseTimeForwarders.map(f => f.avgResponseDays >= 7 ? '#dc2626' : f.avgResponseDays >= 3 ? '#f59e0b' : '#22c55e'),
+                              borderRadius: 4,
+                            }],
+                          }}
+                          options={{
+                            indexAxis: 'y',
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false },
+                              tooltip: {
+                                callbacks: {
+                                  label: (ctx) => {
+                                    const f = responseTimeForwarders[ctx.dataIndex];
+                                    return `${f.avgResponseDays.toFixed(1)}d avg (${f.quotes} quote${f.quotes !== 1 ? 's' : ''})`;
+                                  },
+                                },
+                              },
+                            },
+                            scales: {
+                              x: { beginAtZero: true, ticks: { callback: (v) => `${v}d` }, grid: { color: 'rgba(0,0,0,0.06)' } },
+                              y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                            },
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {selectedTrend && (
                   <div className="dash-panel" style={{ marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: '1rem', flexWrap: 'wrap' }}>
