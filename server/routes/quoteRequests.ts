@@ -154,6 +154,7 @@ router.put(
     body('forwarder_name').optional().trim().notEmpty(),
     body('forwarder_email').optional({ checkFalsy: true }).trim().isEmail(),
     body('quote_date').optional({ checkFalsy: true }).isISO8601().withMessage('Quote date must be a valid date'),
+    body('rate_received_date').optional({ checkFalsy: true }).isISO8601().withMessage('Rate received date must be a valid date'),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
     body('products').optional({ nullable: true }).isArray().withMessage('Products must be an array'),
@@ -215,6 +216,18 @@ router.put(
       sentAtHandled = true;
     }
 
+    // rate_received_date lets a user correct quoted_at directly — same idea
+    // as quote_date/sent_at above, but it must also override the COALESCE
+    // below (which otherwise only ever sets quoted_at once, on the first
+    // quoted transition), since a rate correction via Edit Rate is exactly
+    // when someone would want to fix a wrong date after the fact.
+    let quotedAtHandled = false;
+    if (req.body.rate_received_date !== undefined && req.body.rate_received_date !== '') {
+      params.push(req.body.rate_received_date);
+      updates.push(`quoted_at = $${params.length}`);
+      quotedAtHandled = true;
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
@@ -226,16 +239,17 @@ router.put(
     // since that quote no longer stands.
     if (req.body.status === 'sent') {
       if (!sentAtHandled) updates.push('sent_at = CURRENT_TIMESTAMP');
-      updates.push('quoted_at = NULL');
+      if (!quotedAtHandled) updates.push('quoted_at = NULL');
     } else if (req.body.status === 'quoted') {
       // COALESCE so a later rate correction (Edit Rate) doesn't reset the
-      // original "time to first quote" — only the first quoted transition counts.
-      updates.push('quoted_at = COALESCE(quoted_at, CURRENT_TIMESTAMP)');
+      // original "time to first quote" — only the first quoted transition counts,
+      // unless rate_received_date explicitly overrides it above.
+      if (!quotedAtHandled) updates.push('quoted_at = COALESCE(quoted_at, CURRENT_TIMESTAMP)');
     } else if (req.body.status === 'draft') {
       // A rate withdrawn back to Draft means it was never actually sent —
       // clear both timestamps rather than leaving a stale quoted_at behind.
       if (!sentAtHandled) updates.push('sent_at = NULL');
-      updates.push('quoted_at = NULL');
+      if (!quotedAtHandled) updates.push('quoted_at = NULL');
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');

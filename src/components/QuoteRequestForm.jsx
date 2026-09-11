@@ -36,7 +36,7 @@ const STATUS_LABELS = {
 };
 
 const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
-const EMPTY_RATE_FORM = { quoted_rate: '', quoted_rate_non_stackable: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '' };
+const EMPTY_RATE_FORM = { quoted_rate: '', quoted_rate_non_stackable: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '', rate_received_date: '' };
 
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 
@@ -895,6 +895,7 @@ function QuoteRequestForm({ onClose }) {
       quote_reference: req.quote_reference || '',
       quoted_transit_days: req.quoted_transit_days ?? '',
       quote_notes: req.quote_notes || '',
+      rate_received_date: toDateInput(req.quoted_at),
     });
   };
 
@@ -1791,7 +1792,21 @@ function QuoteRequestForm({ onClose }) {
                     onChange={e => setRateForm(prev => ({ ...prev, quoted_transit_days: e.target.value }))}
                   />
                 </div>
-                <div />
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Rate Received Date</label>
+                  <input
+                    type="date" style={inputStyle}
+                    value={rateForm.rate_received_date}
+                    onChange={e => setRateForm(prev => ({ ...prev, rate_received_date: e.target.value }))}
+                  />
+                </div>
+
+                <div style={{ ...fieldWrap, gridColumn: '1 / -1', marginTop: '-0.5rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>
+                    When the forwarder actually sent this rate. Leave blank to use today —
+                    back-date it if you're logging a rate that came in earlier, so Response Time stays accurate.
+                  </div>
+                </div>
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Notes</label>
