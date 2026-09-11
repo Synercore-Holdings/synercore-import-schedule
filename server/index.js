@@ -544,6 +544,17 @@ async function start() {
       logWarn('Actual arrival date column migration warning', { error: error.message });
     }
 
+    // Add date_shipped to shipments: manually entered by a user to record
+    // when the consignment actually left origin. Used to compute Avg
+    // Freight Lead Time on Supplier Performance instead of falling back to
+    // createdAt (just when the record was logged, not when it shipped).
+    try {
+      await getPool().query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS date_shipped TIMESTAMP`);
+      logger.info('Date shipped column ready');
+    } catch (error) {
+      logWarn('Date shipped column migration warning', { error: error.message });
+    }
+
     // Add warehouse_since to shipments: the date this record started sitting
     // at its *current* receiving_warehouse. Distinct from receiving_date
     // (the original goods-receipt date, left untouched so supplier lead-time/
