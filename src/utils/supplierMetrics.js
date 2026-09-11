@@ -97,6 +97,17 @@ export class SupplierMetrics {
   }
 
   /**
+   * Helper: Resolve the date a shipment actually left origin, for the
+   * freight lead time calculation below. Prefers the user-entered
+   * dateShipped field; falls back to createdAt (when the record was
+   * logged into the system) for shipments created before dateShipped
+   * existed or where it hasn't been backfilled yet.
+   */
+  static getDateShipped(shipment) {
+    return shipment.dateShipped || shipment.createdAt;
+  }
+
+  /**
    * Helper: Number of calendar days between two dates, ignoring
    * time-of-day. scheduledDate is often midnight while actualArrivalDate/
    * receivingDate carries the time the action was actually performed —
@@ -291,10 +302,11 @@ export class SupplierMetrics {
 
   /**
    * Calculate average freight lead time in days for warehouse shipments
-   * Freight lead time = actual arrival date - shipment created date (the
-   * closest proxy we have to a ship/departure date, since no such field is
-   * stored). Distinct from calculateAverageLeadTime, which measures
-   * schedule variance (actual vs scheduled week) rather than a duration.
+   * Freight lead time = actual arrival date - date shipped (user-entered;
+   * falls back to shipment created date for records without it, since
+   * that's the closest available proxy). Distinct from
+   * calculateAverageLeadTime, which measures schedule variance (actual
+   * vs scheduled week) rather than a duration.
    */
   static calculateAverageFreightLeadTime(shipments, supplierName) {
     const supplierShipments = this.getSupplierShipmentLines(shipments, supplierName);
@@ -309,13 +321,13 @@ export class SupplierMetrics {
         'inspection_passed'
       ].includes(s.latestStatus);
 
-      return isInWarehouse && this.getActualArrivalDate(s) && s.createdAt;
+      return isInWarehouse && this.getActualArrivalDate(s) && this.getDateShipped(s);
     });
 
     if (warehouseWithDates.length === 0) return null;
 
     const leadTimes = warehouseWithDates.map(s =>
-      this.diffCalendarDays(this.getActualArrivalDate(s), s.createdAt)
+      this.diffCalendarDays(this.getActualArrivalDate(s), this.getDateShipped(s))
     );
 
     const avgFreightLeadTime = Math.round(

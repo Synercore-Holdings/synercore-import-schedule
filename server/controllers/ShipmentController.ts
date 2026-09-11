@@ -53,6 +53,7 @@ export interface CreateShipmentRequest {
   batchLot?: string;
   releaseNumber?: string;
   actualArrivalDate?: string | null;
+  dateShipped?: string | null;
 }
 
 /**
@@ -86,6 +87,7 @@ export interface UpdateShipmentRequest {
   releaseNumber?: string;
   actualArrivalDate?: string | null;
   warehouseSince?: string | null;
+  dateShipped?: string | null;
 }
 
 /**
@@ -274,6 +276,7 @@ export class ShipmentController {
       batch_lot: data.batchLot || null,
       release_number: data.releaseNumber || null,
       actual_arrival_date: data.actualArrivalDate ? new Date(data.actualArrivalDate) : null,
+      date_shipped: data.dateShipped ? new Date(data.dateShipped) : null,
       created_at: new Date(),
       updated_at: new Date()
     } as Partial<Shipment>);
@@ -362,6 +365,9 @@ export class ShipmentController {
     }
     if (data.actualArrivalDate !== undefined) {
       dbData.actual_arrival_date = data.actualArrivalDate || null;
+    }
+    if (data.dateShipped !== undefined) {
+      dbData.date_shipped = data.dateShipped || null;
     }
     if (data.reminderDate !== undefined) {
       dbData.reminder_date = data.reminderDate || null;

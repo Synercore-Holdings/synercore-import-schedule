@@ -62,6 +62,7 @@ function LocalReceivingSchedule({ shipments, onCreateShipment, onUpdateShipment,
     receivingWarehouse: '',
     carrier: '',
     expectedArrival: '',
+    dateShipped: '',
     latestStatus: 'in_transit_roadway',
     notes: '',
   });
@@ -206,7 +207,7 @@ function LocalReceivingSchedule({ shipments, onCreateShipment, onUpdateShipment,
 
   const resetForm = () => setForm({
     orderRef: '', supplier: '', productName: '', quantity: '', palletQty: '',
-    receivingWarehouse: '', carrier: '', expectedArrival: '', latestStatus: 'in_transit_roadway', notes: '',
+    receivingWarehouse: '', carrier: '', expectedArrival: '', dateShipped: '', latestStatus: 'in_transit_roadway', notes: '',
   });
 
   const handleCreate = async () => {
@@ -227,6 +228,7 @@ function LocalReceivingSchedule({ shipments, onCreateShipment, onUpdateShipment,
         latestStatus: form.latestStatus,
         notes: form.notes,
         vesselName: form.expectedArrival || '', // store expected arrival in vessel_name for local
+        dateShipped: form.dateShipped || '',
         shipmentType: 'local',
       });
       showSuccess('Local shipment created');
@@ -250,6 +252,7 @@ function LocalReceivingSchedule({ shipments, onCreateShipment, onUpdateShipment,
       receivingWarehouse: s.receivingWarehouse || '',
       carrier: s.forwardingAgent || '',
       expectedArrival: s.vesselName || '', // stored in vessel_name for local
+      dateShipped: s.dateShipped ? new Date(s.dateShipped).toISOString().split('T')[0] : '',
       latestStatus: s.latestStatus || 'in_transit_roadway',
       notes: s.notes || '',
     });
@@ -271,6 +274,7 @@ function LocalReceivingSchedule({ shipments, onCreateShipment, onUpdateShipment,
         latestStatus: form.latestStatus,
         notes: form.notes,
         vesselName: form.expectedArrival || '',
+        dateShipped: form.dateShipped || '',
       });
       showSuccess('Shipment updated');
       setShowEditModal(false);
@@ -405,6 +409,12 @@ function LocalReceivingSchedule({ shipments, onCreateShipment, onUpdateShipment,
       <div>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-700)', marginBottom: '4px' }}>Expected Delivery Date</label>
         <input type="date" value={form.expectedArrival} onChange={e => setForm({ ...form, expectedArrival: e.target.value })}
+          className="input" style={{ width: '100%', boxSizing: 'border-box' }} />
+      </div>
+
+      <div>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-700)', marginBottom: '4px' }}>Date Shipped</label>
+        <input type="date" value={form.dateShipped} onChange={e => setForm({ ...form, dateShipped: e.target.value })}
           className="input" style={{ width: '100%', boxSizing: 'border-box' }} />
       </div>
 

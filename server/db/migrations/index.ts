@@ -1434,6 +1434,26 @@ export const migrations: Migration[] = [
       }
     },
   },
+
+  // Date Shipped: lets users record when a shipment actually left origin,
+  // for a more accurate freight lead time than the createdAt proxy.
+  {
+    name: 'add-date-shipped-column',
+    version: '026',
+    description: 'Add date_shipped column to shipments table',
+    depends_on: ['schema.sql'],
+    execute: async () => {
+      const checkResult = await pool.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='shipments' AND column_name='date_shipped'`
+      );
+      if (checkResult.rows.length === 0) {
+        await pool.query(`ALTER TABLE shipments ADD COLUMN date_shipped TIMESTAMP`);
+        logInfo('Added column date_shipped to shipments');
+      }
+      return true;
+    },
+  },
 ];
 
 /**

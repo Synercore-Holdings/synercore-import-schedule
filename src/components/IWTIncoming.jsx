@@ -57,6 +57,7 @@ function IWTIncoming({ shipments, onCreateShipment, onUpdateShipment, onDeleteSh
     releaseNumber: '',
     carrier: '',
     expectedArrival: '',
+    dateShipped: '',
     latestStatus: 'in_transit_roadway',
     notes: '',
   });
@@ -166,7 +167,7 @@ function IWTIncoming({ shipments, onCreateShipment, onUpdateShipment, onDeleteSh
     orderRef: '', productName: '', quantity: '', palletQty: '',
     sourceWarehouse: DEFAULT_SOURCE, receivingWarehouse: DEFAULT_DESTINATION,
     sourcePalletRef: '', batchLot: '', releaseNumber: '',
-    carrier: '', expectedArrival: '', latestStatus: 'in_transit_roadway', notes: '',
+    carrier: '', expectedArrival: '', dateShipped: '', latestStatus: 'in_transit_roadway', notes: '',
   });
 
   const handleCreate = async () => {
@@ -203,6 +204,7 @@ function IWTIncoming({ shipments, onCreateShipment, onUpdateShipment, onDeleteSh
         latestStatus: form.latestStatus,
         notes: form.notes,
         vesselName: form.expectedArrival || '',
+        dateShipped: form.dateShipped || '',
         shipmentType: 'iwt',
       });
       showSuccess('IWT transfer created');
@@ -229,6 +231,7 @@ function IWTIncoming({ shipments, onCreateShipment, onUpdateShipment, onDeleteSh
       releaseNumber: s.releaseNumber || '',
       carrier: s.forwardingAgent || '',
       expectedArrival: s.vesselName || '',
+      dateShipped: s.dateShipped ? new Date(s.dateShipped).toISOString().split('T')[0] : '',
       latestStatus: s.latestStatus || 'in_transit_roadway',
       notes: s.notes || '',
     });
@@ -258,6 +261,7 @@ function IWTIncoming({ shipments, onCreateShipment, onUpdateShipment, onDeleteSh
         latestStatus: form.latestStatus,
         notes: form.notes,
         vesselName: form.expectedArrival || '',
+        dateShipped: form.dateShipped || '',
       });
       showSuccess('IWT transfer updated');
       setShowEditModal(false);
@@ -401,6 +405,12 @@ function IWTIncoming({ shipments, onCreateShipment, onUpdateShipment, onDeleteSh
       <div>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-700)', marginBottom: '4px' }}>Expected Delivery Date</label>
         <input type="date" value={form.expectedArrival} onChange={e => setForm({ ...form, expectedArrival: e.target.value })}
+          className="input" style={{ width: '100%', boxSizing: 'border-box' }} />
+      </div>
+
+      <div>
+        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-700)', marginBottom: '4px' }}>Date Shipped</label>
+        <input type="date" value={form.dateShipped} onChange={e => setForm({ ...form, dateShipped: e.target.value })}
           className="input" style={{ width: '100%', boxSizing: 'border-box' }} />
       </div>
 

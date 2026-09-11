@@ -26,6 +26,7 @@ const EMPTY_FORM = {
   reminderDate: '',
   reminderNote: '',
   actualArrivalDate: '',
+  dateShipped: '',
 };
 
 // Fields that make sense to copy across every product line of the same
@@ -35,6 +36,7 @@ const EMPTY_FORM = {
 // identity.
 export const ORDER_LEVEL_FIELDS = [
   'latestStatus', 'weekNumber', 'selectedWeekDate', 'actualArrivalDate',
+  'dateShipped',
   'receivingWarehouse', 'forwardingAgent', 'vesselName', 'bolNumber',
   'containerNumber', 'shippingLine', 'incoterm',
 ];
@@ -720,6 +722,25 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
             placeholder="Additional notes or comments"
           />
+        </div>
+
+        {/* Date Shipped */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            Date Shipped
+          </label>
+          <input
+            type="date"
+            value={formData.dateShipped ? formData.dateShipped.split('T')[0] : ''}
+            onChange={(e) => handleInputChange('dateShipped', e.target.value)}
+            className="input"
+            style={{ width: '100%' }}
+          />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '0.25rem' }}>
+            When the consignment actually left origin. Used to calculate the
+            Avg Freight Lead Time on Supplier Performance — set this even for
+            shipments already stored, so historical data can be corrected.
+          </div>
         </div>
 
         {/* Actual Arrival Date */}

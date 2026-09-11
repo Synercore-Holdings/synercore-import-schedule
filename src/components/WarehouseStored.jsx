@@ -450,6 +450,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       finalPod: shipment.finalPod || '',
       freightType: shipment.freightType || '',
       receivingDate: shipment.receivingDate ? new Date(shipment.receivingDate).toISOString().split('T')[0] : '',
+      dateShipped: shipment.dateShipped ? new Date(shipment.dateShipped).toISOString().split('T')[0] : '',
     });
   };
 
@@ -468,6 +469,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       if (editForm.finalPod !== (editShipment.finalPod || '')) updates.finalPod = editForm.finalPod;
       if (editForm.freightType !== (editShipment.freightType || '')) updates.freightType = editForm.freightType;
       if (editForm.receivingDate !== (editShipment.receivingDate ? new Date(editShipment.receivingDate).toISOString().split('T')[0] : '')) updates.receivingDate = editForm.receivingDate;
+      if (editForm.dateShipped !== (editShipment.dateShipped ? new Date(editShipment.dateShipped).toISOString().split('T')[0] : '')) updates.dateShipped = editForm.dateShipped;
 
       if (Object.keys(updates).length === 0) {
         setEditShipment(null);
@@ -1685,6 +1687,10 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                     <div style={{ ...rowStyle, gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>Stored Date</label>
                       <input style={fieldStyle} type="date" value={editForm.receivingDate} onChange={e => setEditForm({ ...editForm, receivingDate: e.target.value })} />
+                    </div>
+                    <div style={{ ...rowStyle, gridColumn: '1 / -1' }}>
+                      <label style={labelStyle}>Date Shipped</label>
+                      <input style={fieldStyle} type="date" value={editForm.dateShipped} onChange={e => setEditForm({ ...editForm, dateShipped: e.target.value })} />
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
