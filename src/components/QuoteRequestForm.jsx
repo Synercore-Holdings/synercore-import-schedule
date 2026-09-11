@@ -83,6 +83,18 @@ const businessDaysBetween = (start, end) => {
   }
   return days;
 };
+
+// Business days a forwarder has taken to respond — the final figure once
+// quoted, or an ongoing count while still Sent, so a request that's been
+// sitting unanswered shows up here too rather than only in the "waiting"
+// badge. Null (shown as "—") for Draft/Expired/Cancelled, which were never
+// actually sent, or were sent but withdrawn/have no sent_at recorded.
+const responseTimeDays = (req) => {
+  if (!req.sent_at) return null;
+  const endDate = req.quoted_at || (req.status === 'sent' ? new Date() : null);
+  if (!endDate) return null;
+  return businessDaysBetween(req.sent_at, endDate);
+};
 const INCOTERMS = ['EXW', 'FCA', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
 
 // EXW: forwarder collects from the supplier's premises, so we need the full
@@ -496,6 +508,7 @@ function QuoteRequestForm({ onClose }) {
     return [...list].sort((a, b) => {
       let av = a[key], bv = b[key];
       if (key === 'quoted_rate') { av = av ? Number(av) : null; bv = bv ? Number(bv) : null; }
+      if (key === 'response_days') { av = responseTimeDays(a); bv = responseTimeDays(b); }
       if (av === null || av === undefined || av === '') return 1;
       if (bv === null || bv === undefined || bv === '') return -1;
       if (key === 'created_at') { av = new Date(av).getTime(); bv = new Date(bv).getTime(); }
@@ -946,6 +959,8 @@ function QuoteRequestForm({ onClose }) {
       'Supplier': r.supplier_name || '',
       'Cargo': productSummary(r),
       'Status': STATUS_LABELS[r.status] || r.status,
+      'Quote Date': r.sent_at ? new Date(r.sent_at).toLocaleDateString('en-ZA') : '',
+      'Response Time (business days)': responseTimeDays(r) ?? '',
       'Quote Ref': r.quote_reference || '',
       'Rate': r.quoted_rate || '',
       'Non-Stackable Rate': r.quoted_rate_non_stackable || '',
@@ -1092,6 +1107,13 @@ function QuoteRequestForm({ onClose }) {
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Incoterm</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Cargo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
+                  <th
+                    style={{ padding: '12px 16px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => toggleSort('response_days')}
+                    title="Business days from Quote Date to when the rate was captured (or days waited so far, if still Sent)"
+                  >
+                    Response Time {sortConfig.key === 'response_days' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                  </th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Quote Ref</th>
                   <th
                     style={{ padding: '12px 16px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
@@ -1149,6 +1171,18 @@ function QuoteRequestForm({ onClose }) {
                           {daysSinceSent(req)}d waiting{daysSinceSent(req) >= 7 ? ' — overdue' : ''}
                         </div>
                       )}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>
+                      {(() => {
+                        const rd = responseTimeDays(req);
+                        if (rd === null) return <span style={{ color: 'var(--text-500)' }}>—</span>;
+                        const isOngoing = req.status === 'sent';
+                        return (
+                          <span style={{ fontWeight: 600, color: rd >= 7 ? '#dc2626' : rd >= 3 ? '#92400e' : 'var(--text-700)' }}>
+                            {rd}d{isOngoing ? ' so far' : ''}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-500)' }}>
                       {req.quote_reference || '—'}
