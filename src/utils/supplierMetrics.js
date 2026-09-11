@@ -507,6 +507,59 @@ export class SupplierMetrics {
   }
 
   /**
+   * Statuses that mean an order is still outstanding — everything except
+   * the warehouse-confirmed states already tracked elsewhere (stored,
+   * received, inspection_passed) and true dead ends (sold, archived,
+   * cancelled). Covers the full pre-arrival pipeline (planned/in-transit/
+   * delayed) as well as post-arrival stages not yet resolved (arrived,
+   * unloading, inspection pending/in progress/failed, receiving) —
+   * inspection_failed counts as open since a failed inspection still needs
+   * a re-inspect/receive-partial/reject decision, not a closed order.
+   */
+  static isOpenOrderStatus(status) {
+    const CLOSED_STATUSES = [
+      ShipmentStatus.STORED, 'stored',
+      ShipmentStatus.RECEIVED, 'received',
+      ShipmentStatus.INSPECTION_PASSED, 'inspection_passed',
+      ShipmentStatus.SOLD, 'sold',
+      ShipmentStatus.ARCHIVED, 'archived',
+      ShipmentStatus.CANCELLED, 'cancelled',
+    ];
+    return !!status && !CLOSED_STATUSES.includes(status);
+  }
+
+  /**
+   * Get open orders for a supplier — distinct orders (deduped by orderRef)
+   * not yet stored/sold/archived/cancelled. Used for the "open orders"
+   * count so a 13-line PO doesn't inflate the figure to 13.
+   */
+  static getOpenOrders(shipments, supplierName) {
+    const supplierOrders = this.getSupplierShipments(shipments, supplierName);
+    return supplierOrders.filter(s => this.isOpenOrderStatus(s.latestStatus));
+  }
+
+  /**
+   * Build a line-level list of a supplier's open orders for display —
+   * unlike getOpenOrders (deduped by order, for counting), this keeps every
+   * product line so users can see what's actually in each open order, same
+   * granularity as getShipmentAudit.
+   */
+  static getOpenOrderLines(shipments, supplierName) {
+    return this.getSupplierShipmentLines(shipments, supplierName)
+      .filter(s => this.isOpenOrderStatus(s.latestStatus))
+      .map(s => ({
+        orderRef: s.orderRef || s.id,
+        supplierName: s.supplier,
+        productName: s.productName,
+        latestStatus: s.latestStatus,
+        scheduledDate: this.getScheduledDate(s),
+        daysOutstanding: this.diffCalendarDays(new Date(), s.createdAt || this.getScheduledDate(s)),
+        shipment: s,
+      }))
+      .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+  }
+
+  /**
    * Helper: Check if shipment was on time
    * Only considers warehouse shipments (stored/received/inspection_passed)
    */
@@ -573,6 +626,7 @@ export class SupplierMetrics {
     const avgLeadTime = this.calculateAverageLeadTime(shipments, supplierName);
     const avgFreightLeadTime = this.calculateAverageFreightLeadTime(shipments, supplierName);
     const totalShipments = this.getTotalShipments(shipments, supplierName);
+    const openOrdersCount = this.getOpenOrders(shipments, supplierName).length;
     const trend = this.calculateMetricTrend(shipments, supplierName, 'onTime');
     const grade = this.getSupplierGrade(onTimePercent, passRatePercent);
 
@@ -583,6 +637,7 @@ export class SupplierMetrics {
       avgLeadTime,
       avgFreightLeadTime,
       totalShipments,
+      openOrdersCount,
       trend,
       grade
     };

@@ -77,6 +77,12 @@ const TrendArrow = ({ trend }) => {
 // ---- Line colors for top suppliers ----
 const LINE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
+// ---- Status label formatting (e.g. "in_transit_seaway" -> "In Transit Seaway") ----
+const formatStatusLabel = (status) => (status || '')
+  .split('_')
+  .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+  .join(' ');
+
 function SupplierPerformance({ shipments, onUpdateShipment }) {
   const [searchParams] = useSearchParams();
   const { showError } = useNotification();
@@ -136,8 +142,13 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
 
   // ---- Aggregated KPIs ----
   const kpis = useMemo(() => {
+    // Open orders count regardless of whether a supplier has any completed
+    // shipments yet — a brand-new supplier's first PO should still show up
+    // here even though it has nothing in the on-time/grade figures below.
+    const openOrdersTotal = filteredMetrics.reduce((sum, m) => sum + (m.openOrdersCount || 0), 0);
+
     const active = filteredMetrics.filter(m => m.totalShipments > 0);
-    if (active.length === 0) return { avgOnTime: 0, avgPassRate: 0, avgLeadTime: null, avgFreightLeadTime: null, grades: { A: 0, B: 0, C: 0 } };
+    if (active.length === 0) return { avgOnTime: 0, avgPassRate: 0, avgLeadTime: null, avgFreightLeadTime: null, openOrdersTotal, grades: { A: 0, B: 0, C: 0 } };
 
     const avgOnTime = Math.round(active.reduce((s, m) => s + m.onTimePercent, 0) / active.length);
     const withPassRate = active.filter(m => m.passRatePercent !== null);
@@ -156,7 +167,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     const grades = { A: 0, B: 0, C: 0 };
     active.forEach(m => { if (m.grade?.grade) grades[m.grade.grade] = (grades[m.grade.grade] || 0) + 1; });
 
-    return { avgOnTime, avgPassRate, avgLeadTime, avgFreightLeadTime, grades };
+    return { avgOnTime, avgPassRate, avgLeadTime, avgFreightLeadTime, openOrdersTotal, grades };
   }, [filteredMetrics]);
 
   // ---- On-time color helper ----
@@ -320,7 +331,10 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
 
   // ---- Table sorting ----
   const sortedTableData = useMemo(() => {
-    const data = filteredMetrics.filter(m => m.totalShipments > 0);
+    // A supplier with open orders but nothing delivered yet (e.g. a brand-new
+    // supplier's first PO) should still appear here, not just once something
+    // has actually reached the warehouse.
+    const data = filteredMetrics.filter(m => m.totalShipments > 0 || m.openOrdersCount > 0);
     return [...data].sort((a, b) => {
       let aVal = a[sortCol];
       let bVal = b[sortCol];
@@ -402,6 +416,12 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     return SupplierMetrics.getShipmentAudit(shipments, selectedSupplier);
   }, [shipments, selectedSupplier]);
 
+  // ---- Open orders (only when a single supplier is selected) ----
+  const openOrderLines = useMemo(() => {
+    if (selectedSupplier === 'all') return [];
+    return SupplierMetrics.getOpenOrderLines(shipments, selectedSupplier);
+  }, [shipments, selectedSupplier]);
+
   useEffect(() => {
     if (highlightRef && highlightRowRef.current) {
       highlightRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -475,6 +495,13 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           color="var(--text-900)"
           subtext={`${kpis.grades.A + kpis.grades.B + kpis.grades.C} graded suppliers`}
         />
+        <KpiCard
+          label="Open Orders"
+          value={kpis.openOrdersTotal}
+          suffix=""
+          color="var(--text-900)"
+          subtext={selectedSupplier === 'all' ? 'Not yet stored, sold, archived or cancelled' : `For ${selectedSupplier}`}
+        />
       </div>
 
       {/* Charts Grid (2x2) */}
@@ -505,7 +532,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
       </div>
 
       {/* Detailed Table */}
-      <ChartCard title="Supplier Detail" subtitle={`${sortedTableData.length} suppliers with shipments`}>
+      <ChartCard title="Supplier Detail" subtitle={`${sortedTableData.length} suppliers with shipments or open orders`}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
@@ -513,6 +540,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                 {[
                   { key: 'supplierName', label: 'Supplier' },
                   { key: 'totalShipments', label: 'Shipments' },
+                  { key: 'openOrdersCount', label: 'Open Orders' },
                   { key: 'onTimePercent', label: 'On-Time %' },
                   { key: 'passRatePercent', label: 'Pass Rate %' },
                   { key: 'avgLeadTime', label: 'Avg Lead Time' },
@@ -537,7 +565,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
             </thead>
             <tbody>
               {sortedTableData.length === 0 && (
-                <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No supplier data available</td></tr>
+                <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No supplier data available</td></tr>
               )}
               {sortedTableData.map((m, idx) => (
                 <tr
@@ -549,6 +577,9 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                 >
                   <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{m.supplierName}</td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.totalShipments}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontWeight: 700, color: m.openOrdersCount > 0 ? 'var(--text-900)' : 'var(--text-500)' }}>{m.openOrdersCount}</span>
+                  </td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{ fontWeight: 700, color: onTimeColor(m.onTimePercent) }}>{m.onTimePercent}%</span>
                   </td>
@@ -569,6 +600,55 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           </table>
         </div>
       </ChartCard>
+
+      {/* Open Orders — only when a single supplier is selected */}
+      {selectedSupplier !== 'all' && (
+        <ChartCard
+          title="Open Orders"
+          subtitle={`${openOrderLines.length} open line item${openOrderLines.length !== 1 ? 's' : ''} for ${selectedSupplier}`}
+          style={{ marginTop: 16 }}
+        >
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  {['Order Ref', 'Product', 'Status', 'Scheduled Date', 'Days Outstanding'].map(label => (
+                    <th key={label} style={{
+                      padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                      fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                      letterSpacing: 0.5, whiteSpace: 'nowrap',
+                    }}>
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {openOrderLines.length === 0 && (
+                  <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No open orders — everything from this supplier has been stored, sold, archived or cancelled</td></tr>
+                )}
+                {openOrderLines.map((o, idx) => (
+                  <tr
+                    key={o.shipment.id}
+                    style={{
+                      borderBottom: '1px solid var(--border)',
+                      backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{o.orderRef}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.productName || '--'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{formatStatusLabel(o.latestStatus)}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.scheduledDate || '--'}</td>
+                    <td style={{ padding: '10px 12px', color: o.daysOutstanding > 30 ? '#dc3545' : 'var(--text-700)' }}>
+                      {o.daysOutstanding} day{o.daysOutstanding !== 1 ? 's' : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ChartCard>
+      )}
 
       {/* Shipment Audit Trail — only when a single supplier is selected */}
       {selectedSupplier !== 'all' && (
