@@ -368,6 +368,26 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
       } catch (err) {
         showError('Failed to apply the change to the other line items. Please try again.');
       }
+    } else if (editingSiblings.length > 0 && shipmentData.dateShipped !== (editingShipment.dateShipped || '')) {
+      // Date Shipped is an order-level fact — a consignment leaves origin as
+      // one unit, so every product line of the same order shares the same
+      // ship date. Propagate it automatically even when "apply to all
+      // lines" isn't ticked, since unlike status/schedule it's never
+      // legitimately different per line.
+      try {
+        const results = await Promise.all(editingSiblings.map(sib =>
+          authFetch(getApiUrl(`/api/shipments/${sib.id}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateShipped: shipmentData.dateShipped }),
+          })
+        ));
+        if (results.some(r => !r.ok)) {
+          showError(`Date Shipped saved, but failed to apply it to some of the other ${editingSiblings.length} line item(s) of this order.`);
+        }
+      } catch (err) {
+        showError('Failed to apply Date Shipped to the other line items. Please try again.');
+      }
     }
 
     // Primary line goes through the normal update path last, so its

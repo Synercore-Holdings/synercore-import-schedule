@@ -393,6 +393,25 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
   const handleSaveAmendment = async (shipmentData) => {
     try {
       await onUpdateShipment(amendingShipment.id, shipmentData);
+
+      // Date Shipped is an order-level fact — a consignment leaves origin as
+      // one unit, so every product line of the same order shares the same
+      // ship date. Propagate it to sibling lines automatically rather than
+      // requiring the user to repeat the edit on each line.
+      if (shipmentData.dateShipped !== undefined && shipmentData.dateShipped !== (amendingShipment.dateShipped || '') && amendingShipment.orderRef) {
+        const siblings = (shipments || []).filter(
+          s => s.orderRef === amendingShipment.orderRef && s.id !== amendingShipment.id
+        );
+        if (siblings.length > 0) {
+          const results = await Promise.allSettled(
+            siblings.map(sib => onUpdateShipment(sib.id, { dateShipped: shipmentData.dateShipped }))
+          );
+          if (results.some(r => r.status === 'rejected')) {
+            showError(`Date Shipped saved, but failed to apply it to some of the other ${siblings.length} line item(s) of this order.`);
+          }
+        }
+      }
+
       setAmendingShipment(null);
     } catch (error) {
       console.error('Error amending shipment:', error);

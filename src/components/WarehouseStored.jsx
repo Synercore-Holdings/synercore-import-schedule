@@ -476,6 +476,25 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
         return;
       }
       await onUpdateShipment(editShipment.id, updates);
+
+      // Date Shipped is an order-level fact — a consignment leaves origin as
+      // one unit, so every product line of the same order shares the same
+      // ship date. Propagate it to sibling lines automatically rather than
+      // requiring the user to repeat the edit on each line.
+      if (updates.dateShipped !== undefined && editShipment.orderRef) {
+        const siblings = (allShipments || shipments).filter(
+          s => s.orderRef === editShipment.orderRef && s.id !== editShipment.id
+        );
+        if (siblings.length > 0) {
+          const results = await Promise.allSettled(
+            siblings.map(sib => onUpdateShipment(sib.id, { dateShipped: updates.dateShipped }))
+          );
+          if (results.some(r => r.status === 'rejected') && showError) {
+            showError(`Date Shipped saved, but failed to apply it to some of the other ${siblings.length} line item(s) of this order.`);
+          }
+        }
+      }
+
       if (showSuccess) showSuccess('Shipment updated successfully');
       setEditShipment(null);
     } catch (err) {
