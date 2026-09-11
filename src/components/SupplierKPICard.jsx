@@ -166,7 +166,7 @@ function SupplierKPICard({ supplier, shipments }) {
           borderLeft: `4px solid #17a2b8`
         }}>
           <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
-            ⏱️ Avg Lead Time
+            ⏱️ Avg Arrival Days Late/Early
           </div>
           <div style={{
             fontSize: '1.5rem',

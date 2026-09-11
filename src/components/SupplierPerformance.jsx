@@ -475,7 +475,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           subtext="Based on inspected shipments"
         />
         <KpiCard
-          label="Avg Lead Time"
+          label="Avg Arrival Days Late/Early"
           value={kpis.avgLeadTime !== null ? kpis.avgLeadTime : '--'}
           suffix={kpis.avgLeadTime !== null ? ' days' : ''}
           color="var(--text-900)"
@@ -543,7 +543,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                   { key: 'openOrdersCount', label: 'Open Orders' },
                   { key: 'onTimePercent', label: 'On-Time %' },
                   { key: 'passRatePercent', label: 'Pass Rate %' },
-                  { key: 'avgLeadTime', label: 'Avg Lead Time' },
+                  { key: 'avgLeadTime', label: 'Avg Arrival Days Late/Early' },
                   { key: 'avgFreightLeadTime', label: 'Avg Freight Lead Time' },
                   { key: 'grade', label: 'Grade' },
                   { key: 'trend', label: 'Trend' },
