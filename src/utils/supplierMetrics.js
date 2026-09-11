@@ -559,6 +559,8 @@ export class SupplierMetrics {
    * granularity as getShipmentAudit.
    */
   static getOpenOrderLines(shipments, supplierName) {
+    const PLANNED_STATUSES = [ShipmentStatus.PLANNED_SEAFREIGHT, ShipmentStatus.PLANNED_AIRFREIGHT];
+
     return this.getSupplierShipmentLines(shipments, supplierName)
       .filter(s => this.isOpenOrderStatus(s.latestStatus))
       .map(s => {
@@ -566,17 +568,23 @@ export class SupplierMetrics {
         // order that's been legitimately rescheduled should show against
         // its current expected date, not look overdue against a date that
         // no longer applies.
-        const scheduledDate = this.getCurrentScheduledDate(s);
+        const eta = this.getCurrentScheduledDate(s);
+        // While still Planned, the shipment hasn't departed yet, so ETD is
+        // the milestone that's actually due next — falls back to ETA if ETD
+        // hasn't been set. Once it's In Transit (or beyond), it has already
+        // departed, so ETA becomes the relevant "is this due/overdue" date.
+        const isPlanned = PLANNED_STATUSES.includes(s.latestStatus);
+        const dueDate = (isPlanned && s.etd) ? s.etd : eta;
         return {
           orderRef: s.orderRef || s.id,
           supplierName: s.supplier,
           productName: s.productName,
           latestStatus: s.latestStatus,
-          scheduledDate,
-          // Days until the scheduled date (negative once it's overdue) —
-          // not days since the record was created, which said nothing about
-          // whether the order was actually running late.
-          daysOutstanding: this.diffCalendarDays(scheduledDate, new Date()),
+          scheduledDate: eta,
+          // Days until whichever of ETD/ETA is next due (negative once
+          // overdue) — not days since the record was created, which said
+          // nothing about whether the order was actually running late.
+          daysOutstanding: this.diffCalendarDays(dueDate, new Date()),
           shipment: s,
         };
       })
