@@ -85,6 +85,20 @@ export class SupplierMetrics {
   }
 
   /**
+   * Helper: Resolve the CURRENT/live scheduled date — unlike getScheduledDate
+   * above, this deliberately does NOT prefer the frozen original benchmark.
+   * For an order that's still open (not yet delivered), the original date is
+   * irrelevant once it's been legitimately rescheduled — what matters
+   * operationally is the live weekNumber/selectedWeekDate. Use this for
+   * "is this order due/overdue right now" (e.g. Open Orders); use
+   * getScheduledDate for scoring on-time delivery of shipments that already
+   * arrived, where the frozen original date is the whole point.
+   */
+  static getCurrentScheduledDate(shipment) {
+    return shipment.selectedWeekDate || this.estimateDateFromWeek(shipment.weekNumber, shipment.receivingDate);
+  }
+
+  /**
    * Helper: Resolve the date a shipment actually arrived, for benchmarking
    * against the scheduled date. Prefers actualArrivalDate — manually
    * entered by a user as soon as they learn the consignment physically
@@ -548,7 +562,11 @@ export class SupplierMetrics {
     return this.getSupplierShipmentLines(shipments, supplierName)
       .filter(s => this.isOpenOrderStatus(s.latestStatus))
       .map(s => {
-        const scheduledDate = this.getScheduledDate(s);
+        // The live schedule, not the frozen original benchmark — an open
+        // order that's been legitimately rescheduled should show against
+        // its current expected date, not look overdue against a date that
+        // no longer applies.
+        const scheduledDate = this.getCurrentScheduledDate(s);
         return {
           orderRef: s.orderRef || s.id,
           supplierName: s.supplier,
