@@ -639,8 +639,12 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.productName || '--'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{formatStatusLabel(o.latestStatus)}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.scheduledDate || '--'}</td>
-                    <td style={{ padding: '10px 12px', color: o.daysOutstanding > 30 ? '#dc3545' : 'var(--text-700)' }}>
-                      {o.daysOutstanding} day{o.daysOutstanding !== 1 ? 's' : ''}
+                    <td style={{ padding: '10px 12px', color: o.daysOutstanding < 0 ? '#dc3545' : 'var(--text-700)' }}>
+                      {o.daysOutstanding < 0
+                        ? `${Math.abs(o.daysOutstanding)} day${Math.abs(o.daysOutstanding) !== 1 ? 's' : ''} overdue`
+                        : o.daysOutstanding === 0
+                          ? 'Due today'
+                          : `Due in ${o.daysOutstanding} day${o.daysOutstanding !== 1 ? 's' : ''}`}
                     </td>
                   </tr>
                 ))}

@@ -547,15 +547,21 @@ export class SupplierMetrics {
   static getOpenOrderLines(shipments, supplierName) {
     return this.getSupplierShipmentLines(shipments, supplierName)
       .filter(s => this.isOpenOrderStatus(s.latestStatus))
-      .map(s => ({
-        orderRef: s.orderRef || s.id,
-        supplierName: s.supplier,
-        productName: s.productName,
-        latestStatus: s.latestStatus,
-        scheduledDate: this.getScheduledDate(s),
-        daysOutstanding: this.diffCalendarDays(new Date(), s.createdAt || this.getScheduledDate(s)),
-        shipment: s,
-      }))
+      .map(s => {
+        const scheduledDate = this.getScheduledDate(s);
+        return {
+          orderRef: s.orderRef || s.id,
+          supplierName: s.supplier,
+          productName: s.productName,
+          latestStatus: s.latestStatus,
+          scheduledDate,
+          // Days until the scheduled date (negative once it's overdue) —
+          // not days since the record was created, which said nothing about
+          // whether the order was actually running late.
+          daysOutstanding: this.diffCalendarDays(scheduledDate, new Date()),
+          shipment: s,
+        };
+      })
       .sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
   }
 
