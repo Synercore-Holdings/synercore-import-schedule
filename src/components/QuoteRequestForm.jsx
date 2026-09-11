@@ -111,7 +111,7 @@ const normalizePortOptions = (ports) => {
 const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', value: '', value_currency: 'USD' };
 
 const EMPTY_FORM = {
-  forwarder_name: '', forwarder_email: '', transport_mode: 'sea', container_type: '', incoterm: '',
+  forwarder_name: '', forwarder_email: '', quote_date: '', transport_mode: 'sea', container_type: '', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', products: [{ ...EMPTY_PRODUCT_LINE }],
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
   pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
@@ -136,6 +136,7 @@ const toDateInput = (d) => {
 const toFormState = (req) => ({
   forwarder_name: req.forwarder_name || '',
   forwarder_email: req.forwarder_email || '',
+  quote_date: toDateInput(req.sent_at),
   transport_mode: req.transport_mode || 'sea',
   container_type: req.container_type || '',
   incoterm: req.incoterm || '',
@@ -818,7 +819,7 @@ function QuoteRequestForm({ onClose }) {
   const handleCopyClick = (req) => {
     setEditingId(null);
     setEditingMeta(null);
-    setForm({ ...toFormState(req), forwarder_name: '', forwarder_email: '' });
+    setForm({ ...toFormState(req), forwarder_name: '', forwarder_email: '', quote_date: '' });
     setIsViewMode(false);
     setShowCustomSupplier(false);
     setShowCustomOrigin(false);
@@ -1278,6 +1279,15 @@ function QuoteRequestForm({ onClose }) {
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Forwarder Email</label>
                   <input type="email" style={inputStyle} value={form.forwarder_email} onChange={e => handleFieldChange('forwarder_email', e.target.value)} />
+                </div>
+
+                <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Quote Date</label>
+                  <input type="date" style={{ ...inputStyle, maxWidth: '220px' }} value={form.quote_date} onChange={e => handleFieldChange('quote_date', e.target.value)} />
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                    When this quote was actually requested from the forwarder. Leave blank to use today —
+                    back-date it if you're logging a request that went out earlier, so response-time tracking stays accurate.
+                  </div>
                 </div>
 
                 <div style={fieldWrap}>

@@ -42,6 +42,7 @@ router.post(
   [
     body('forwarder_name').trim().notEmpty().withMessage('Forwarder name is required'),
     body('forwarder_email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Invalid email'),
+    body('quote_date').optional({ checkFalsy: true }).isISO8601().withMessage('Quote date must be a valid date'),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
     body('incoterm').optional({ nullable: true }).trim(),
@@ -74,7 +75,7 @@ router.post(
   validate,
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      forwarder_name, forwarder_email, transport_mode = 'sea', container_type, incoterm,
+      forwarder_name, forwarder_email, quote_date, transport_mode = 'sea', container_type, incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
       dg_classification = 'non_dg', gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm,
       pallet_count, cargo_value, cargo_value_currency = 'USD', cargo_ready_date, required_date, notes,
@@ -87,14 +88,17 @@ router.post(
     // default straight to 'sent' (with sent_at captured) rather than 'draft'.
     // Otherwise sent_at never gets recorded and "Awaiting a Rate" / response
     // time tracking can never work, since "Add Rate" is reachable from Draft
-    // too and skips the sent transition entirely.
+    // too and skips the sent transition entirely. quote_date lets a user
+    // back-date sent_at when logging a request that actually went out
+    // earlier, so response-time tracking reflects reality instead of when
+    // it happened to get entered into the system.
     const result = await pool.query(
       `INSERT INTO quote_requests (
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode, container_type,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
         dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
         cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', CURRENT_TIMESTAMP)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP))
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode, container_type || null,
@@ -102,6 +106,7 @@ router.post(
         cargo_description || null, hs_code || null, JSON.stringify(products || []), dg_classification, gross_weight_kg || null,
         length_cm || null, width_cm || null, height_cm || null, volume_cbm || null,
         pallet_count || null, cargo_value || null, cargo_value_currency, cargo_ready_date || null, required_date || null, notes || null,
+        quote_date || null,
       ]
     );
 
@@ -148,6 +153,7 @@ router.put(
     body('status').optional().isIn(STATUSES),
     body('forwarder_name').optional().trim().notEmpty(),
     body('forwarder_email').optional({ checkFalsy: true }).trim().isEmail(),
+    body('quote_date').optional({ checkFalsy: true }).isISO8601().withMessage('Quote date must be a valid date'),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
     body('products').optional({ nullable: true }).isArray().withMessage('Products must be an array'),
@@ -197,6 +203,18 @@ router.put(
       }
     }
 
+    // quote_date lets a user correct sent_at directly (e.g. they logged the
+    // request today but it actually went out earlier) — handled separately
+    // from allowedFields since it maps to a differently-named column, and
+    // it must take priority over the status-transition CURRENT_TIMESTAMP
+    // below rather than being clobbered by it.
+    let sentAtHandled = false;
+    if (req.body.quote_date !== undefined && req.body.quote_date !== '') {
+      params.push(req.body.quote_date);
+      updates.push(`sent_at = $${params.length}`);
+      sentAtHandled = true;
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
@@ -207,7 +225,8 @@ router.put(
     // or a withdrawn rate) restarts the clock and clears any prior quoted_at,
     // since that quote no longer stands.
     if (req.body.status === 'sent') {
-      updates.push('sent_at = CURRENT_TIMESTAMP', 'quoted_at = NULL');
+      if (!sentAtHandled) updates.push('sent_at = CURRENT_TIMESTAMP');
+      updates.push('quoted_at = NULL');
     } else if (req.body.status === 'quoted') {
       // COALESCE so a later rate correction (Edit Rate) doesn't reset the
       // original "time to first quote" — only the first quoted transition counts.
@@ -215,7 +234,8 @@ router.put(
     } else if (req.body.status === 'draft') {
       // A rate withdrawn back to Draft means it was never actually sent —
       // clear both timestamps rather than leaving a stale quoted_at behind.
-      updates.push('sent_at = NULL', 'quoted_at = NULL');
+      if (!sentAtHandled) updates.push('sent_at = NULL');
+      updates.push('quoted_at = NULL');
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
