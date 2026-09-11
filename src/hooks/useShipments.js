@@ -125,6 +125,7 @@ export function useShipments() {
         receivingDate: s.receiving_date || s.receivingDate,
         actualArrivalDate: s.actual_arrival_date || s.actualArrivalDate || null,
         dateShipped: s.date_shipped || s.dateShipped || null,
+        etd: s.etd || null,
         warehouseSince: s.warehouse_since || s.warehouseSince || null,
         receivingStatus: s.receiving_status || s.receivingStatus,
         receivingNotes: s.receiving_notes || s.receivingNotes,

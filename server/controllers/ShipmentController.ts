@@ -54,6 +54,7 @@ export interface CreateShipmentRequest {
   releaseNumber?: string;
   actualArrivalDate?: string | null;
   dateShipped?: string | null;
+  etd?: string | null;
 }
 
 /**
@@ -88,6 +89,7 @@ export interface UpdateShipmentRequest {
   actualArrivalDate?: string | null;
   warehouseSince?: string | null;
   dateShipped?: string | null;
+  etd?: string | null;
 }
 
 /**
@@ -277,6 +279,7 @@ export class ShipmentController {
       release_number: data.releaseNumber || null,
       actual_arrival_date: data.actualArrivalDate ? new Date(data.actualArrivalDate) : null,
       date_shipped: data.dateShipped ? new Date(data.dateShipped) : null,
+      etd: data.etd ? new Date(data.etd) : null,
       created_at: new Date(),
       updated_at: new Date()
     } as Partial<Shipment>);
@@ -368,6 +371,9 @@ export class ShipmentController {
     }
     if (data.dateShipped !== undefined) {
       dbData.date_shipped = data.dateShipped || null;
+    }
+    if (data.etd !== undefined) {
+      dbData.etd = data.etd || null;
     }
     if (data.reminderDate !== undefined) {
       dbData.reminder_date = data.reminderDate || null;

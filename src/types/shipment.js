@@ -278,6 +278,7 @@ export class Shipment {
     receivingDate = null,
     actualArrivalDate = null,
     dateShipped = null,
+    etd = null,
     receivedQuantity = null,
     discrepancies = [],
     unloadingStartDate = null,
@@ -317,6 +318,7 @@ export class Shipment {
     this.receivingDate = receivingDate;
     this.actualArrivalDate = actualArrivalDate;
     this.dateShipped = dateShipped;
+    this.etd = etd;
     this.receivedQuantity = receivedQuantity;
     this.discrepancies = discrepancies;
     this.unloadingStartDate = unloadingStartDate;

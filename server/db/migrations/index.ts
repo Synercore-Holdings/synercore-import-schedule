@@ -1454,6 +1454,26 @@ export const migrations: Migration[] = [
       return true;
     },
   },
+
+  // ETD: estimated departure date, distinct from the existing
+  // week_number/selected_week_date field which is always the ETA.
+  {
+    name: 'add-etd-column',
+    version: '027',
+    description: 'Add etd column to shipments table',
+    depends_on: ['schema.sql'],
+    execute: async () => {
+      const checkResult = await pool.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='shipments' AND column_name='etd'`
+      );
+      if (checkResult.rows.length === 0) {
+        await pool.query(`ALTER TABLE shipments ADD COLUMN etd TIMESTAMP`);
+        logInfo('Added column etd to shipments');
+      }
+      return true;
+    },
+  },
 ];
 
 /**

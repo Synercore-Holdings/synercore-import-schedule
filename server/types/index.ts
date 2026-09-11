@@ -122,6 +122,7 @@ export interface Shipment {
   receiving_date?: Date;
   actual_arrival_date?: Date;
   date_shipped?: Date;
+  etd?: Date;
   warehouse_since?: Date;
   receiving_status?: string;
   receiving_notes?: string;

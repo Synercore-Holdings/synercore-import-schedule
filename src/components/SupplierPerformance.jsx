@@ -635,7 +635,23 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                       backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
                     }}
                   >
-                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{o.orderRef}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
+                      {onUpdateShipment ? (
+                        <button
+                          onClick={() => setEditingShipment(o.shipment)}
+                          title="Edit this shipment's ETD and ETA"
+                          style={{
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            fontWeight: 600, fontSize: 13, color: 'var(--accent-600, #3b82f6)',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          {o.orderRef}
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--text-900)' }}>{o.orderRef}</span>
+                      )}
+                    </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.productName || '--'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{formatStatusLabel(o.latestStatus)}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.scheduledDate || '--'}</td>

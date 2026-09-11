@@ -555,6 +555,18 @@ async function start() {
       logWarn('Date shipped column migration warning', { error: error.message });
     }
 
+    // Add etd to shipments: the estimated departure date, distinct from the
+    // existing week_number/selected_week_date field (which is always the
+    // ETA — kept that way so on-time/lead-time metrics built on it don't
+    // change meaning). ETD is most relevant while a shipment is still
+    // Planned, before it has actually departed.
+    try {
+      await getPool().query(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS etd TIMESTAMP`);
+      logger.info('ETD column ready');
+    } catch (error) {
+      logWarn('ETD column migration warning', { error: error.message });
+    }
+
     // Add warehouse_since to shipments: the date this record started sitting
     // at its *current* receiving_warehouse. Distinct from receiving_date
     // (the original goods-receipt date, left untouched so supplier lead-time/

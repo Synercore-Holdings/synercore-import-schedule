@@ -27,6 +27,7 @@ const EMPTY_FORM = {
   reminderNote: '',
   actualArrivalDate: '',
   dateShipped: '',
+  etd: '',
 };
 
 // Fields that make sense to copy across every product line of the same
@@ -36,7 +37,7 @@ const EMPTY_FORM = {
 // identity.
 export const ORDER_LEVEL_FIELDS = [
   'latestStatus', 'weekNumber', 'selectedWeekDate', 'actualArrivalDate',
-  'dateShipped',
+  'dateShipped', 'etd',
   'receivingWarehouse', 'forwardingAgent', 'vesselName', 'bolNumber',
   'containerNumber', 'shippingLine', 'incoterm',
 ];
@@ -415,11 +416,30 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
           />
         </div>
 
-        {/* Expected Arrival Date — create mode only */}
+        {/* ETD (Estimated Departure) */}
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+            ETD (Estimated Departure) <span style={{ color: '#999', fontSize: '0.85em' }}>Optional</span>
+          </label>
+          <input
+            type="date"
+            value={formData.etd ? formData.etd.split('T')[0] : ''}
+            onChange={(e) => handleInputChange('etd', e.target.value)}
+            className="input"
+            style={{ width: '100%' }}
+          />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '0.25rem' }}>
+            When the shipment is expected to leave origin — most useful while
+            still Planned, before it has actually departed. See Date Shipped
+            below for the actual date once it has.
+          </div>
+        </div>
+
+        {/* Expected Arrival Date (ETA) — create mode only */}
         {!isEditMode && (
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
-              Expected Arrival Date <span style={{ color: '#999', fontSize: '0.85em' }}>Optional</span>
+              Expected Arrival Date (ETA) <span style={{ color: '#999', fontSize: '0.85em' }}>Optional</span>
             </label>
             <input
               type="date"
