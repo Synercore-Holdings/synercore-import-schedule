@@ -612,7 +612,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                  {['Order Ref', 'Product', 'Status', 'Scheduled Date', 'Days Outstanding'].map(label => (
+                  {['Order Ref', 'Product', 'Status', 'ETD', 'Scheduled Date (ETA)', 'Days Outstanding'].map(label => (
                     <th key={label} style={{
                       padding: '10px 12px', textAlign: 'left', fontSize: 11,
                       fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
@@ -625,7 +625,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
               </thead>
               <tbody>
                 {openOrderLines.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No open orders — everything from this supplier has been stored, sold, archived or cancelled</td></tr>
+                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No open orders — everything from this supplier has been stored, sold, archived or cancelled</td></tr>
                 )}
                 {openOrderLines.map((o, idx) => (
                   <tr
@@ -654,7 +654,12 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.productName || '--'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{formatStatusLabel(o.latestStatus)}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.scheduledDate || '--'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {o.shipment.etd ? new Date(o.shipment.etd).toLocaleDateString() : '--'}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {o.scheduledDate ? new Date(o.scheduledDate).toLocaleDateString() : '--'}
+                    </td>
                     <td style={{ padding: '10px 12px', color: o.daysOutstanding < 0 ? '#dc3545' : 'var(--text-700)' }}>
                       {o.daysOutstanding < 0
                         ? `${Math.abs(o.daysOutstanding)} day${Math.abs(o.daysOutstanding) !== 1 ? 's' : ''} overdue`
