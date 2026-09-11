@@ -574,13 +574,18 @@ export class SupplierMetrics {
         // hasn't been set. Once it's In Transit (or beyond), it has already
         // departed, so ETA becomes the relevant "is this due/overdue" date.
         const isPlanned = PLANNED_STATUSES.includes(s.latestStatus);
-        const dueDate = (isPlanned && s.etd) ? s.etd : eta;
+        const dueDateIsEtd = isPlanned && !!s.etd;
+        const dueDate = dueDateIsEtd ? s.etd : eta;
         return {
           orderRef: s.orderRef || s.id,
           supplierName: s.supplier,
           productName: s.productName,
           latestStatus: s.latestStatus,
           scheduledDate: eta,
+          // Which milestone daysOutstanding is measured against, so the UI
+          // can label it — without this, "Due in 34 days" is ambiguous when
+          // both an ETD and an ETA are visible in the same row.
+          dueDateBasis: dueDateIsEtd ? 'ETD' : 'ETA',
           // Days until whichever of ETD/ETA is next due (negative once
           // overdue) — not days since the record was created, which said
           // nothing about whether the order was actually running late.

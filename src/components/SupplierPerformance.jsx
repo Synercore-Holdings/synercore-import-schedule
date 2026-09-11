@@ -608,6 +608,9 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           subtitle={`${openOrderLines.length} open line item${openOrderLines.length !== 1 ? 's' : ''} for ${selectedSupplier}`}
           style={{ marginTop: 16 }}
         >
+          <p style={{ margin: '-8px 0 12px', fontSize: 11, color: 'var(--text-500)' }}>
+            📌 marks whichever date Days Outstanding is measured against — ETD while still Planned (has it left on time?), ETA once In Transit (has it arrived on time?).
+          </p>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
@@ -654,11 +657,21 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{o.productName || '--'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{formatStatusLabel(o.latestStatus)}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                    <td style={{
+                      padding: '10px 12px',
+                      color: o.dueDateBasis === 'ETD' ? 'var(--text-900)' : 'var(--text-700)',
+                      fontWeight: o.dueDateBasis === 'ETD' ? 700 : 400,
+                    }}>
                       {o.shipment.etd ? new Date(o.shipment.etd).toLocaleDateString() : '--'}
+                      {o.dueDateBasis === 'ETD' && <span title="Days Outstanding is counting down to this date" style={{ marginLeft: 4, cursor: 'help' }}>📌</span>}
                     </td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                    <td style={{
+                      padding: '10px 12px',
+                      color: o.dueDateBasis === 'ETA' ? 'var(--text-900)' : 'var(--text-700)',
+                      fontWeight: o.dueDateBasis === 'ETA' ? 700 : 400,
+                    }}>
                       {o.scheduledDate ? new Date(o.scheduledDate).toLocaleDateString() : '--'}
+                      {o.dueDateBasis === 'ETA' && <span title="Days Outstanding is counting down to this date" style={{ marginLeft: 4, cursor: 'help' }}>📌</span>}
                     </td>
                     <td style={{ padding: '10px 12px', color: o.daysOutstanding < 0 ? '#dc3545' : 'var(--text-700)' }}>
                       {o.daysOutstanding < 0
@@ -666,6 +679,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                         : o.daysOutstanding === 0
                           ? 'Due today'
                           : `Due in ${o.daysOutstanding} day${o.daysOutstanding !== 1 ? 's' : ''}`}
+                      <span style={{ fontWeight: 400, color: 'var(--text-500)' }}> ({o.dueDateBasis})</span>
                     </td>
                   </tr>
                 ))}
