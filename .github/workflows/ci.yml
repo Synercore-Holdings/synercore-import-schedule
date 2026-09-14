@@ -28,3 +28,45 @@ jobs:
       - run: npm ci
       - run: npm run lint
     continue-on-error: true
+
+  deploy:
+    name: Deploy to Vercel (production)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    concurrency:
+      group: vercel-production-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # NOTE: VERCEL_TOKEN belongs to Willem van der Merwe's Vercel account, not the
+      # GitHub repo owner (tgo0427), whose "synecore" team role (VIEWER_FOR_PLUS) can't
+      # deploy via dashboard or git integration. This token can be revoked/rotated by its
+      # owner at any time with no warning to this pipeline -- the durable fix is for a
+      # Vercel org owner to either upgrade tgo0427's role or issue a dedicated CI token.
+      - name: Deploy to Vercel (production)
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          DEPLOY_URL=$(npx vercel@latest deploy --prod --token="$VERCEL_TOKEN" --yes)
+          echo "Deployed to: $DEPLOY_URL"
+          echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+      # Vercel does not reliably auto-promote CLI-triggered --prod deployments to the
+      # production domain for this project -- do not remove without verifying first.
+      - name: Promote deployment to production domain
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          npx vercel@latest alias set "${{ steps.deploy.outputs.deploy_url }}" synercore-import-schedule.vercel.app --token="$VERCEL_TOKEN" --scope synecore
