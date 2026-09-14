@@ -83,6 +83,9 @@ const INITIAL_FORM_STATE = {
   crusaders_distribution_loads: 0,
   crusaders_warehousing_total_weeks: 0,
   crusaders_clearing_forwarding_zar: 0,
+  crusaders_cold_room_enabled: false,
+  crusaders_cold_room_months: 0,
+  crusaders_cold_room_pallet_count: 0,
   // Destination Charges (Port/Shipping) - Default rates from AFI rate sheet
   shipping_line_charges_zar: 0,
   cargo_dues_20ft_zar: 1879.72,

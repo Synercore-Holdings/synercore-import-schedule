@@ -905,6 +905,9 @@ export function generateEstimatePDF(estimate) {
             ['Handling In/Out', formatCurrency(c.handlingTotal)],
             ['Warehousing', formatCurrency(c.warehousingTotal)],
             ['Import & Export Clearing & Forwarding', formatCurrency(c.clearingForwardingTotal)],
+            ['Once-Off Set Up Fee (Cold Room)', formatCurrency(c.coldRoomSetupTotal)],
+            ['Monthly Rental (Cold Room)', formatCurrency(c.coldRoomRentalTotal)],
+            ['In/Out Fee (Cold Room)', formatCurrency(c.coldRoomInOutTotal)],
           ];
         })())
       : filterZeroRows([

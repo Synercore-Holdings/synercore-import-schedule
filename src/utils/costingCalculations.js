@@ -212,6 +212,12 @@ export const CRUSADERS_LOCAL_CHARGE_RATES = {
   handling_in_out: 45,            // per pallet
   warehousing: 31.5,              // per pallet per week
   warehousing_free_weeks: 1,      // days 1-7 free = first week free
+  // Temperature-controlled (cold room) add-on -- 2x 40ft cold room
+  // containers on site at Crusaders' Eastport facility, solar + 650kVA
+  // backup generator.
+  cold_room_setup_fee: 42624,       // once-off
+  cold_room_monthly_rental: 19042,  // per month
+  cold_room_in_out_fee: 55,         // per pallet
 };
 
 export const calculateCrusadersLocalCharges = (data) => {
@@ -240,7 +246,15 @@ export const calculateCrusadersLocalCharges = (data) => {
 
   const clearingForwardingTotal = parseFloat(data.crusaders_clearing_forwarding_zar) || 0;
 
-  const subtotal = unpackTotal + distributionTotal + palletSupplyTotal + handlingTotal + warehousingTotal + clearingForwardingTotal;
+  const coldRoomEnabled = !!data.crusaders_cold_room_enabled;
+  const coldRoomSetupTotal = coldRoomEnabled ? CRUSADERS_LOCAL_CHARGE_RATES.cold_room_setup_fee : 0;
+  const coldRoomMonths = parseFloat(data.crusaders_cold_room_months) || 0;
+  const coldRoomRentalTotal = coldRoomEnabled ? coldRoomMonths * CRUSADERS_LOCAL_CHARGE_RATES.cold_room_monthly_rental : 0;
+  const coldRoomPalletQty = parseFloat(data.crusaders_cold_room_pallet_count) || 0;
+  const coldRoomInOutTotal = coldRoomEnabled ? coldRoomPalletQty * CRUSADERS_LOCAL_CHARGE_RATES.cold_room_in_out_fee : 0;
+  const coldRoomTotal = coldRoomSetupTotal + coldRoomRentalTotal + coldRoomInOutTotal;
+
+  const subtotal = unpackTotal + distributionTotal + palletSupplyTotal + handlingTotal + warehousingTotal + clearingForwardingTotal + coldRoomTotal;
 
   return {
     packingType, unpackRate, containerQty, unpackTotal,
@@ -248,6 +262,8 @@ export const calculateCrusadersLocalCharges = (data) => {
     palletQty, palletSupplyTotal, handlingTotal,
     totalWeeks, billableWeeks, warehousingTotal,
     clearingForwardingTotal,
+    coldRoomEnabled, coldRoomSetupTotal, coldRoomMonths, coldRoomRentalTotal,
+    coldRoomPalletQty, coldRoomInOutTotal, coldRoomTotal,
     subtotal,
   };
 };

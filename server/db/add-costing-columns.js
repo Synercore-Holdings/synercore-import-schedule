@@ -269,6 +269,9 @@ export default async function addCostingColumns() {
     'crusaders_distribution_loads NUMERIC(12,2) DEFAULT 0',
     'crusaders_warehousing_total_weeks NUMERIC(12,2) DEFAULT 0',
     'crusaders_clearing_forwarding_zar NUMERIC(12,2) DEFAULT 0',
+    'crusaders_cold_room_enabled BOOLEAN DEFAULT false',
+    'crusaders_cold_room_months NUMERIC(12,2) DEFAULT 0',
+    'crusaders_cold_room_pallet_count NUMERIC(12,2) DEFAULT 0',
   ];
 
   for (const col of crusadersColumns) {

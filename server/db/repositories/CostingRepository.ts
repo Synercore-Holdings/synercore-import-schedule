@@ -205,6 +205,7 @@ const COST_ESTIMATE_COLUMNS = [
   'local_charges_provider', 'crusaders_unpack_packing_type', 'crusaders_pallet_count',
   'crusaders_distribution_direction', 'crusaders_distribution_loads',
   'crusaders_warehousing_total_weeks', 'crusaders_clearing_forwarding_zar',
+  'crusaders_cold_room_enabled', 'crusaders_cold_room_months', 'crusaders_cold_room_pallet_count',
   // Destination Charges
   'shipping_line_charges_zar', 'cargo_dues_20ft_zar', 'cargo_dues_40ft_zar', 'cto_fee_zar',
   'port_health_inspection_zar', 'daff_inspection_zar', 'state_vet_cancellation_fee_zar',

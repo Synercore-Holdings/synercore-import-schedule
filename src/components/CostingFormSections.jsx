@@ -749,6 +749,52 @@ function CostingFormSections({
 
           {currencyInput('Import & Export Clearing & Forwarding', 'crusaders_clearing_forwarding_zar', 'ZAR', "Quoted per shipment on Crusaders' rate card — no fixed rate, enter the quoted amount.")}
 
+          <div style={{ marginBottom: '12px', gridColumn: 'span 3', display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '4px', borderTop: '1px dashed #86efac' }}>
+            <input
+              type="checkbox"
+              id="crusaders_cold_room_enabled"
+              checked={!!formData.crusaders_cold_room_enabled}
+              onChange={(e) => onInputChange('crusaders_cold_room_enabled', e.target.checked)}
+              style={{ width: '16px', height: '16px' }}
+            />
+            <label htmlFor="crusaders_cold_room_enabled" style={{ fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)', cursor: 'pointer' }}>
+              Temperature-Controlled Storage Required <InfoTip text="2x 40ft cold room containers at Crusaders' Eastport facility (solar + 650kVA backup generator on site)." />
+            </label>
+          </div>
+
+          {formData.crusaders_cold_room_enabled && (
+            <>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+                  Once-Off Set Up Fee
+                </label>
+                <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+                  {formatCurrency(crusadersCalc.coldRoomSetupTotal)}
+                </div>
+              </div>
+
+              {input('Monthly Rental: No. of Months', 'crusaders_cold_room_months', 'number')}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+                  Monthly Rental - Auto
+                </label>
+                <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+                  {formatCurrency(crusadersCalc.coldRoomRentalTotal)}
+                </div>
+              </div>
+
+              {input('Cold Room Pallet Count (In/Out)', 'crusaders_cold_room_pallet_count', 'number')}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+                  In/Out Fee - Auto
+                </label>
+                <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+                  {formatCurrency(crusadersCalc.coldRoomInOutTotal)}
+                </div>
+              </div>
+            </>
+          )}
+
           <div style={{ marginBottom: '12px' }}>
             <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
               Local Charges Sub-Total - Auto
