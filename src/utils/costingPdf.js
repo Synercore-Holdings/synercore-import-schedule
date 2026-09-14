@@ -4,7 +4,7 @@
  */
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { calculateAllTotals, formatCurrency, formatNumber, LAST_MILE_SERVICE_TYPES, getLastMileRate } from './costingCalculations';
+import { calculateAllTotals, formatCurrency, formatNumber, LAST_MILE_SERVICE_TYPES, getLastMileRate, calculateCrusadersLocalCharges } from './costingCalculations';
 
 // === Design tokens (shared across the PDF) ==============================
 // Single palette so every section feels of-a-piece. Section identity is
@@ -892,8 +892,22 @@ export function generateEstimatePDF(estimate) {
       });
     }
 
-    // Local Charges — labels flip to/from for export
-    const localChargeRows = filterZeroRows([
+    // Local Charges — either AGX's flat fields (labels flip to/from for
+    // export), or Crusaders' live rate x quantity breakdown, depending on
+    // which provider this estimate used.
+    const localChargeRows = estimate.local_charges_provider === 'crusaders'
+      ? filterZeroRows((() => {
+          const c = calculateCrusadersLocalCharges(estimate);
+          return [
+            ['Container Unpacking', formatCurrency(c.unpackTotal)],
+            ['Distribution', formatCurrency(c.distributionTotal)],
+            ['Pallet Supply', formatCurrency(c.palletSupplyTotal)],
+            ['Handling In/Out', formatCurrency(c.handlingTotal)],
+            ['Warehousing', formatCurrency(c.warehousingTotal)],
+            ['Import & Export Clearing & Forwarding', formatCurrency(c.clearingForwardingTotal)],
+          ];
+        })())
+      : filterZeroRows([
       [isExport ? 'Local Cartage: Klapmuts to CPT (<20 Ton)' : 'Local Cartage: CPT to Klapmuts (<20 Ton)', formatCurrency(estimate.local_cartage_cpt_klapmuts_20ton_zar)],
       [isExport ? 'Local Cartage: Klapmuts to CPT (21-28 Ton)' : 'Local Cartage: CPT to Klapmuts (21-28 Ton)', formatCurrency(estimate.local_cartage_cpt_klapmuts_28ton_zar)],
       [isExport ? 'Transport: Pretoria to DBN Port (20FT)' : 'Transport: DBN Port to Pretoria (20FT)', formatCurrency(estimate.transport_dbn_to_pretoria_20ft_zar)],

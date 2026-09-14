@@ -1474,6 +1474,40 @@ export const migrations: Migration[] = [
       return true;
     },
   },
+
+  // Crusaders local-charges provider: distinct rate card from AGX's flat
+  // fields (per-container/pallet/load/week rather than per fixed route),
+  // selectable per estimate via local_charges_provider (default 'agx').
+  {
+    name: 'add-crusaders-local-charges-columns',
+    version: '028',
+    description: 'Add Crusaders local-charges provider columns to import_cost_estimates table',
+    depends_on: ['schema.sql'],
+    execute: async () => {
+      const crusadersColumns = [
+        "local_charges_provider VARCHAR(20) DEFAULT 'agx'",
+        "crusaders_unpack_packing_type VARCHAR(20) DEFAULT 'palletised'",
+        'crusaders_pallet_count NUMERIC(12,2) DEFAULT 0',
+        'crusaders_distribution_direction VARCHAR(20)',
+        'crusaders_distribution_loads NUMERIC(12,2) DEFAULT 0',
+        'crusaders_warehousing_total_weeks NUMERIC(12,2) DEFAULT 0',
+        'crusaders_clearing_forwarding_zar NUMERIC(12,2) DEFAULT 0',
+      ];
+      for (const colDef of crusadersColumns) {
+        const colName = colDef.split(' ')[0];
+        const checkResult = await pool.query(
+          `SELECT column_name FROM information_schema.columns
+           WHERE table_name='import_cost_estimates' AND column_name=$1`,
+          [colName]
+        );
+        if (checkResult.rows.length === 0) {
+          await pool.query(`ALTER TABLE import_cost_estimates ADD COLUMN ${colDef}`);
+          logInfo(`Added column ${colName} to import_cost_estimates`);
+        }
+      }
+      return true;
+    },
+  },
 ];
 
 /**

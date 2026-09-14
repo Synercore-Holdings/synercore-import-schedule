@@ -13,6 +13,8 @@ import {
   AIRLINES,
   LAST_MILE_SERVICE_TYPES,
   getLastMileRouteOptions,
+  LOCAL_CHARGES_PROVIDERS,
+  calculateCrusadersLocalCharges,
 } from '../utils/costingCalculations';
 
 // Payment terms options
@@ -141,6 +143,11 @@ function CostingFormSections({
   const presentationRate = parseFloat(
     presentationCurrency === 'EUR' ? formData.roe_eur : formData.roe_origin
   ) || 0;
+
+  // Live rate x quantity breakdown for the Crusaders local-charges
+  // provider -- cheap enough to compute unconditionally on every render,
+  // only actually read from when local_charges_provider === 'crusaders'.
+  const crusadersCalc = calculateCrusadersLocalCharges(formData);
   const toPresentation = (zar) => (isExport && presentationRate > 0 ? zar / presentationRate : zar);
   const getProductAllocationShippingTotal = () => {
     const freightIncluded = ['CIF', 'CIP', 'CFR'].includes((formData.inco_terms || '').toUpperCase());
@@ -674,6 +681,84 @@ function CostingFormSections({
       {/* Section: Local Charges (Transport/Cartage) */}
       <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '8px' }}>
         <h4 style={{ margin: '0 0 1rem', color: '#166534', fontSize: '1rem' }}>Local Charges (Transport/Cartage) - ZAR <InfoTip text={isExport ? 'Inland transport and handling costs within South Africa for delivery to port of loading.' : 'Inland transport and handling costs within South Africa after port discharge.'} /></h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: formData.local_charges_provider === 'crusaders' ? '0' : '1rem' }}>
+          {select('Local Charges Provider', 'local_charges_provider', LOCAL_CHARGES_PROVIDERS, "Choose which forwarder's rate card applies to this estimate.")}
+        </div>
+        {formData.local_charges_provider === 'crusaders' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          {select('Container Unpacking: Packing Type', 'crusaders_unpack_packing_type', [
+            { value: 'palletised', label: 'Palletised (20ft & 40ft)' },
+            { value: 'loose', label: 'Loose' },
+          ])}
+          <div style={{ marginBottom: '12px', gridColumn: 'span 2' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Container Unpacking - Auto
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+              {formatCurrency(crusadersCalc.unpackTotal)}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
+              {crusadersCalc.containerQty} container(s) ({formData.container_type || '—'}) × {formatCurrency(crusadersCalc.unpackRate)}
+            </div>
+          </div>
+
+          {select('Distribution Direction', 'crusaders_distribution_direction', [
+            { value: 'cpt_to_jhb', label: 'Cape Town to Johannesburg' },
+            { value: 'jhb_to_cpt', label: 'Johannesburg to Cape Town' },
+          ])}
+          {input('Distribution: No. of Loads', 'crusaders_distribution_loads', 'number')}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Distribution - Auto
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+              {formatCurrency(crusadersCalc.distributionTotal)}
+            </div>
+          </div>
+
+          {input('Pallet Count', 'crusaders_pallet_count', 'number', {}, 'Shared by Pallet Supply, Handling In/Out and Warehousing below.')}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Pallet Supply - Auto
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+              {formatCurrency(crusadersCalc.palletSupplyTotal)}
+            </div>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Handling In/Out - Auto
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+              {formatCurrency(crusadersCalc.handlingTotal)}
+            </div>
+          </div>
+
+          {input('Warehousing: Total Weeks in Storage', 'crusaders_warehousing_total_weeks', 'number', {}, 'Days 1–7 (first week) are free — only weeks beyond that are billed.')}
+          <div style={{ marginBottom: '12px', gridColumn: 'span 2' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Warehousing - Auto
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+              {formatCurrency(crusadersCalc.warehousingTotal)}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '4px' }}>
+              {crusadersCalc.billableWeeks} billable week(s) of {crusadersCalc.totalWeeks} total × {crusadersCalc.palletQty} pallet(s)
+            </div>
+          </div>
+
+          {currencyInput('Import & Export Clearing & Forwarding', 'crusaders_clearing_forwarding_zar', 'ZAR', "Quoted per shipment on Crusaders' rate card — no fixed rate, enter the quoted amount.")}
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Local Charges Sub-Total - Auto
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#dcfce7', borderRadius: '6px', fontWeight: '600', color: '#166534' }}>
+              {formatCurrency(calculatedTotals.local_charges_subtotal_zar)}
+            </div>
+          </div>
+        </div>
+        ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
           {currencyInput(isExport ? 'Local Cartage: Klapmuts to CPT (<20 Ton)' : 'Local Cartage: CPT to Klapmuts (<20 Ton)', 'local_cartage_cpt_klapmuts_20ton_zar')}
           {currencyInput(isExport ? 'Local Cartage: Klapmuts to CPT (21-28 Ton)' : 'Local Cartage: CPT to Klapmuts (21-28 Ton)', 'local_cartage_cpt_klapmuts_28ton_zar')}
@@ -699,8 +784,8 @@ function CostingFormSections({
             </div>
           </div>
         </div>
+        )}
       </div>
-
       {/* Section: Destination Charges (import) OR Export Charges (export) */}
       {isExport ? (
         <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px' }}>

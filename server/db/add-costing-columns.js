@@ -256,6 +256,24 @@ export default async function addCostingColumns() {
     if (await addColumn(col)) added++;
   }
 
+
+  // Second local-charges provider alongside the flat AGX fields above --
+  // Crusaders prices per container/pallet/load/week; local_charges_provider
+  // selects which one an estimate uses (default 'agx', so existing estimates
+  // are unaffected). See calculateCrusadersLocalCharges in costingCalculations.js.
+  const crusadersColumns = [
+    "local_charges_provider VARCHAR(20) DEFAULT 'agx'",
+    "crusaders_unpack_packing_type VARCHAR(20) DEFAULT 'palletised'",
+    'crusaders_pallet_count NUMERIC(12,2) DEFAULT 0',
+    'crusaders_distribution_direction VARCHAR(20)',
+    'crusaders_distribution_loads NUMERIC(12,2) DEFAULT 0',
+    'crusaders_warehousing_total_weeks NUMERIC(12,2) DEFAULT 0',
+    'crusaders_clearing_forwarding_zar NUMERIC(12,2) DEFAULT 0',
+  ];
+
+  for (const col of crusadersColumns) {
+    if (await addColumn(col)) added++;
+  }
   const lastMileColumns = [
     "last_mile_service_type VARCHAR(50)",
     "last_mile_route VARCHAR(100)",

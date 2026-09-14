@@ -73,6 +73,16 @@ const INITIAL_FORM_STATE = {
   local_cartage_dbn_whs_pretoria_12m_zar: 14330,
   transport_pe_coega_to_pretoria_zar: 0,
   transport_plz_to_east_london_zar: 0,
+  // Local Charges provider toggle + Crusaders rate-card quantities (rates
+  // themselves are hardcoded constants, not stored per-estimate — see
+  // CRUSADERS_LOCAL_CHARGE_RATES in costingCalculations.js)
+  local_charges_provider: 'agx',
+  crusaders_unpack_packing_type: 'palletised',
+  crusaders_pallet_count: 0,
+  crusaders_distribution_direction: '',
+  crusaders_distribution_loads: 0,
+  crusaders_warehousing_total_weeks: 0,
+  crusaders_clearing_forwarding_zar: 0,
   // Destination Charges (Port/Shipping) - Default rates from AFI rate sheet
   shipping_line_charges_zar: 0,
   cargo_dues_20ft_zar: 1879.72,

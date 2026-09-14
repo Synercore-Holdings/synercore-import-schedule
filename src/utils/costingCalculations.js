@@ -192,7 +192,70 @@ export const calculateOriginChargeZAR = (originChargeUSD, roeOrigin) => {
 /**
  * Calculate local charges (transport/cartage) subtotal
  */
+// Second local-charges provider, alongside the flat AGX field-set above --
+// Crusaders prices per container/pallet/load/week rather than per fixed
+// route, so it's modelled as live rate x quantity, same pattern as
+// calculateLastMileCharge below, instead of the AGX convention of typing
+// a pre-computed final ZAR amount into each field.
+export const LOCAL_CHARGES_PROVIDERS = [
+  { value: 'agx', label: 'AGX' },
+  { value: 'crusaders', label: 'Crusaders' },
+];
+
+export const CRUSADERS_LOCAL_CHARGE_RATES = {
+  unpack_palletised: 1450,       // per container (20ft or 40ft, same rate)
+  unpack_loose_20ft: 2100,       // per 20ft container
+  unpack_loose_40ft: 2300,       // per 40ft container
+  distribution_cpt_to_jhb: 28000, // per load
+  distribution_jhb_to_cpt: 38000, // per load
+  pallet_supply: 135,             // per pallet (includes shrink wrapping)
+  handling_in_out: 45,            // per pallet
+  warehousing: 31.5,              // per pallet per week
+  warehousing_free_weeks: 1,      // days 1-7 free = first week free
+};
+
+export const calculateCrusadersLocalCharges = (data) => {
+  const packingType = data.crusaders_unpack_packing_type || 'palletised';
+  const is40ft = (data.container_type || '').includes('40');
+  const containerQty = parseFloat(data.quantity) || 0;
+  const unpackRate = packingType === 'loose'
+    ? (is40ft ? CRUSADERS_LOCAL_CHARGE_RATES.unpack_loose_40ft : CRUSADERS_LOCAL_CHARGE_RATES.unpack_loose_20ft)
+    : CRUSADERS_LOCAL_CHARGE_RATES.unpack_palletised;
+  const unpackTotal = unpackRate * containerQty;
+
+  const distDirection = data.crusaders_distribution_direction || '';
+  const distLoads = parseFloat(data.crusaders_distribution_loads) || 0;
+  const distRate = distDirection === 'cpt_to_jhb' ? CRUSADERS_LOCAL_CHARGE_RATES.distribution_cpt_to_jhb
+    : distDirection === 'jhb_to_cpt' ? CRUSADERS_LOCAL_CHARGE_RATES.distribution_jhb_to_cpt
+    : 0;
+  const distributionTotal = distRate * distLoads;
+
+  const palletQty = parseFloat(data.crusaders_pallet_count) || 0;
+  const palletSupplyTotal = palletQty * CRUSADERS_LOCAL_CHARGE_RATES.pallet_supply;
+  const handlingTotal = palletQty * CRUSADERS_LOCAL_CHARGE_RATES.handling_in_out;
+
+  const totalWeeks = parseFloat(data.crusaders_warehousing_total_weeks) || 0;
+  const billableWeeks = Math.max(0, totalWeeks - CRUSADERS_LOCAL_CHARGE_RATES.warehousing_free_weeks);
+  const warehousingTotal = palletQty * billableWeeks * CRUSADERS_LOCAL_CHARGE_RATES.warehousing;
+
+  const clearingForwardingTotal = parseFloat(data.crusaders_clearing_forwarding_zar) || 0;
+
+  const subtotal = unpackTotal + distributionTotal + palletSupplyTotal + handlingTotal + warehousingTotal + clearingForwardingTotal;
+
+  return {
+    packingType, unpackRate, containerQty, unpackTotal,
+    distDirection, distRate, distLoads, distributionTotal,
+    palletQty, palletSupplyTotal, handlingTotal,
+    totalWeeks, billableWeeks, warehousingTotal,
+    clearingForwardingTotal,
+    subtotal,
+  };
+};
+
 export const calculateLocalChargesSubtotal = (data) => {
+  if (data.local_charges_provider === 'crusaders') {
+    return calculateCrusadersLocalCharges(data).subtotal;
+  }
   return (
     (parseFloat(data.local_cartage_cpt_klapmuts_20ton_zar) || 0) +
     (parseFloat(data.local_cartage_cpt_klapmuts_28ton_zar) || 0) +
@@ -1187,6 +1250,9 @@ export default {
   INCO_TERMS,
   LAST_MILE_SERVICE_TYPES,
   LAST_MILE_RATES,
+  LOCAL_CHARGES_PROVIDERS,
+  CRUSADERS_LOCAL_CHARGE_RATES,
+  calculateCrusadersLocalCharges,
   getLastMileRouteOptions,
   getLastMileRate,
   SA_PORTS,
