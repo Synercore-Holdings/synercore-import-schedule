@@ -148,9 +148,13 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     const openOrdersTotal = filteredMetrics.reduce((sum, m) => sum + (m.openOrdersCount || 0), 0);
 
     const active = filteredMetrics.filter(m => m.totalShipments > 0);
-    if (active.length === 0) return { avgOnTime: 0, avgPassRate: 0, avgLeadTime: null, avgFreightLeadTime: null, openOrdersTotal, grades: { A: 0, B: 0, C: 0 } };
+    if (active.length === 0) return { avgOnTime: 0, avgOnTimeDeparture: null, avgPassRate: 0, avgLeadTime: null, avgFreightLeadTime: null, openOrdersTotal, grades: { A: 0, B: 0, C: 0 } };
 
     const avgOnTime = Math.round(active.reduce((s, m) => s + m.onTimePercent, 0) / active.length);
+    const withOnTimeDeparture = active.filter(m => m.onTimeDeparturePercent !== null);
+    const avgOnTimeDeparture = withOnTimeDeparture.length > 0
+      ? Math.round(withOnTimeDeparture.reduce((s, m) => s + m.onTimeDeparturePercent, 0) / withOnTimeDeparture.length)
+      : null;
     const withPassRate = active.filter(m => m.passRatePercent !== null);
     const avgPassRate = withPassRate.length > 0
       ? Math.round(withPassRate.reduce((s, m) => s + m.passRatePercent, 0) / withPassRate.length)
@@ -167,7 +171,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     const grades = { A: 0, B: 0, C: 0 };
     active.forEach(m => { if (m.grade?.grade) grades[m.grade.grade] = (grades[m.grade.grade] || 0) + 1; });
 
-    return { avgOnTime, avgPassRate, avgLeadTime, avgFreightLeadTime, openOrdersTotal, grades };
+    return { avgOnTime, avgOnTimeDeparture, avgPassRate, avgLeadTime, avgFreightLeadTime, openOrdersTotal, grades };
   }, [filteredMetrics]);
 
   // ---- On-time color helper ----
@@ -489,11 +493,11 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           subtext="Shipment date to actual arrival"
         />
         <KpiCard
-          label="Grade Distribution"
-          value={`${kpis.grades.A}A / ${kpis.grades.B}B / ${kpis.grades.C}C`}
-          suffix=""
-          color="var(--text-900)"
-          subtext={`${kpis.grades.A + kpis.grades.B + kpis.grades.C} graded suppliers`}
+          label="On-Time Shipped %"
+          value={kpis.avgOnTimeDeparture !== null ? kpis.avgOnTimeDeparture : '--'}
+          suffix={kpis.avgOnTimeDeparture !== null ? '%' : ''}
+          color={kpis.avgOnTimeDeparture !== null ? (kpis.avgOnTimeDeparture >= 85 ? '#28a745' : kpis.avgOnTimeDeparture >= 70 ? '#ffc107' : '#dc3545') : 'var(--text-500)'}
+          subtext="ETD vs actual Date Shipped"
         />
         <KpiCard
           label="Open Orders"

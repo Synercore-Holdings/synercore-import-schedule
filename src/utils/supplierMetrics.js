@@ -157,6 +157,25 @@ export class SupplierMetrics {
   }
 
   /**
+   * Calculate on-time departure percentage for a supplier — the ETD-side
+   * counterpart to calculateOnTimeDelivery below. Deliberately not
+   * restricted to warehouse-confirmed shipments (unlike the arrival-side
+   * metrics): departure already happened as soon as both ETD and Date
+   * Shipped are captured, regardless of whether the shipment has arrived/
+   * been stored yet, so restricting to warehouse status would undercount
+   * recent activity. Returns null (not 0) when no shipments have both
+   * dates captured, so it reads as "no data" rather than "0% on time".
+   */
+  static calculateOnTimeDepartureRate(shipments, supplierName) {
+    const supplierShipments = this.getSupplierShipmentLines(shipments, supplierName);
+    const withDepartureData = supplierShipments.filter(s => s.etd && s.dateShipped);
+    if (withDepartureData.length === 0) return null;
+
+    const onTimeCount = withDepartureData.filter(s => this.diffCalendarDays(s.dateShipped, s.etd) <= 0).length;
+    return Math.round((onTimeCount / withDepartureData.length) * 100);
+  }
+
+  /**
    * Calculate on-time delivery percentage for a supplier
    * On-time = shipments received/stored in or before their scheduled week
    * Uses warehouse storage data for metrics
@@ -671,6 +690,7 @@ export class SupplierMetrics {
    */
   static calculateAllMetrics(shipments, supplierName) {
     const onTimePercent = this.calculateOnTimeDelivery(shipments, supplierName);
+    const onTimeDeparturePercent = this.calculateOnTimeDepartureRate(shipments, supplierName);
     const passRatePercent = this.calculateInspectionPassRate(shipments, supplierName);
     const avgLeadTime = this.calculateAverageLeadTime(shipments, supplierName);
     const avgFreightLeadTime = this.calculateAverageFreightLeadTime(shipments, supplierName);
@@ -682,6 +702,7 @@ export class SupplierMetrics {
     return {
       supplierName,
       onTimePercent,
+      onTimeDeparturePercent,
       passRatePercent,
       avgLeadTime,
       avgFreightLeadTime,
