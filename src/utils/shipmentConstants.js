@@ -15,6 +15,7 @@ export const AIRFREIGHT_AGENTS = [
   { value: 'SAA Cargo', label: 'SAA Cargo' },
   { value: 'Kenya Airways Cargo', label: 'Kenya Airways Cargo' },
   { value: 'Investec', label: 'Investec' },
+  { value: 'DHL', label: 'DHL' },
 ];
 
 // Forwarding agent options for sea freight and other modes
