@@ -397,6 +397,14 @@ export class SupplierMetrics {
         const scheduledDate = this.getScheduledDate(s);
         const actualDate = this.getActualArrivalDate(s);
         const diffDays = this.diffCalendarDays(actualDate, scheduledDate);
+        // Departure timing (ETD vs actual Date Shipped) is a separate check
+        // from arrival timing above — a shipment can arrive early/on-time
+        // against its ETA while still having left origin late against its
+        // ETD (e.g. a shorter-than-planned transit masked a late departure).
+        // Only meaningful once both dates are actually captured; older
+        // shipments predate these fields.
+        const hasDepartureData = !!(s.etd && s.dateShipped);
+        const departureDiffDays = hasDepartureData ? this.diffCalendarDays(s.dateShipped, s.etd) : null;
         return {
           orderRef: s.orderRef || s.id,
           supplierName: s.supplier,
@@ -410,6 +418,10 @@ export class SupplierMetrics {
           // rather than falling back to the receiving-workflow timestamp
           isVerifiedArrival: !!s.actualArrivalDate,
           lateConfirmed: !!s.lateConfirmed,
+          etd: s.etd || null,
+          dateShipped: s.dateShipped || null,
+          hasDepartureData,
+          departureDiffDays,
           // Full shipment, so callers can open it for editing (e.g. to
           // enter the actual arrival date) straight from the audit row
           shipment: s,

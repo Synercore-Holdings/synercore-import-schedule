@@ -700,7 +700,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                  {['Order Ref', 'Product', 'Originally Scheduled', 'Actual Received', 'Days Late/Early', 'Status'].map(label => (
+                  {['Order Ref', 'Product', 'ETD', 'Date Shipped', 'Departure Variance', 'Originally Scheduled', 'Actual Received', 'Days Late/Early', 'Status'].map(label => (
                     <th key={label} style={{
                       padding: '10px 12px', textAlign: 'left', fontSize: 11,
                       fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
@@ -713,7 +713,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
               </thead>
               <tbody>
                 {shipmentAudit.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No warehouse-confirmed shipments yet</td></tr>
+                  <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No warehouse-confirmed shipments yet</td></tr>
                 )}
                 {(() => { let highlightMatched = false; return shipmentAudit.map((a, idx) => {
                   const isHighlighted = a.orderRef === highlightRef && !highlightMatched;
@@ -748,6 +748,19 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                       )}
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{a.productName || '--'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {a.etd ? new Date(a.etd).toLocaleDateString() : '--'}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
+                      {a.dateShipped ? new Date(a.dateShipped).toLocaleDateString() : '--'}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: !a.hasDepartureData ? 'var(--text-500)' : a.departureDiffDays > 0 ? '#dc3545' : a.departureDiffDays < 0 ? '#28a745' : 'var(--text-700)' }}>
+                      {!a.hasDepartureData
+                        ? '--'
+                        : a.departureDiffDays > 0 ? `${a.departureDiffDays} day${a.departureDiffDays !== 1 ? 's' : ''} late`
+                        : a.departureDiffDays < 0 ? `${Math.abs(a.departureDiffDays)} day${Math.abs(a.departureDiffDays) !== 1 ? 's' : ''} early`
+                        : 'On time'}
+                    </td>
                     <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>
                       {a.scheduledDate}
                       {a.usedFallbackBenchmark && (
