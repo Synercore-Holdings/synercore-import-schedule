@@ -607,12 +607,20 @@ export class SupplierMetrics {
         const isPlanned = PLANNED_STATUSES.includes(s.latestStatus);
         const dueDateIsEtd = isPlanned && !!s.etd;
         const dueDate = dueDateIsEtd ? s.etd : eta;
+        // The frozen original commitment, for surfacing "this was revised
+        // from X" in the UI — separate from getScheduledDate(), which
+        // returns whichever of the two matters for scoring, not both.
+        const originalScheduledDate = s.originalSelectedWeekDate
+          || (s.originalWeekNumber ? this.estimateDateFromWeek(s.originalWeekNumber, s.receivingDate) : null);
+        const wasRescheduled = !!originalScheduledDate && this.diffCalendarDays(eta, originalScheduledDate) !== 0;
         return {
           orderRef: s.orderRef || s.id,
           supplierName: s.supplier,
           productName: s.productName,
           latestStatus: s.latestStatus,
           scheduledDate: eta,
+          originalScheduledDate,
+          wasRescheduled,
           // Which milestone daysOutstanding is measured against, so the UI
           // can label it — without this, "Due in 34 days" is ambiguous when
           // both an ETD and an ETA are visible in the same row.

@@ -676,6 +676,11 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
                     }}>
                       {o.scheduledDate ? new Date(o.scheduledDate).toLocaleDateString() : '--'}
                       {o.dueDateBasis === 'ETA' && <span title="Days Outstanding is counting down to this date" style={{ marginLeft: 4, cursor: 'help' }}>📌</span>}
+                      {o.wasRescheduled && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '2px' }}>
+                          (originally: {new Date(o.originalScheduledDate).toLocaleDateString()})
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '10px 12px', color: o.daysOutstanding < 0 ? '#dc3545' : 'var(--text-700)' }}>
                       {o.daysOutstanding < 0

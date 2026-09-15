@@ -414,6 +414,12 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             onWeekSelect={handleWeekUpdate}
             selectedWeekDate={selectedWeekDate}
           />
+          {formData.originalWeekNumber && formData.weekNumber && String(formData.originalWeekNumber) !== String(formData.weekNumber) && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginTop: '0.5rem' }}>
+              Originally scheduled: Week {formData.originalWeekNumber}
+              {formData.originalSelectedWeekDate ? ` (${new Date(formData.originalSelectedWeekDate).toLocaleDateString()})` : ''}
+            </div>
+          )}
         </div>
 
         {/* ETD (Estimated Departure) */}
