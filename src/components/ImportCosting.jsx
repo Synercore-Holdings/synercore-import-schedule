@@ -386,6 +386,19 @@ function ReferenceChangeView({ estimates, onClose }) {
   );
 }
 
+// Broad cost-composition buckets for the stacked bar in Compare Estimates --
+// coarser than COMPARE_METRIC_ROWS on purpose, since the point of the bar is
+// "is this shipment freight-heavy or customs-heavy", not exact line items.
+const COMPOSITION_SEGMENTS = [
+  { label: 'Goods Value', color: '#94a3b8', getValue: (t) => t.customs_value_zar || 0 },
+  { label: 'Freight', color: '#3b82f6', getValue: (t, est) => (est.transport_mode === 'air' ? t.total_airfreight_cost_zar : t.total_ocean_freight_zar) || 0 },
+  {
+    label: 'Local & Destination Handling', color: '#f59e0b',
+    getValue: (t) => (t.local_charges_subtotal_zar || 0) + (t.destination_charges_subtotal_zar || 0) + (t.warehouse_charges_subtotal_zar || 0) + (t.last_mile_charges_subtotal_zar || 0),
+  },
+  { label: 'Customs & Duties', color: '#10b981', getValue: (t) => t.customs_subtotal_zar || 0 },
+];
+
 // Mirrors the weight fallback inside calculateAllTotals (costingCalculations.js)
 // so Compare Estimates can normalize non-headline rows to a per-kg figure too.
 const getEstimateWeightKg = (est) => {
@@ -526,6 +539,39 @@ function CompareEstimatesView({ estimates, onClose }) {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)', marginBottom: '12px' }}>Cost Composition</div>
+              {[estA, estB].map((est, idx) => {
+                const totals = idx === 0 ? totalsA : totalsB;
+                const segments = COMPOSITION_SEGMENTS.map(seg => ({ ...seg, value: Math.max(0, seg.getValue(totals, est)) }));
+                const segmentTotal = segments.reduce((sum, seg) => sum + seg.value, 0);
+                return (
+                  <div key={est.id} style={{ marginBottom: idx === 0 ? '14px' : 0 }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginBottom: '4px' }}>
+                      Estimate {idx === 0 ? 'A' : 'B'} — {est.reference_number || est.id}
+                    </div>
+                    <div style={{ display: 'flex', width: '100%', height: '22px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                      {segmentTotal > 0 ? segments.filter(seg => seg.value > 0).map(seg => (
+                        <div
+                          key={seg.label}
+                          title={`${seg.label}: ${formatCurrency(seg.value)} (${((seg.value / segmentTotal) * 100).toFixed(1)}%)`}
+                          style={{ width: `${(seg.value / segmentTotal) * 100}%`, backgroundColor: seg.color }}
+                        />
+                      )) : <div style={{ width: '100%', backgroundColor: '#e5e7eb' }} />}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px' }}>
+                {COMPOSITION_SEGMENTS.map(seg => (
+                  <div key={seg.label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-700)' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: seg.color, display: 'inline-block' }} />
+                    {seg.label}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
