@@ -386,6 +386,13 @@ function ReferenceChangeView({ estimates, onClose }) {
   );
 }
 
+// Mirrors the weight fallback inside calculateAllTotals (costingCalculations.js)
+// so Compare Estimates can normalize non-headline rows to a per-kg figure too.
+const getEstimateWeightKg = (est) => {
+  const productsWeight = (est.products || []).reduce((sum, p) => sum + (parseFloat(p.weight_kg) || 0), 0);
+  return productsWeight > 0 ? productsWeight : (parseFloat(est.total_gross_weight_kg) || 0);
+};
+
 // Metric rows shown in the Compare Estimates table. seaOnly/airOnly rows are
 // dropped entirely when neither estimate being compared uses that mode, and
 // non-headline rows are dropped when both estimates are zero for that field —
@@ -421,6 +428,11 @@ function CompareEstimatesView({ estimates, onClose }) {
   const estB = activeEstimates.find(e => e.id === compareIdB) || null;
   const totalsA = estA ? calculateAllTotals(estA) : null;
   const totalsB = estB ? calculateAllTotals(estB) : null;
+  // Same weight fallback calculateAllTotals uses internally (products sum,
+  // else the legacy total_gross_weight_kg field) — needed here separately
+  // since the totals object doesn't expose the weight it divided by.
+  const weightA = estA ? getEstimateWeightKg(estA) : 0;
+  const weightB = estB ? getEstimateWeightKg(estB) : 0;
 
   const optionLabel = (est) => `${est.reference_number || est.id} — ${est.supplier_name || '—'} (${formatEstimateDate(est)})`;
 
@@ -509,6 +521,9 @@ function CompareEstimatesView({ estimates, onClose }) {
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '4px' }}>
                     {est.transport_mode === 'air' ? 'Air' : 'Sea'} · {est.transport_mode === 'air' ? (est.airline_name || '—') : (est.container_type || '—')} · {formatEstimateDate(est)}
                   </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '2px' }}>
+                    {formatNumber(idx === 0 ? weightA : weightB)} kg · {(est.products || []).length} product line{(est.products || []).length !== 1 ? 's' : ''}
+                  </div>
                 </div>
               ))}
             </div>
@@ -530,17 +545,28 @@ function CompareEstimatesView({ estimates, onClose }) {
                     const diff = valB - valA;
                     const aIsLower = row.headline && valA > 0 && valA < valB;
                     const bIsLower = row.headline && valB > 0 && valB < valA;
+                    // Per-kg normalizes line items across estimates of different
+                    // shipment sizes -- the headline rows are already either a
+                    // total or already a per-kg figure, so they don't need this.
+                    const perKgA = !row.headline && weightA > 0 ? valA / weightA : null;
+                    const perKgB = !row.headline && weightB > 0 ? valB / weightB : null;
+                    const pctDiff = valA !== 0 ? (diff / Math.abs(valA)) * 100 : null;
                     return (
                       <tr key={row.key} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: row.headline ? '#fffbeb' : (idx % 2 === 0 ? 'transparent' : '#fafafa') }}>
                         <td style={{ padding: '10px 12px', fontWeight: row.headline ? 700 : 500, color: '#0f172a' }}>{row.label}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: aIsLower ? 700 : 400, backgroundColor: aIsLower ? '#dcfce7' : undefined, color: aIsLower ? '#166534' : 'var(--text-700)' }}>
                           {formatCurrency(valA)}{aIsLower && <span style={{ marginLeft: 6, fontSize: '0.7rem', fontWeight: 700 }}>LOWER</span>}
+                          {perKgA !== null && <div style={{ fontSize: '0.72rem', color: 'var(--text-500)', fontWeight: 400 }}>{formatCurrency(perKgA)}/kg</div>}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: bIsLower ? 700 : 400, backgroundColor: bIsLower ? '#dcfce7' : undefined, color: bIsLower ? '#166534' : 'var(--text-700)' }}>
                           {formatCurrency(valB)}{bIsLower && <span style={{ marginLeft: 6, fontSize: '0.7rem', fontWeight: 700 }}>LOWER</span>}
+                          {perKgB !== null && <div style={{ fontSize: '0.72rem', color: 'var(--text-500)', fontWeight: 400 }}>{formatCurrency(perKgB)}/kg</div>}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: diff > 0 ? '#dc2626' : diff < 0 ? '#16a34a' : 'var(--text-500)' }}>
                           {diff === 0 ? '—' : `${diff > 0 ? '+' : ''}${formatCurrency(diff)}`}
+                          {pctDiff !== null && diff !== 0 && (
+                            <div style={{ fontSize: '0.72rem', fontWeight: 400 }}>({pctDiff > 0 ? '+' : ''}{pctDiff.toFixed(1)}%)</div>
+                          )}
                         </td>
                       </tr>
                     );
