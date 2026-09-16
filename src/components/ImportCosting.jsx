@@ -386,6 +386,175 @@ function ReferenceChangeView({ estimates, onClose }) {
   );
 }
 
+// Metric rows shown in the Compare Estimates table. seaOnly/airOnly rows are
+// dropped entirely when neither estimate being compared uses that mode, and
+// non-headline rows are dropped when both estimates are zero for that field —
+// keeps the table from listing a wall of "R0.00 vs R0.00" rows.
+const COMPARE_METRIC_ROWS = [
+  { label: 'Total Landed Cost', key: 'total_landed_cost_zar', headline: true },
+  { label: 'Landed Cost / KG', key: 'all_in_warehouse_cost_per_kg_zar', headline: true },
+  { label: 'Total Shipping Cost', key: 'total_shipping_cost_zar' },
+  { label: 'Ocean Freight', key: 'total_ocean_freight_zar', seaOnly: true },
+  { label: 'Airfreight Total', key: 'total_airfreight_cost_zar', airOnly: true },
+  { label: 'Origin Charges', key: 'total_origin_charges_zar' },
+  { label: 'Local Charges', key: 'local_charges_subtotal_zar' },
+  { label: 'Destination Charges', key: 'destination_charges_subtotal_zar', seaOnly: true },
+  { label: 'Warehouse Charges', key: 'warehouse_charges_subtotal_zar' },
+  { label: 'Last Mile Charges', key: 'last_mile_charges_subtotal_zar' },
+  { label: 'Customs Subtotal', key: 'customs_subtotal_zar' },
+  { label: 'Total Duties', key: 'total_duties_zar' },
+  { label: 'Agency Fee', key: 'agency_fee_zar' },
+  { label: 'Import VAT', key: 'import_vat_zar' },
+];
+
+function CompareEstimatesView({ estimates, onClose }) {
+  const [compareIdA, setCompareIdA] = useState('');
+  const [compareIdB, setCompareIdB] = useState('');
+
+  const activeEstimates = useMemo(() => {
+    return (estimates || [])
+      .filter(est => est.status !== 'archived')
+      .sort((a, b) => getEstimateDateValue(b) - getEstimateDateValue(a));
+  }, [estimates]);
+
+  const estA = activeEstimates.find(e => e.id === compareIdA) || null;
+  const estB = activeEstimates.find(e => e.id === compareIdB) || null;
+  const totalsA = estA ? calculateAllTotals(estA) : null;
+  const totalsB = estB ? calculateAllTotals(estB) : null;
+
+  const optionLabel = (est) => `${est.reference_number || est.id} — ${est.supplier_name || '—'} (${formatEstimateDate(est)})`;
+
+  const rows = (totalsA && totalsB) ? COMPARE_METRIC_ROWS.filter(row => {
+    if (row.seaOnly && estA.transport_mode === 'air' && estB.transport_mode === 'air') return false;
+    if (row.airOnly && estA.transport_mode !== 'air' && estB.transport_mode !== 'air') return false;
+    if (row.headline) return true;
+    const valA = parseFloat(totalsA[row.key]) || 0;
+    const valB = parseFloat(totalsB[row.key]) || 0;
+    return valA !== 0 || valB !== 0;
+  }) : [];
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1100,
+      backgroundColor: 'white', overflow: 'auto',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{
+        padding: '1rem 1.5rem', borderBottom: '1px solid #e5e7eb',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 10,
+      }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>Compare Cost Estimates</h2>
+          <p style={{ margin: '0.25rem 0 0', color: 'var(--text-500)', fontSize: '0.8rem' }}>
+            Pick any two estimates to see their key figures side by side
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+            color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
+            fontSize: '0.85rem', fontWeight: 500,
+          }}
+        >
+          ✕ Close
+        </button>
+      </div>
+
+      <div style={{ padding: '1.5rem', flex: 1, maxWidth: '1400px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)' }}>Estimate A</label>
+            <select
+              value={compareIdA}
+              onChange={(e) => setCompareIdA(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}
+            >
+              <option value="">Select an estimate...</option>
+              {activeEstimates.map(est => (
+                <option key={est.id} value={est.id} disabled={est.id === compareIdB}>{optionLabel(est)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)' }}>Estimate B</label>
+            <select
+              value={compareIdB}
+              onChange={(e) => setCompareIdB(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}
+            >
+              <option value="">Select an estimate...</option>
+              {activeEstimates.map(est => (
+                <option key={est.id} value={est.id} disabled={est.id === compareIdA}>{optionLabel(est)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {!estA || !estB ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-500)', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+            Select two estimates above to compare.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              {[estA, estB].map((est, idx) => (
+                <div key={est.id} style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                    Estimate {idx === 0 ? 'A' : 'B'}
+                  </div>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{est.reference_number || est.id}</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-700)' }}>{est.supplier_name || '—'}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                    {est.transport_mode === 'air' ? 'Air' : 'Sea'} · {est.transport_mode === 'air' ? (est.airline_name || '—') : (est.container_type || '—')} · {formatEstimateDate(est)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Metric</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Estimate A</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Estimate B</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Difference (B − A)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, idx) => {
+                    const valA = parseFloat(totalsA[row.key]) || 0;
+                    const valB = parseFloat(totalsB[row.key]) || 0;
+                    const diff = valB - valA;
+                    const aIsLower = row.headline && valA > 0 && valA < valB;
+                    const bIsLower = row.headline && valB > 0 && valB < valA;
+                    return (
+                      <tr key={row.key} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: row.headline ? '#fffbeb' : (idx % 2 === 0 ? 'transparent' : '#fafafa') }}>
+                        <td style={{ padding: '10px 12px', fontWeight: row.headline ? 700 : 500, color: '#0f172a' }}>{row.label}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: aIsLower ? 700 : 400, backgroundColor: aIsLower ? '#dcfce7' : undefined, color: aIsLower ? '#166534' : 'var(--text-700)' }}>
+                          {formatCurrency(valA)}{aIsLower && <span style={{ marginLeft: 6, fontSize: '0.7rem', fontWeight: 700 }}>LOWER</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: bIsLower ? 700 : 400, backgroundColor: bIsLower ? '#dcfce7' : undefined, color: bIsLower ? '#166534' : 'var(--text-700)' }}>
+                          {formatCurrency(valB)}{bIsLower && <span style={{ marginLeft: 6, fontSize: '0.7rem', fontWeight: 700 }}>LOWER</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: diff > 0 ? '#dc2626' : diff < 0 ? '#16a34a' : 'var(--text-500)' }}>
+                          {diff === 0 ? '—' : `${diff > 0 ? '+' : ''}${formatCurrency(diff)}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ImportCosting() {
   const [searchParams] = useSearchParams();
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
@@ -412,6 +581,7 @@ function ImportCosting() {
   const [emailEstimate, setEmailEstimate] = useState(null);
   const [showReports, setShowReports] = useState(false);
   const [showReferenceChanges, setShowReferenceChanges] = useState(false);
+  const [showCompareEstimates, setShowCompareEstimates] = useState(false);
   const [customImportPorts, setCustomImportPorts] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(CUSTOM_IMPORT_PORTS_KEY) || '[]');
@@ -1089,6 +1259,15 @@ function ImportCosting() {
           >
             {showReferenceChanges ? 'Close Changes' : 'Reference Changes'}
           </button>
+          <button
+            onClick={() => setShowCompareEstimates(!showCompareEstimates)}
+            style={{
+              padding: '10px 20px', backgroundColor: showCompareEstimates ? '#0369a1' : '#0ea5e9', color: 'white',
+              border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500'
+            }}
+          >
+            {showCompareEstimates ? '✕ Close Compare' : '⚖️ Compare'}
+          </button>
           {isAdmin ? (
             <>
               <button
@@ -1159,6 +1338,10 @@ function ImportCosting() {
 
       {showReferenceChanges && (
         <ReferenceChangeView estimates={estimates} onClose={() => setShowReferenceChanges(false)} />
+      )}
+
+      {showCompareEstimates && (
+        <CompareEstimatesView estimates={estimates} onClose={() => setShowCompareEstimates(false)} />
       )}
 
       {/* Form Modal */}
