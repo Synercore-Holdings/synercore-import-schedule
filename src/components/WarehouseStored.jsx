@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShipmentStatus } from '../types/shipment';
+import { ShipmentStatus, STATUS_LABELS } from '../types/shipment';
+import { isAirfreight } from '../utils/shipmentConstants';
 import { authFetch } from '../utils/authFetch';
+import { authUtils } from '../utils/auth';
 import { getApiUrl } from '../config/api';
 import { useNotification } from '../contexts/NotificationContext';
 import FilterPresetBar from './FilterPresetBar';
@@ -76,6 +78,29 @@ const stockQty = (shipment) => {
   return Number(received ?? shipment.quantity) || 0;
 };
 
+// Statuses an admin can send a mistakenly-arrived/stored shipment back to.
+// Deliberately excludes every post-arrival workflow status (unloading
+// through stored/archived/sold) -- those are exactly what this action undoes.
+const REVERT_TARGET_STATUSES = [
+  ShipmentStatus.PLANNED_SEAFREIGHT,
+  ShipmentStatus.PLANNED_AIRFREIGHT,
+  ShipmentStatus.IN_TRANSIT_SEAWAY,
+  ShipmentStatus.IN_TRANSIT_AIRFREIGHT,
+  ShipmentStatus.IN_TRANSIT_ROADWAY,
+  ShipmentStatus.IN_TRANSIT_LAST_MILE,
+  ShipmentStatus.MOORED,
+  ShipmentStatus.BERTH_WORKING,
+  ShipmentStatus.BERTH_COMPLETE,
+  ShipmentStatus.GATED_IN_PORT,
+  ShipmentStatus.DELAYED_PORT,
+  ShipmentStatus.DELAYED_CUSTOMS,
+  ShipmentStatus.DELAYED_DOCUMENTS,
+  ShipmentStatus.DELAYED_SUPPLIER,
+  ShipmentStatus.ARRIVED_PTA,
+  ShipmentStatus.ARRIVED_KLM,
+  ShipmentStatus.ARRIVED_OFFSITE,
+];
+
 const hasBeenStored = (shipment) => {
   const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
   return shipment.latestStatus === 'stored'
@@ -85,8 +110,9 @@ const hasBeenStored = (shipment) => {
     || warehouse === 'OFFSITE';
 };
 
-function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteShipment, onCreateShipment, loading }) {
+function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteShipment, onCreateShipment, onRefresh, loading }) {
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
+  const isAdmin = authUtils.getUser()?.role === 'admin';
   const [searchParamsObj, setSearchParamsObj] = useSearchParams();
   const globalSearchTerm = searchParamsObj.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(globalSearchTerm || '');
@@ -98,6 +124,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
   const [editingDate, setEditingDate] = useState(null);
   const [moveModal, setMoveModal] = useState(null);
   const [soldModal, setSoldModal] = useState(null);
+  const [revertModal, setRevertModal] = useState(null);
   const [editingDateValue, setEditingDateValue] = useState('');
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [editShipment, setEditShipment] = useState(null);
@@ -401,6 +428,37 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
       showError('Failed to move stock');
     }
     setMoveModal(null);
+  };
+
+  const openRevertModal = (shipment) => {
+    const defaultTarget = isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName)
+      ? ShipmentStatus.IN_TRANSIT_AIRFREIGHT
+      : ShipmentStatus.IN_TRANSIT_SEAWAY;
+    setRevertModal({ shipment, targetStatus: defaultTarget });
+  };
+
+  const handleRevertSubmit = async () => {
+    if (!revertModal || !revertModal.targetStatus) return;
+    const { shipment, targetStatus } = revertModal;
+
+    try {
+      const response = await authFetch(getApiUrl(`/api/shipments/${shipment.id}/admin-revert`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetStatus }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Failed to revert shipment');
+      }
+
+      showSuccess(`${shipment.orderRef} reverted to ${STATUS_LABELS[targetStatus] || targetStatus}`);
+      if (onRefresh) await onRefresh();
+    } catch (err) {
+      showError(err.message || 'Failed to revert shipment');
+    }
+    setRevertModal(null);
   };
 
   const openSoldModal = (shipment) => {
@@ -1109,6 +1167,16 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                                 Sold
                               </button>
                             )}
+                            {isAdmin && (
+                              <button
+                                className="btn btn-ghost"
+                                onClick={() => openRevertModal(shipment)}
+                                title="Undo an incorrect arrival/stored marking"
+                                style={{ fontSize: 12, padding: '6px 12px', color: 'var(--danger)' }}
+                              >
+                                Undo Stored
+                              </button>
+                            )}
                             {!isArch && (
                               <button
                                 className="btn btn-ghost"
@@ -1292,6 +1360,16 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                                   title="Mark stock as sold from offsite storage"
                                 >
                                   Sold
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  className="btn btn-ghost"
+                                  onClick={() => openRevertModal(shipment)}
+                                  style={{ fontSize: 12, padding: '4px 10px', marginLeft: 4, color: 'var(--danger)' }}
+                                  title="Undo an incorrect arrival/stored marking"
+                                >
+                                  Undo Stored
                                 </button>
                               )}
                               {!isArch && (
@@ -1510,6 +1588,65 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                 style={{ fontSize: 13, padding: '8px 16px' }}
               >
                 Move Stock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Undo Stored / Revert to In-Transit Modal */}
+      {revertModal && (
+        <div
+          onClick={() => setRevertModal(null)}
+          style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: 12, padding: 24, width: '100%', maxWidth: 420,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--navy-900)' }}>Undo Stored</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-500)' }}>
+              {revertModal.shipment.orderRef} &mdash; {revertModal.shipment.productName || 'N/A'}
+            </p>
+
+            <div style={{
+              background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 8,
+              padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#92400E'
+            }}>
+              This clears the unloading, inspection and receiving details recorded on this shipment
+              and sends it back to the status you pick below. Use this when a shipment was marked
+              arrived/stored by mistake.
+            </div>
+
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text-700)' }}>
+              Actual Current Status
+            </label>
+            <select
+              value={revertModal.targetStatus}
+              onChange={(e) => setRevertModal(prev => ({ ...prev, targetStatus: e.target.value }))}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, marginBottom: 20 }}
+            >
+              {REVERT_TARGET_STATUSES.map(status => (
+                <option key={status} value={status}>{STATUS_LABELS[status] || status}</option>
+              ))}
+            </select>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setRevertModal(null)} style={{ fontSize: 13, padding: '8px 16px' }}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!revertModal.targetStatus}
+                onClick={handleRevertSubmit}
+                style={{ fontSize: 13, padding: '8px 16px', background: 'var(--danger)', borderColor: 'var(--danger)' }}
+              >
+                Revert Shipment
               </button>
             </div>
           </div>

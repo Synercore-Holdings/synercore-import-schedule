@@ -949,6 +949,36 @@ router.post(
 );
 
 /**
+ * POST /api/shipments/:id/admin-revert
+ * Admin: undo an incorrect arrival/stored marking, sending the shipment
+ * back to an in-transit (or earlier) status
+ */
+router.post(
+  '/:id/admin-revert',
+  requireAdmin,
+  body('targetStatus').trim().notEmpty().withMessage('targetStatus is required'),
+  asyncHandler(async (req: BodyRequest<{ targetStatus: string }>, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const shipment = await ShipmentController.adminRevertToTransit(
+      req.params.id!,
+      req.body.targetStatus as any,
+      req.user.username || req.user.email || 'Admin'
+    );
+
+    const user = (req as any).user;
+    if (user) {
+      AuditRepository.logAudit(user.id, user.username || user.email, 'admin_revert', 'shipment', req.params.id!, shipment.orderRef || req.params.id!, { targetStatus: req.body.targetStatus });
+    }
+
+    res.status(200).json({
+      data: shipment,
+      message: 'Shipment reverted by admin'
+    });
+  })
+);
+
+/**
  * POST /api/shipments/:id/reject-shipment
  * Reject a failed-inspection shipment and return it to the supplier
  */

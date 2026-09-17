@@ -879,6 +879,58 @@ export class ShipmentController {
   }
 
   /**
+   * Admin: undo an incorrect arrival/stored marking, sending the shipment
+   * back to an in-transit (or earlier) status and wiping the unloading/
+   * inspection/receiving fields that got stamped along the way. Counterpart
+   * to adminCompleteWorkflow, for the mirror-image mistake — a shipment
+   * marked as arrived/stored before it actually was.
+   */
+  static async adminRevertToTransit(id: string, targetStatus: ShipmentStatus, adminName: string): Promise<Shipment> {
+    const shipment = await this.getShipment(id);
+
+    // Same post-arrival states adminCompleteWorkflow can move a shipment
+    // into or out of, plus 'stored' itself (the actual bug this undoes).
+    const revertibleStates = [
+      'arrived_pta', 'arrived_klm', 'arrived_offsite',
+      'unloading', 'inspection_pending', 'inspecting',
+      'inspection_passed', 'inspection_failed',
+      'receiving', 'received', 'stored'
+    ];
+    if (!revertibleStates.includes(shipment.latest_status)) {
+      throw AppError.conflict('Shipment is not in a post-arrival workflow state');
+    }
+
+    const disallowedTargets = [...revertibleStates, 'archived', 'sold', 'cancelled'];
+    if (disallowedTargets.includes(targetStatus)) {
+      throw AppError.badRequest('Target status must be a pre-arrival or in-transit status');
+    }
+
+    const now = new Date();
+    const revertNote = `[Admin revert ${now.toISOString().slice(0, 10)}] '${shipment.latest_status}' -> '${targetStatus}' by ${adminName}.`;
+    const notes = (shipment as any).notes ? `${(shipment as any).notes}\n${revertNote}` : revertNote;
+
+    const updated = await shipmentRepository.update(id, {
+      latest_status: targetStatus,
+      notes,
+      unloading_start_date: null,
+      unloading_completed_date: null,
+      inspection_status: null,
+      inspection_date: null,
+      inspection_notes: null,
+      inspected_by: null,
+      receiving_status: null,
+      receiving_date: null,
+      received_by: null,
+      received_quantity: null,
+      warehouse_since: null,
+      actual_arrival_date: null,
+      updated_at: now
+    } as unknown as Partial<Shipment>);
+
+    return updated;
+  }
+
+  /**
    * Split a shipment across warehouses.
    *
    * Used by the Stored Stock "Move" action when only a portion of a shipment

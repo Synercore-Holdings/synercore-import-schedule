@@ -539,6 +539,7 @@ function App() {
         onUpdateShipment={handleUpdateShipment}
         onCreateShipment={handleCreateShipment}
         onDeleteShipment={handleDeleteShipment}
+        onRefresh={fetchShipments}
         loading={loading}
       />
     );
