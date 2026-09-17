@@ -6,6 +6,7 @@ import { getApiUrl } from '../config/api';
 import { calculateAllTotals } from '../utils/costingCalculations';
 import ShipmentFormModal, { extractOrderLevelFields } from './ShipmentFormModal';
 import { useNotification } from '../contexts/NotificationContext';
+import { generateSupplierPerformancePDF } from '../utils/supplierPerformancePdf';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -83,6 +84,24 @@ const formatStatusLabel = (status) => (status || '')
   .map(w => w.charAt(0).toUpperCase() + w.slice(1))
   .join(' ');
 
+// ---- Shared "last 12 weeks" labels + trend padding, used by both the
+// top-5 multi-supplier trend chart and the single-supplier one below ----
+const buildLast12WeekLabels = () => {
+  const weeks = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    weeks.push(`W${SupplierMetrics.getWeekNumber(d)}`);
+  }
+  return weeks;
+};
+const padTrendTo12Weeks = (trend) => {
+  const padded = Array(12).fill(null);
+  const last12 = trend.slice(-12);
+  last12.forEach((v, i) => { padded[12 - last12.length + i] = v; });
+  return padded;
+};
+
 function SupplierPerformance({ shipments, onUpdateShipment }) {
   const [searchParams] = useSearchParams();
   const { showError } = useNotification();
@@ -93,6 +112,10 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
   const [editingShipment, setEditingShipment] = useState(null);
   const [highlightRef, setHighlightRef] = useState(null);
   const highlightRowRef = useRef(null);
+  // Refs onto the two single-supplier charts below, so a PDF export can pull
+  // their live Chart.js canvas as a PNG image (see supplierPerformancePdf.js).
+  const trendChartRef = useRef(null);
+  const diffChartRef = useRef(null);
 
   // Jump straight to a supplier's audit trail when arriving from a global
   // search hit (e.g. searching an order ref while already on this page).
@@ -213,23 +236,11 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
       .sort((a, b) => b.totalShipments - a.totalShipments)
       .slice(0, 5);
 
-    // Build weekly labels from last 12 weeks
-    const weeks = [];
-    const now = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-      const wn = SupplierMetrics.getWeekNumber(d);
-      weeks.push(`W${wn}`);
-    }
-
     const datasets = top5.map((m, idx) => {
       const trend = SupplierMetrics.calculateMetricTrend(shipments, m.supplierName, 'onTime', 84);
-      // Pad to 12 entries
-      const padded = Array(12).fill(null);
-      trend.slice(-12).forEach((v, i) => { padded[12 - trend.slice(-12).length + i] = v; });
       return {
         label: m.supplierName,
-        data: padded,
+        data: padTrendTo12Weeks(trend),
         borderColor: LINE_COLORS[idx % LINE_COLORS.length],
         backgroundColor: LINE_COLORS[idx % LINE_COLORS.length] + '20',
         tension: 0.3,
@@ -238,7 +249,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
       };
     });
 
-    return { labels: weeks, datasets };
+    return { labels: buildLast12WeekLabels(), datasets };
   }, [allMetrics, shipments]);
 
   const leadTimeTrendOptions = useMemo(() => ({
@@ -333,6 +344,69 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     },
   }), []);
 
+  // ---- Shipment-level audit trail (only when a single supplier is selected) ----
+  const shipmentAudit = useMemo(() => {
+    if (selectedSupplier === 'all') return [];
+    return SupplierMetrics.getShipmentAudit(shipments, selectedSupplier);
+  }, [shipments, selectedSupplier]);
+
+  // ---- Open orders (only when a single supplier is selected) ----
+  const openOrderLines = useMemo(() => {
+    if (selectedSupplier === 'all') return [];
+    return SupplierMetrics.getOpenOrderLines(shipments, selectedSupplier);
+  }, [shipments, selectedSupplier]);
+
+  // ---- Chart 5: On-Time Trend for the selected supplier only (distinct from
+  // the top-5 multi-supplier chart above, which stays fixed regardless of
+  // the dropdown — this one is what actually gets embedded in the PDF). ----
+  const supplierTrendChartData = useMemo(() => {
+    if (selectedSupplier === 'all') return null;
+    const trend = SupplierMetrics.calculateMetricTrend(shipments, selectedSupplier, 'onTime', 84);
+    return {
+      labels: buildLast12WeekLabels(),
+      datasets: [{
+        label: `${selectedSupplier} — On-Time %`,
+        data: padTrendTo12Weeks(trend),
+        borderColor: LINE_COLORS[0],
+        backgroundColor: LINE_COLORS[0] + '20',
+        tension: 0.3,
+        pointRadius: 3,
+        fill: true,
+      }],
+    };
+  }, [selectedSupplier, shipments]);
+
+  // ---- Chart 6: Delivery timing per shipment (days late/early), one bar per
+  // warehouse-confirmed shipment in the audit trail below — visualizes how
+  // consistent (vs. spiky) a supplier's timing actually is, which the
+  // aggregate "Avg Arrival Days Late/Early" KPI alone can't show. ----
+  const diffChartData = useMemo(() => {
+    if (selectedSupplier === 'all' || shipmentAudit.length === 0) return null;
+    const sorted = [...shipmentAudit].sort((a, b) => new Date(a.actualDate) - new Date(b.actualDate));
+    return {
+      labels: sorted.map(a => a.orderRef),
+      datasets: [{
+        label: 'Days Late (+) / Early (-)',
+        data: sorted.map(a => a.diffDays),
+        backgroundColor: sorted.map(a => a.diffDays > 0 ? '#dc3545' : a.diffDays < 0 ? '#28a745' : '#6b7280'),
+        borderRadius: 4,
+      }],
+    };
+  }, [shipmentAudit, selectedSupplier]);
+
+  const diffChartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => ctx.parsed.y > 0 ? `${ctx.parsed.y}d late` : ctx.parsed.y < 0 ? `${Math.abs(ctx.parsed.y)}d early` : 'On time' } },
+    },
+    scales: {
+      y: { ticks: { callback: v => `${v}d` }, grid: { color: 'rgba(0,0,0,0.06)' } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 } },
+    },
+  }), []);
+
   // ---- Table sorting ----
   const sortedTableData = useMemo(() => {
     // A supplier with open orders but nothing delivered yet (e.g. a brand-new
@@ -358,6 +432,19 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
   };
 
   const sortIcon = (col) => sortCol === col ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+
+  // ---- Export the current single-supplier view as a shareable PDF ----
+  const handlePrintPDF = () => {
+    if (selectedSupplier === 'all' || filteredMetrics.length === 0) return;
+    generateSupplierPerformancePDF({
+      supplierName: selectedSupplier,
+      metrics: filteredMetrics[0],
+      shipmentAudit,
+      openOrderLines,
+      trendChartRef,
+      diffChartRef,
+    });
+  };
 
   // Other product lines sharing the order currently being corrected — lets
   // the modal offer to copy the same schedule/logistics fix to all of them.
@@ -414,18 +501,6 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     setEditingShipment(null);
   };
 
-  // ---- Shipment-level audit trail (only when a single supplier is selected) ----
-  const shipmentAudit = useMemo(() => {
-    if (selectedSupplier === 'all') return [];
-    return SupplierMetrics.getShipmentAudit(shipments, selectedSupplier);
-  }, [shipments, selectedSupplier]);
-
-  // ---- Open orders (only when a single supplier is selected) ----
-  const openOrderLines = useMemo(() => {
-    if (selectedSupplier === 'all') return [];
-    return SupplierMetrics.getOpenOrderLines(shipments, selectedSupplier);
-  }, [shipments, selectedSupplier]);
-
   useEffect(() => {
     if (highlightRef && highlightRowRef.current) {
       highlightRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -459,6 +534,19 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
             <option value="all">All Suppliers</option>
             {supplierNames.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
+          {selectedSupplier !== 'all' && (
+            <button
+              onClick={handlePrintPDF}
+              title={`Export a PDF report for ${selectedSupplier}`}
+              style={{
+                padding: '6px 14px', fontSize: 13, fontWeight: 600, borderRadius: 6,
+                border: '1px solid var(--border)', background: 'var(--surface)',
+                color: 'var(--text-900)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              📄 Print PDF
+            </button>
+          )}
         </div>
       </div>
 
@@ -534,6 +622,24 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
             : <ChartEmpty label="No costing data available" />}
         </ChartCard>
       </div>
+
+      {/* Single-supplier charts — only meaningful (and only rendered) once a
+          specific supplier is selected; these are also what "Print PDF" embeds. */}
+      {selectedSupplier !== 'all' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16, marginBottom: 24 }}>
+          <ChartCard title="On-Time Trend" subtitle={`${selectedSupplier} — last 12 weeks`}>
+            {supplierTrendChartData
+              ? <div style={{ height: 260 }}><LineChart ref={trendChartRef} data={supplierTrendChartData} options={leadTimeTrendOptions} /></div>
+              : <ChartEmpty label="No trend data available" />}
+          </ChartCard>
+
+          <ChartCard title="Delivery Timing per Shipment" subtitle="Days late (+) / early (-)">
+            {diffChartData
+              ? <div style={{ height: 260 }}><BarChart ref={diffChartRef} data={diffChartData} options={diffChartOptions} /></div>
+              : <ChartEmpty label="No warehouse-confirmed shipments yet" />}
+          </ChartCard>
+        </div>
+      )}
 
       {/* Detailed Table */}
       <ChartCard title="Supplier Detail" subtitle={`${sortedTableData.length} suppliers with shipments or open orders`}>
