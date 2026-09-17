@@ -641,7 +641,7 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             <span>{isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB Number' : 'Vessel Name'}</span>
             {isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && formData.vesselName && (
               <a
-                href={getAwbTrackingUrl(formData.vesselName)}
+                href={getAwbTrackingUrl(formData.vesselName, formData.forwardingAgent)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--accent)' }}

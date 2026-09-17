@@ -856,7 +856,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                       {shipment.vesselName && (
                         <a
                           href={isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName)
-                            ? getAwbTrackingUrl(shipment.vesselName)
+                            ? getAwbTrackingUrl(shipment.vesselName, shipment.forwardingAgent)
                             : `https://www.vesselfinder.com/vessels?name=${encodeURIComponent(shipment.vesselName)}`
                           }
                           target="_blank"

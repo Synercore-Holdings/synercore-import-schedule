@@ -333,6 +333,14 @@ describe('getAwbTrackingUrl', () => {
     expect(getAwbTrackingUrl(null)).toBe(null);
     expect(getAwbTrackingUrl(undefined)).toBe(null);
   });
+
+  it('routes DHL through its own tracking-id deep link instead of track-trace.com', () => {
+    expect(getAwbTrackingUrl('7563880170', 'DHL')).toBe('https://www.dhl.com/za-en/home/tracking.html?tracking-id=7563880170&submit=1');
+  });
+
+  it('still uses track-trace.com for other/unknown forwarding agents', () => {
+    expect(getAwbTrackingUrl('72479938666', 'Emirates SkyCargo')).toBe('https://www.track-trace.com/aircargo?awb=72479938666');
+  });
 });
 
 describe('getBolTrackingUrl', () => {

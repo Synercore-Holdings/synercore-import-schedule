@@ -171,9 +171,13 @@ export const getAgentTrackingUrl = (forwardingAgent) => AGENT_TRACKING_URLS[forw
 
 // track-trace.com's aircargo tool reliably prefills from a query string
 // regardless of airline, so AWB tracking always uses it directly rather than
-// sending the user to the airline's own (usually non-prefillable) page.
-export const getAwbTrackingUrl = (awbNumber) => {
+// sending the user to the airline's own (usually non-prefillable) page --
+// except DHL, whose own waybill numbers track directly on dhl.com (same
+// confirmed-working deep link as DHL BOLs, see BOL_TRACKING_URL_BUILDERS
+// below), so route those there instead of track-trace.com.
+export const getAwbTrackingUrl = (awbNumber, forwardingAgent) => {
   if (!awbNumber) return null;
+  if (forwardingAgent === 'DHL') return BOL_TRACKING_URL_BUILDERS['DHL'](awbNumber);
   return `https://www.track-trace.com/aircargo?awb=${encodeURIComponent(awbNumber.replace(/\D/g, ''))}`;
 };
 
