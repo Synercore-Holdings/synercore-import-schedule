@@ -47,6 +47,18 @@ export const SEA_FORWARDER_ONLY_VALUES = ['DHL', 'DSV', 'Afrigistics', 'Investec
 
 export const isPureSeaForwarder = (forwardingAgent) => SEA_FORWARDER_ONLY_VALUES.includes(forwardingAgent);
 
+// The "effective" shipping line for a shipment: whatever's actually recorded,
+// or (for a pure forwarder with nothing recorded yet) an explicit "not
+// recorded" sentinel rather than silently falling back to the forwarding
+// agent's name, which would misattribute the booking to a carrier that
+// never touched the container. A direct carrier booking (MSC, Maersk, ...)
+// already IS the shipping line, so it always resolves to itself.
+export const UNRECORDED_CARRIER = '(Not recorded)';
+export const resolveShippingCarrier = (shipment) => {
+  if (shipment.shippingLine) return shipment.shippingLine;
+  return isPureSeaForwarder(shipment.forwardingAgent) ? UNRECORDED_CARRIER : shipment.forwardingAgent;
+};
+
 // The actual ocean carriers (who operate the vessel) — a separate, optional
 // field from Forwarding Agent, since a shipment is often booked through a
 // forwarder (DHL, DSV, Afrigistics) but physically carried by one of these.

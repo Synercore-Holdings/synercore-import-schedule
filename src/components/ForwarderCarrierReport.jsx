@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
-import { isAirfreight, isPureSeaForwarder } from '../utils/shipmentConstants';
+import { isAirfreight, isPureSeaForwarder, resolveShippingCarrier, UNRECORDED_CARRIER } from '../utils/shipmentConstants';
+import { GroupedFreightMetrics } from '../utils/groupedFreightMetrics';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement,
@@ -9,7 +10,7 @@ import { Bar as BarChart } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-const NOT_RECORDED = '(Not recorded)';
+const NOT_RECORDED = UNRECORDED_CARRIER;
 
 // Same month-bucketing convention as the Pretoria/Klapmuts freight-spend
 // cards in WarehouseStored.jsx — "YYYY-MM", scheduled date preferred over
@@ -46,6 +47,23 @@ const KpiCard = ({ label, value, suffix, color, subtext }) => (
     {subtext && <div style={{ fontSize: 11, color: 'var(--text-500)', marginTop: 6 }}>{subtext}</div>}
   </div>
 );
+
+// Same convention as SupplierPerformance's GradeBadge
+const GradeBadge = ({ grade }) => {
+  const colors = { A: '#28a745', B: '#ffc107', C: '#dc3545' };
+  const labels = { A: 'Excellent', B: 'Good', C: 'Needs Improvement' };
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: 12,
+      fontSize: 12, fontWeight: 700,
+      backgroundColor: `${colors[grade] || '#6b7280'}20`,
+      color: colors[grade] || '#6b7280',
+      border: `1px solid ${colors[grade] || '#6b7280'}40`,
+    }}>
+      {grade} — {labels[grade] || 'N/A'}
+    </span>
+  );
+};
 
 const CARRIER_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#ec4899'];
 
@@ -138,10 +156,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
   // DSV, Afrigistics) — they book space on someone else's vessel. If the
   // agent is already an actual carrier (MSC, Maersk, ONE, ...), booked
   // directly, that value IS the carrier: MSC uses MSC, Maersk uses Maersk.
-  const resolveCarrier = useCallback((s) => {
-    if (s.shippingLine) return s.shippingLine;
-    return isPureSeaForwarder(s.forwardingAgent) ? NOT_RECORDED : s.forwardingAgent;
-  }, []);
+  const resolveCarrier = resolveShippingCarrier;
 
   const forwardingAgentNames = useMemo(() => {
     const names = new Set();
@@ -183,6 +198,8 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
   }, [seaOrders, forwardingAgentNames, forwarderOnlyShipments, resolveCarrier]);
 
   const completionColor = (pct) => pct >= 85 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
+  // Same thresholds as SupplierPerformance's onTimeColor
+  const onTimeColor = (pct) => pct >= 85 ? '#28a745' : pct >= 70 ? '#ffc107' : '#dc3545';
 
   // ---- Chart: stacked bar, one segment per shipping line, per agent ----
   const chartData = useMemo(() => {
@@ -314,6 +331,74 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
     return Object.values(rows).sort((a, b) => b.count - a.count);
   }, [airOrders, selectedAgent, getOrigin]);
 
+  // ==================== PERFORMANCE ====================
+  // On-time/lead-time metrics, distinct from everything above (which is
+  // volume/completeness, not timing). Forwarding Agent spans BOTH sea and
+  // air -- an agent's reliability is meaningful either way, e.g. DHL books
+  // both -- while Shipping Line stays sea-only, same as the rest of this
+  // file (air has no separate carrier concept).
+
+  const monthFilteredAllShipments = useMemo(() => {
+    if (!monthFilter) return shipments || [];
+    return (shipments || []).filter(s => getMonthKey(s) === monthFilter);
+  }, [shipments, monthFilter]);
+
+  const monthFilteredSeaShipments = useMemo(() => {
+    if (!monthFilter) return seaShipments;
+    return seaShipments.filter(s => getMonthKey(s) === monthFilter);
+  }, [seaShipments, monthFilter]);
+
+  const agentPerformanceRows = useMemo(() => {
+    const names = new Set();
+    monthFilteredAllShipments.forEach(s => { if (s.forwardingAgent) names.add(s.forwardingAgent); });
+    return [...names]
+      .map(name => GroupedFreightMetrics.calculateAllGroupMetrics(monthFilteredAllShipments, s => s.forwardingAgent === name, name))
+      .filter(m => m.totalShipments > 0 || m.openOrdersCount > 0)
+      .sort((a, b) => a.onTimePercent - b.onTimePercent);
+  }, [monthFilteredAllShipments]);
+
+  const carrierPerformanceRows = useMemo(() => {
+    const names = new Set();
+    monthFilteredSeaShipments.forEach(s => {
+      const carrier = resolveCarrier(s);
+      if (carrier && carrier !== NOT_RECORDED) names.add(carrier);
+    });
+    return [...names]
+      .map(name => GroupedFreightMetrics.calculateAllGroupMetrics(monthFilteredSeaShipments, s => resolveCarrier(s) === name, name))
+      .filter(m => m.totalShipments > 0 || m.openOrdersCount > 0)
+      .sort((a, b) => a.onTimePercent - b.onTimePercent);
+  }, [monthFilteredSeaShipments, resolveCarrier]);
+
+  const buildPerfChartData = (rows) => {
+    const withData = rows.filter(m => m.totalShipments > 0);
+    return {
+      labels: withData.map(m => m.groupName),
+      datasets: [{
+        label: 'On-Time %',
+        data: withData.map(m => m.onTimePercent),
+        backgroundColor: withData.map(m => m.grade.color),
+        borderRadius: 4,
+        barThickness: 20,
+      }],
+    };
+  };
+  const agentPerfChartData = useMemo(() => buildPerfChartData(agentPerformanceRows), [agentPerformanceRows]);
+  const carrierPerfChartData = useMemo(() => buildPerfChartData(carrierPerformanceRows), [carrierPerformanceRows]);
+
+  const perfChartOptions = useMemo(() => ({
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.x}%` } },
+    },
+    scales: {
+      x: { min: 0, max: 100, ticks: { callback: v => `${v}%` }, grid: { color: 'rgba(0,0,0,0.06)' } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+    },
+  }), []);
+
   const handleModeChange = (newMode) => {
     setMode(newMode);
     setSelectedAgent('all');
@@ -331,12 +416,14 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-500)' }}>
             {mode === 'sea'
               ? 'Which shipping line each forwarding agent actually uses, by origin'
-              : 'Which airline handles each origin — air has no separate forwarder/carrier split'}
+              : mode === 'air'
+              ? 'Which airline handles each origin — air has no separate forwarder/carrier split'
+              : 'On-time delivery and lead time, by forwarding agent and by shipping line'}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-            {[{ key: 'sea', label: 'Sea Freight' }, { key: 'air', label: 'Air Freight' }].map(opt => (
+            {[{ key: 'sea', label: 'Sea Freight' }, { key: 'air', label: 'Air Freight' }, { key: 'performance', label: 'Performance' }].map(opt => (
               <button
                 key={opt.key}
                 onClick={() => handleModeChange(opt.key)}
@@ -350,19 +437,23 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
               </button>
             ))}
           </div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>{agentFilterLabel}:</label>
-          <select
-            value={selectedAgent}
-            onChange={e => setSelectedAgent(e.target.value)}
-            style={{
-              padding: '6px 12px', fontSize: 13, borderRadius: 6,
-              border: '1px solid var(--border)', background: 'var(--surface)',
-              color: 'var(--text-900)', minWidth: 180,
-            }}
-          >
-            <option value="all">All {mode === 'sea' ? 'Forwarding Agents' : 'Airlines'}</option>
-            {agentFilterOptions.map(name => <option key={name} value={name}>{name}</option>)}
-          </select>
+          {mode !== 'performance' && (
+            <>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>{agentFilterLabel}:</label>
+              <select
+                value={selectedAgent}
+                onChange={e => setSelectedAgent(e.target.value)}
+                style={{
+                  padding: '6px 12px', fontSize: 13, borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--text-900)', minWidth: 180,
+                }}
+              >
+                <option value="all">All {mode === 'sea' ? 'Forwarding Agents' : 'Airlines'}</option>
+                {agentFilterOptions.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </>
+          )}
           <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-500)' }}>Period:</label>
           <select
             value={monthFilter}
@@ -496,7 +587,7 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
         </div>
       </ChartCard>
       </>
-      ) : (
+      ) : mode === 'air' ? (
       <>{/* ==================== AIR FREIGHT ==================== */}
 
       {/* KPI Cards */}
@@ -557,6 +648,103 @@ function ForwarderCarrierReport({ shipments, suppliers }) {
                   <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{r.agent}</td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{r.origin}</td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{r.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+      </>
+      ) : (
+      <>{/* ==================== PERFORMANCE ==================== */}
+
+      <ChartCard title="On-Time Delivery by Forwarding Agent" subtitle="Sea and air combined, sorted by %, colored by grade" style={{ marginBottom: 24 }}>
+        {agentPerfChartData.labels.length > 0
+          ? <div style={{ height: Math.max(200, agentPerfChartData.labels.length * 32) }}><BarChart data={agentPerfChartData} options={perfChartOptions} /></div>
+          : <ChartEmpty label="No warehouse-confirmed shipments with a forwarding agent yet" />}
+      </ChartCard>
+
+      <ChartCard title="Forwarding Agent Detail" subtitle={`${agentPerformanceRows.length} agent${agentPerformanceRows.length !== 1 ? 's' : ''} with shipments or open orders`} style={{ marginBottom: 24 }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['Forwarding Agent', 'Shipments', 'Open Orders', 'On-Time %', 'Avg Arrival Days Late/Early', 'Avg Freight Lead Time', 'On-Time Shipped %', 'Grade'].map(label => (
+                  <th key={label} style={{
+                    padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                    fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                    letterSpacing: 0.5, whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {agentPerformanceRows.length === 0 && (
+                <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No data available</td></tr>
+              )}
+              {agentPerformanceRows.map((m, idx) => (
+                <tr key={m.groupName} style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{m.groupName}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.totalShipments}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontWeight: 700, color: m.openOrdersCount > 0 ? 'var(--text-900)' : 'var(--text-500)' }}>{m.openOrdersCount}</span>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontWeight: 700, color: onTimeColor(m.onTimePercent) }}>{m.onTimePercent}%</span>
+                  </td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.avgLeadTime !== null ? `${m.avgLeadTime} days` : '--'}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.avgFreightLeadTime !== null ? `${m.avgFreightLeadTime} days` : '--'}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.onTimeDeparturePercent !== null ? `${m.onTimeDeparturePercent}%` : '--'}</td>
+                  <td style={{ padding: '10px 12px' }}><GradeBadge grade={m.grade?.grade} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </ChartCard>
+
+      <ChartCard title="On-Time Delivery by Shipping Line" subtitle="Sea only — direct-carrier bookings and recorded forwarder bookings; excludes '(Not recorded)'" style={{ marginBottom: 24 }}>
+        {carrierPerfChartData.labels.length > 0
+          ? <div style={{ height: Math.max(200, carrierPerfChartData.labels.length * 32) }}><BarChart data={carrierPerfChartData} options={perfChartOptions} /></div>
+          : <ChartEmpty label="No warehouse-confirmed sea shipments with a recorded shipping line yet" />}
+      </ChartCard>
+
+      <ChartCard title="Shipping Line Detail" subtitle={`${carrierPerformanceRows.length} shipping line${carrierPerformanceRows.length !== 1 ? 's' : ''} with shipments or open orders`}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['Shipping Line', 'Shipments', 'Open Orders', 'On-Time %', 'Avg Arrival Days Late/Early', 'Avg Freight Lead Time', 'On-Time Shipped %', 'Grade'].map(label => (
+                  <th key={label} style={{
+                    padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                    fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                    letterSpacing: 0.5, whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {carrierPerformanceRows.length === 0 && (
+                <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No data available</td></tr>
+              )}
+              {carrierPerformanceRows.map((m, idx) => (
+                <tr key={m.groupName} style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{m.groupName}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.totalShipments}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontWeight: 700, color: m.openOrdersCount > 0 ? 'var(--text-900)' : 'var(--text-500)' }}>{m.openOrdersCount}</span>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ fontWeight: 700, color: onTimeColor(m.onTimePercent) }}>{m.onTimePercent}%</span>
+                  </td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.avgLeadTime !== null ? `${m.avgLeadTime} days` : '--'}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.avgFreightLeadTime !== null ? `${m.avgFreightLeadTime} days` : '--'}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.onTimeDeparturePercent !== null ? `${m.onTimeDeparturePercent}%` : '--'}</td>
+                  <td style={{ padding: '10px 12px' }}><GradeBadge grade={m.grade?.grade} /></td>
                 </tr>
               ))}
             </tbody>
