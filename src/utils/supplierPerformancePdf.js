@@ -126,7 +126,7 @@ export function generateSupplierPerformancePDF({ supplierName, metrics, shipment
   doc.setTextColor(...BRAND_DARK);
   doc.text('On-Time Trend — Last 12 Weeks', 14, y);
   y += 4;
-  addChartImage(doc, trendChartRef, 14, y, pageWidth - 28, 65, 'Not enough shipment history to chart a trend yet.');
+  addChartImage(doc, trendChartRef, 14, y, pageWidth - 28, 65, 'No deliveries from this supplier in the last 12 weeks.');
   y += 73;
 
   doc.setFont(undefined, 'bold');

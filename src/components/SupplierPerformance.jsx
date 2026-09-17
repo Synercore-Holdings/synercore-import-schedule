@@ -362,11 +362,16 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
   const supplierTrendChartData = useMemo(() => {
     if (selectedSupplier === 'all') return null;
     const trend = SupplierMetrics.calculateMetricTrend(shipments, selectedSupplier, 'onTime', 84);
+    const padded = padTrendTo12Weeks(trend);
+    // A low-volume supplier's last delivery can easily fall outside this
+    // 12-week window (e.g. its most recent shipment landed 3+ months ago) --
+    // render nothing rather than an empty axis with a dangling legend swatch.
+    if (!padded.some(v => v !== null)) return null;
     return {
       labels: buildLast12WeekLabels(),
       datasets: [{
         label: `${selectedSupplier} — On-Time %`,
-        data: padTrendTo12Weeks(trend),
+        data: padded,
         borderColor: LINE_COLORS[0],
         backgroundColor: LINE_COLORS[0] + '20',
         tension: 0.3,
@@ -630,7 +635,7 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
           <ChartCard title="On-Time Trend" subtitle={`${selectedSupplier} — last 12 weeks`}>
             {supplierTrendChartData
               ? <div style={{ height: 260 }}><LineChart ref={trendChartRef} data={supplierTrendChartData} options={leadTimeTrendOptions} /></div>
-              : <ChartEmpty label="No trend data available" />}
+              : <ChartEmpty label="No deliveries from this supplier in the last 12 weeks" />}
           </ChartCard>
 
           <ChartCard title="Delivery Timing per Shipment" subtitle="Days late (+) / early (-)">
