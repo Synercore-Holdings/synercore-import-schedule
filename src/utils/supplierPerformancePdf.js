@@ -32,6 +32,36 @@ const formatStatusLabel = (status) => (status || '')
   .map(w => w.charAt(0).toUpperCase() + w.slice(1))
   .join(' ');
 
+// One row per GroupedFreightMetrics.calculateAllGroupMetrics() result --
+// shared by the "By Forwarding Agent" and "By Shipping Line" tables below.
+function addFreightPerfTable(doc, y, pageWidth, title, nameLabel, rows) {
+  if (rows.length === 0) return y;
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...BRAND_DARK);
+  doc.text(title, 14, y);
+  y += 4;
+  autoTable(doc, {
+    startY: y,
+    head: [[nameLabel, 'Shipments', 'On-Time %', 'Avg Arrival Days Late/Early', 'Avg Freight Lead Time', 'Grade']],
+    body: rows.map(m => [
+      m.groupName,
+      String(m.totalShipments ?? 0),
+      fmtPct(m.onTimePercent),
+      fmtDays(m.avgLeadTime),
+      fmtDays(m.avgFreightLeadTime),
+      m.grade?.grade ? `${m.grade.grade} — ${GRADE_LABELS[m.grade.grade] || ''}` : '—',
+    ]),
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: ROW_ALT },
+    margin: { left: 14, right: 14 },
+    tableWidth: pageWidth - 28,
+  });
+  return doc.lastAutoTable.finalY + 10;
+}
+
 // Best-effort: pulls a PNG snapshot straight from the live Chart.js canvas
 // (via the react-chartjs-2 ref) rather than re-rendering the chart data as
 // its own drawing routine — same approach already used by the Import
@@ -60,10 +90,12 @@ function addChartImage(doc, chartRef, x, y, w, h, fallbackLabel) {
  * @param {Object} options.metrics - one entry from SupplierMetrics.calculateAllMetrics
  * @param {Array} options.shipmentAudit - SupplierMetrics.getShipmentAudit(shipments, supplierName)
  * @param {Array} options.openOrderLines - SupplierMetrics.getOpenOrderLines(shipments, supplierName)
+ * @param {Array} options.agentPerformance - GroupedFreightMetrics rows for this supplier, grouped by forwarding agent
+ * @param {Array} options.carrierPerformance - GroupedFreightMetrics rows for this supplier, grouped by shipping line (sea only)
  * @param {Object} options.trendChartRef - React ref to the supplier's on-time trend <Line> chart
  * @param {Object} options.diffChartRef - React ref to the supplier's delivery-timing <Bar> chart
  */
-export function generateSupplierPerformancePDF({ supplierName, metrics, shipmentAudit, openOrderLines, trendChartRef, diffChartRef }) {
+export function generateSupplierPerformancePDF({ supplierName, metrics, shipmentAudit, openOrderLines, agentPerformance = [], carrierPerformance = [], trendChartRef, diffChartRef }) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
@@ -135,6 +167,13 @@ export function generateSupplierPerformancePDF({ supplierName, metrics, shipment
   addChartImage(doc, diffChartRef, 14, y, pageWidth - 28, 65, 'No warehouse-confirmed shipments to chart yet.');
   y += 73;
 
+  if (y > pageHeight - 40) { doc.addPage(); y = 20; }
+
+  // Freight performance — which forwarding agent/shipping line handled this
+  // supplier's shipments, and how each performed
+  y = addFreightPerfTable(doc, y, pageWidth, 'By Forwarding Agent', 'Forwarding Agent', agentPerformance);
+  if (y > pageHeight - 40) { doc.addPage(); y = 20; }
+  y = addFreightPerfTable(doc, y, pageWidth, 'By Shipping Line', 'Shipping Line', carrierPerformance);
   if (y > pageHeight - 40) { doc.addPage(); y = 20; }
 
   // Shipment Audit Trail

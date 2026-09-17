@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SupplierMetrics } from '../utils/supplierMetrics';
+import { GroupedFreightMetrics } from '../utils/groupedFreightMetrics';
+import { isAirfreight, resolveShippingCarrier, UNRECORDED_CARRIER } from '../utils/shipmentConstants';
 import { authFetch } from '../utils/authFetch';
 import { getApiUrl } from '../config/api';
 import { calculateAllTotals } from '../utils/costingCalculations';
@@ -73,6 +75,54 @@ const TrendArrow = ({ trend }) => {
   if (diff > 0) return <span style={{ color: '#28a745', fontSize: 13, fontWeight: 700 }}>+{diff}%</span>;
   if (diff < 0) return <span style={{ color: '#dc3545', fontSize: 13, fontWeight: 700 }}>{diff}%</span>;
   return <span style={{ color: 'var(--text-500)', fontSize: 12 }}>0%</span>;
+};
+
+// ---- Freight performance table: which forwarding agent/shipping line
+// handled a supplier's shipments, and how each performed ----
+const FreightPerfTable = ({ title, subtitle, nameLabel, rows }) => {
+  const onTimeColor = (pct) => pct >= 85 ? '#28a745' : pct >= 70 ? '#ffc107' : '#dc3545';
+  return (
+    <ChartCard title={title} subtitle={subtitle}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)' }}>
+              {[nameLabel, 'Shipments', 'Open Orders', 'On-Time %', 'Avg Arrival Days Late/Early', 'Avg Freight Lead Time', 'On-Time Shipped %', 'Grade'].map(label => (
+                <th key={label} style={{
+                  padding: '10px 12px', textAlign: 'left', fontSize: 11,
+                  fontWeight: 700, color: 'var(--text-500)', textTransform: 'uppercase',
+                  letterSpacing: 0.5, whiteSpace: 'nowrap',
+                }}>
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--text-500)' }}>No data available</td></tr>
+            )}
+            {rows.map((m, idx) => (
+              <tr key={m.groupName} style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-900)' }}>{m.groupName}</td>
+                <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.totalShipments}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={{ fontWeight: 700, color: m.openOrdersCount > 0 ? 'var(--text-900)' : 'var(--text-500)' }}>{m.openOrdersCount}</span>
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={{ fontWeight: 700, color: onTimeColor(m.onTimePercent) }}>{m.onTimePercent}%</span>
+                </td>
+                <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.avgLeadTime !== null ? `${m.avgLeadTime} days` : '--'}</td>
+                <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.avgFreightLeadTime !== null ? `${m.avgFreightLeadTime} days` : '--'}</td>
+                <td style={{ padding: '10px 12px', color: 'var(--text-700)' }}>{m.onTimeDeparturePercent !== null ? `${m.onTimeDeparturePercent}%` : '--'}</td>
+                <td style={{ padding: '10px 12px' }}><GradeBadge grade={m.grade?.grade} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </ChartCard>
+  );
 };
 
 // ---- Line colors for top suppliers ----
@@ -412,6 +462,43 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
     },
   }), []);
 
+  // ---- Freight performance breakdown for the selected supplier only: which
+  // forwarding agent/shipping line actually handled its shipments, and how
+  // each performed -- so a supplier's own on-time figures above can be
+  // explained (e.g. "always on time except via Agent X"). Reuses
+  // GroupedFreightMetrics (built for the Forwarder vs Carrier "Performance"
+  // tab), scoped down to just this supplier's shipments. ----
+  const supplierAgentPerformance = useMemo(() => {
+    if (selectedSupplier === 'all') return [];
+    const supplierNorm = selectedSupplier.toLowerCase().trim();
+    const matchesSupplier = (s) => s.supplier?.toLowerCase().trim() === supplierNorm;
+    const names = new Set();
+    (shipments || []).forEach(s => { if (matchesSupplier(s) && s.forwardingAgent) names.add(s.forwardingAgent); });
+    return [...names]
+      .map(name => GroupedFreightMetrics.calculateAllGroupMetrics(shipments, s => matchesSupplier(s) && s.forwardingAgent === name, name))
+      .filter(m => m.totalShipments > 0 || m.openOrdersCount > 0)
+      .sort((a, b) => b.totalShipments - a.totalShipments);
+  }, [shipments, selectedSupplier]);
+
+  // Shipping Line stays sea-only, same as the Forwarder vs Carrier report --
+  // air has no separate carrier concept (the agent IS the airline).
+  const supplierCarrierPerformance = useMemo(() => {
+    if (selectedSupplier === 'all') return [];
+    const supplierNorm = selectedSupplier.toLowerCase().trim();
+    const matchesSupplier = (s) => s.supplier?.toLowerCase().trim() === supplierNorm;
+    const isSeaMatch = (s) => matchesSupplier(s) && !isAirfreight(s.latestStatus, s.forwardingAgent, s.vesselName);
+    const names = new Set();
+    (shipments || []).forEach(s => {
+      if (!isSeaMatch(s)) return;
+      const carrier = resolveShippingCarrier(s);
+      if (carrier && carrier !== UNRECORDED_CARRIER) names.add(carrier);
+    });
+    return [...names]
+      .map(name => GroupedFreightMetrics.calculateAllGroupMetrics(shipments, s => isSeaMatch(s) && resolveShippingCarrier(s) === name, name))
+      .filter(m => m.totalShipments > 0 || m.openOrdersCount > 0)
+      .sort((a, b) => b.totalShipments - a.totalShipments);
+  }, [shipments, selectedSupplier]);
+
   // ---- Table sorting ----
   const sortedTableData = useMemo(() => {
     // A supplier with open orders but nothing delivered yet (e.g. a brand-new
@@ -446,6 +533,8 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
       metrics: filteredMetrics[0],
       shipmentAudit,
       openOrderLines,
+      agentPerformance: supplierAgentPerformance,
+      carrierPerformance: supplierCarrierPerformance,
       trendChartRef,
       diffChartRef,
     });
@@ -643,6 +732,26 @@ function SupplierPerformance({ shipments, onUpdateShipment }) {
               ? <div style={{ height: 260 }}><BarChart ref={diffChartRef} data={diffChartData} options={diffChartOptions} /></div>
               : <ChartEmpty label="No warehouse-confirmed shipments yet" />}
           </ChartCard>
+        </div>
+      )}
+
+      {/* Freight performance for the selected supplier — which forwarding
+          agent/shipping line handled its shipments, and how each performed.
+          Also embedded in "Print PDF" (supplierPerformancePdf.js). */}
+      {selectedSupplier !== 'all' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16, marginBottom: 24 }}>
+          <FreightPerfTable
+            title="By Forwarding Agent"
+            subtitle={`${selectedSupplier} — sea and air combined`}
+            nameLabel="Forwarding Agent"
+            rows={supplierAgentPerformance}
+          />
+          <FreightPerfTable
+            title="By Shipping Line"
+            subtitle={`${selectedSupplier} — sea only`}
+            nameLabel="Shipping Line"
+            rows={supplierCarrierPerformance}
+          />
         </div>
       )}
 
