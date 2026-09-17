@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShipmentStatus, STATUS_LABELS } from '../types/shipment';
+import { ShipmentStatus, STATUS_LABELS, POST_ARRIVAL_STATUSES } from '../types/shipment';
 import { isAirfreight } from '../utils/shipmentConstants';
 import { authFetch } from '../utils/authFetch';
 import { authUtils } from '../utils/auth';
@@ -103,23 +103,19 @@ const REVERT_TARGET_STATUSES = [
 
 // Mirrors the backend's own revertibleStates guard (server/controllers/
 // ShipmentController.ts, adminRevertToTransit) -- a shipment merely routed
-// to the OFFSITE warehouse while still e.g. in_transit_seaway shows up on
-// this page (see hasBeenStored below) but has nothing to undo, so the
-// button must not appear for it or every click 404s against the same check.
-const REVERTIBLE_STORED_STATUSES = [
-  ShipmentStatus.ARRIVED_PTA, ShipmentStatus.ARRIVED_KLM, ShipmentStatus.ARRIVED_OFFSITE,
-  ShipmentStatus.UNLOADING, ShipmentStatus.INSPECTION_PENDING, ShipmentStatus.INSPECTING,
-  ShipmentStatus.INSPECTION_PASSED, ShipmentStatus.INSPECTION_FAILED,
-  ShipmentStatus.RECEIVING, ShipmentStatus.RECEIVED, ShipmentStatus.STORED,
-];
+// to the OFFSITE warehouse while still e.g. in_transit_seaway must not have
+// nothing-to-undo hidden behind a button that always 404s against that check.
+const REVERTIBLE_STORED_STATUSES = [...POST_ARRIVAL_STATUSES, ShipmentStatus.STORED];
 
+// A shipment only has a real storage footprint once it's actually reached a
+// warehouse -- being merely *destined* for OFFSITE (receiving_warehouse set)
+// while still e.g. in_transit_seaway doesn't count, even though it used to
+// (bypassing this same status check) and is exactly what caused shipments to
+// show up here, storage cost and all, days before they'd actually arrived.
 const hasBeenStored = (shipment) => {
-  const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
-  return shipment.latestStatus === 'stored'
-    || shipment.latestStatus === 'arrived_offsite'
+  return REVERTIBLE_STORED_STATUSES.includes(shipment.latestStatus)
     || shipment.latestStatus === 'sold'
-    || shipment.latestStatus === 'archived'
-    || warehouse === 'OFFSITE';
+    || shipment.latestStatus === 'archived';
 };
 
 function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteShipment, onCreateShipment, onRefresh, loading }) {

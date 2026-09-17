@@ -529,8 +529,11 @@ function App() {
   const StoredWrapper = () => {
     const storedShipments = shipments.filter(s => {
       if (s.latestStatus === 'sold' || s.latestStatus === 'archived') return false;
-      const warehouse = (s.receivingWarehouse || '').toUpperCase();
-      return s.latestStatus === 'stored' || warehouse === 'OFFSITE' || s.latestStatus === 'arrived_offsite';
+      // Being routed to OFFSITE (receiving_warehouse) isn't itself arrival --
+      // a shipment still in_transit_seaway with that destination has no real
+      // storage footprint yet, so it must not appear here until its status
+      // actually reflects arrival, same as any other warehouse.
+      return s.latestStatus === 'stored' || POST_ARRIVAL_STATUSES.includes(s.latestStatus);
     });
     return (
       <WarehouseStored
