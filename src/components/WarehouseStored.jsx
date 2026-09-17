@@ -101,6 +101,18 @@ const REVERT_TARGET_STATUSES = [
   ShipmentStatus.ARRIVED_OFFSITE,
 ];
 
+// Mirrors the backend's own revertibleStates guard (server/controllers/
+// ShipmentController.ts, adminRevertToTransit) -- a shipment merely routed
+// to the OFFSITE warehouse while still e.g. in_transit_seaway shows up on
+// this page (see hasBeenStored below) but has nothing to undo, so the
+// button must not appear for it or every click 404s against the same check.
+const REVERTIBLE_STORED_STATUSES = [
+  ShipmentStatus.ARRIVED_PTA, ShipmentStatus.ARRIVED_KLM, ShipmentStatus.ARRIVED_OFFSITE,
+  ShipmentStatus.UNLOADING, ShipmentStatus.INSPECTION_PENDING, ShipmentStatus.INSPECTING,
+  ShipmentStatus.INSPECTION_PASSED, ShipmentStatus.INSPECTION_FAILED,
+  ShipmentStatus.RECEIVING, ShipmentStatus.RECEIVED, ShipmentStatus.STORED,
+];
+
 const hasBeenStored = (shipment) => {
   const warehouse = (shipment.receivingWarehouse || '').toUpperCase();
   return shipment.latestStatus === 'stored'
@@ -1167,7 +1179,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                                 Sold
                               </button>
                             )}
-                            {isAdmin && (
+                            {isAdmin && REVERTIBLE_STORED_STATUSES.includes(shipment.latestStatus) && (
                               <button
                                 className="btn btn-ghost"
                                 onClick={() => openRevertModal(shipment)}
@@ -1362,7 +1374,7 @@ function WarehouseStored({ shipments, allShipments, onUpdateShipment, onDeleteSh
                                   Sold
                                 </button>
                               )}
-                              {isAdmin && (
+                              {isAdmin && REVERTIBLE_STORED_STATUSES.includes(shipment.latestStatus) && (
                                 <button
                                   className="btn btn-ghost"
                                   onClick={() => openRevertModal(shipment)}
