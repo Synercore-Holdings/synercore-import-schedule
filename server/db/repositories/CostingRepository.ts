@@ -529,7 +529,14 @@ export class CostingRepository {
       throw new Error('Cost estimate not found');
     }
 
-    const { id: _, created_at, updated_at, reference_number, ...copyData } = original;
+    // roe_origin/roe_eur/roe_customs are deliberately dropped, not copied --
+    // they're a snapshot of the exchange rate on the day the original was
+    // costed, and silently carrying them into a new draft (costed "today")
+    // makes the copy look current while actually still pricing off a
+    // rate that can be months stale. Leaving them unset means the estimate
+    // form's own "prefill from today's live rate if empty" logic (see
+    // ImportCosting.jsx) fills in the real rate when the draft is opened.
+    const { id: _, created_at, updated_at, reference_number, roe_origin, roe_eur, roe_customs, ...copyData } = original;
 
     return this.create({
       ...copyData,
