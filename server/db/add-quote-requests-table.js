@@ -72,6 +72,11 @@ async function createQuoteRequestsTable() {
     // independent of quoted_rate (either can be quoted without the other).
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_type_2 VARCHAR(30);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate_2 NUMERIC;`);
+    // How the total cargo weight actually splits across the two containers
+    // (e.g. 24t on the 40', 12t on the 20') -- informational for the forwarder,
+    // independent of gross_weight_kg (which stays the shipment-wide total).
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_weight_kg NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_2_weight_kg NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;`);

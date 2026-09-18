@@ -46,6 +46,8 @@ router.post(
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
     body('container_type_2').optional({ nullable: true }).trim(),
+    body('container_weight_kg').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('container_2_weight_kg').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('incoterm').optional({ nullable: true }).trim(),
     body('origin').optional({ nullable: true }).trim(),
     body('destination').optional({ nullable: true }).trim(),
@@ -76,7 +78,8 @@ router.post(
   validate,
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      forwarder_name, forwarder_email, quote_date, transport_mode = 'sea', container_type, container_type_2, incoterm,
+      forwarder_name, forwarder_email, quote_date, transport_mode = 'sea', container_type, container_type_2,
+      container_weight_kg, container_2_weight_kg, incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
       dg_classification = 'non_dg', gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm,
       pallet_count, cargo_value, cargo_value_currency = 'USD', cargo_ready_date, required_date, notes,
@@ -98,8 +101,8 @@ router.post(
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode, container_type,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
         dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
-        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at, container_type_2
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP), $28)
+        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at, container_type_2, container_weight_kg, container_2_weight_kg
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP), $28, $29, $30)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode, container_type || null,
@@ -107,7 +110,7 @@ router.post(
         cargo_description || null, hs_code || null, JSON.stringify(products || []), dg_classification, gross_weight_kg || null,
         length_cm || null, width_cm || null, height_cm || null, volume_cbm || null,
         pallet_count || null, cargo_value || null, cargo_value_currency, cargo_ready_date || null, required_date || null, notes || null,
-        quote_date || null, container_type_2 || null,
+        quote_date || null, container_type_2 || null, container_weight_kg || null, container_2_weight_kg || null,
       ]
     );
 
@@ -159,6 +162,8 @@ router.put(
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
     body('container_type_2').optional({ nullable: true }).trim(),
+    body('container_weight_kg').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('container_2_weight_kg').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('products').optional({ nullable: true }).isArray().withMessage('Products must be an array'),
     body('products.*.name').optional({ nullable: true }).trim(),
     body('products.*.hs_code').optional({ nullable: true }).trim(),
@@ -191,7 +196,7 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const allowedFields = [
-      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'container_type_2', 'incoterm', 'origin', 'destination',
+      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'container_type_2', 'container_weight_kg', 'container_2_weight_kg', 'incoterm', 'origin', 'destination',
       'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'products', 'dg_classification',
       'gross_weight_kg', 'length_cm', 'width_cm', 'height_cm', 'volume_cbm', 'pallet_count',
       'cargo_value', 'cargo_value_currency', 'cargo_ready_date', 'required_date', 'notes', 'status',

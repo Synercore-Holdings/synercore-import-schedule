@@ -79,6 +79,9 @@ export function generateQuoteRequestPDF(req) {
     body: [
       ['Mode', TRANSPORT_LABELS[req.transport_mode] || fmt(req.transport_mode)],
       ...(req.container_type ? [['Container Type', [req.container_type, req.container_type_2].filter(Boolean).join(' and ')]] : []),
+      ...(req.container_type_2 && (req.container_weight_kg || req.container_2_weight_kg) ? [
+        ['Weight Split', `${req.container_type}: ${fmt(req.container_weight_kg, ' kg')}  /  ${req.container_type_2}: ${fmt(req.container_2_weight_kg, ' kg')}`],
+      ] : []),
       ['Incoterm', fmt(req.incoterm)],
       [req.transport_mode === 'sea' ? 'Origin Port' : 'Origin', fmt(req.origin)],
       ...(req.collection_address ? [['Collection Address', req.collection_address]] : []),
