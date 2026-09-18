@@ -13,6 +13,7 @@ import {
   PORTS_OF_LOADING,
 } from '../utils/costingCalculations';
 import { generateEstimatePDF, generateEstimatePDFBase64 } from '../utils/costingPdf';
+import { generateCompareEstimatesPDF } from '../utils/compareEstimatesPdf';
 import { useNotification } from '../contexts/NotificationContext';
 import CostingReportsPanel from './CostingReportsPanel';
 import CostingEstimatesTable from './CostingEstimatesTable';
@@ -458,6 +459,51 @@ function CompareEstimatesView({ estimates, onClose }) {
     return valA !== 0 || valB !== 0;
   }) : [];
 
+  // Every value the table (and the PDF export below) needs per row,
+  // computed once here instead of inline in the JSX map -- single source
+  // of truth so "Print PDF" can never drift from what's on screen.
+  const comparisonRows = rows.map(row => {
+    const valA = parseFloat(totalsA[row.key]) || 0;
+    const valB = parseFloat(totalsB[row.key]) || 0;
+    const diff = valB - valA;
+    const aIsLower = row.headline && valA > 0 && valA < valB;
+    const bIsLower = row.headline && valB > 0 && valB < valA;
+    const perKgA = !row.headline && weightA > 0 ? valA / weightA : null;
+    const perKgB = !row.headline && weightB > 0 ? valB / weightB : null;
+    const pctDiff = valA !== 0 ? (diff / Math.abs(valA)) * 100 : null;
+    return { label: row.label, headline: !!row.headline, valA, valB, diff, pctDiff, aIsLower, bIsLower, perKgA, perKgB };
+  });
+
+  // Same shape used by the on-screen composition bars, resolved once so the
+  // PDF export can reuse it directly instead of re-deriving segment values.
+  const buildComposition = (totals, est) => {
+    if (!totals || !est) return [];
+    const segments = COMPOSITION_SEGMENTS.map(seg => ({ ...seg, value: Math.max(0, seg.getValue(totals, est)) }));
+    const segmentTotal = segments.reduce((sum, seg) => sum + seg.value, 0);
+    return segments.map(seg => ({ label: seg.label, color: seg.color, value: seg.value, pct: segmentTotal > 0 ? (seg.value / segmentTotal) * 100 : 0 }));
+  };
+  const compositionA = buildComposition(totalsA, estA);
+  const compositionB = buildComposition(totalsB, estB);
+
+  const handlePrintPDF = () => {
+    if (!estA || !estB) return;
+    const describe = (est, weight) => ({
+      reference: est.reference_number || est.id,
+      supplier: est.supplier_name || '—',
+      modeLabel: `${est.transport_mode === 'air' ? 'Air' : 'Sea'} · ${est.transport_mode === 'air' ? (est.airline_name || '—') : (est.container_type || '—')}`,
+      date: est.costing_date || est.created_at,
+      weightKg: weight,
+      productCount: (est.products || []).length,
+    });
+    generateCompareEstimatesPDF({
+      estA: describe(estA, weightA),
+      estB: describe(estB, weightB),
+      compositionA,
+      compositionB,
+      rows: comparisonRows,
+    });
+  };
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1100,
@@ -475,16 +521,30 @@ function CompareEstimatesView({ estimates, onClose }) {
             Pick any two estimates to see their key figures side by side
           </p>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
-            color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
-            fontSize: '0.85rem', fontWeight: 500,
-          }}
-        >
-          ✕ Close
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {estA && estB && (
+            <button
+              onClick={handlePrintPDF}
+              style={{
+                background: '#0ea5e9', border: '1px solid #0ea5e9',
+                color: 'white', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 500,
+              }}
+            >
+              🖨️ Print PDF
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(0,0,0,0.05)', border: '1px solid #d1d5db',
+              color: '#374151', padding: '8px 20px', borderRadius: '8px', cursor: 'pointer',
+              fontSize: '0.85rem', fontWeight: 500,
+            }}
+          >
+            ✕ Close
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '1.5rem', flex: 1, maxWidth: '1400px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
@@ -544,20 +604,19 @@ function CompareEstimatesView({ estimates, onClose }) {
             <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '1.5rem' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)', marginBottom: '12px' }}>Cost Composition</div>
               {[estA, estB].map((est, idx) => {
-                const totals = idx === 0 ? totalsA : totalsB;
-                const segments = COMPOSITION_SEGMENTS.map(seg => ({ ...seg, value: Math.max(0, seg.getValue(totals, est)) }));
-                const segmentTotal = segments.reduce((sum, seg) => sum + seg.value, 0);
+                const segments = idx === 0 ? compositionA : compositionB;
+                const hasData = segments.some(seg => seg.value > 0);
                 return (
                   <div key={est.id} style={{ marginBottom: idx === 0 ? '14px' : 0 }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-500)', marginBottom: '4px' }}>
                       Estimate {idx === 0 ? 'A' : 'B'} — {est.reference_number || est.id}
                     </div>
                     <div style={{ display: 'flex', width: '100%', height: '22px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-                      {segmentTotal > 0 ? segments.filter(seg => seg.value > 0).map(seg => (
+                      {hasData ? segments.filter(seg => seg.value > 0).map(seg => (
                         <div
                           key={seg.label}
-                          title={`${seg.label}: ${formatCurrency(seg.value)} (${((seg.value / segmentTotal) * 100).toFixed(1)}%)`}
-                          style={{ width: `${(seg.value / segmentTotal) * 100}%`, backgroundColor: seg.color }}
+                          title={`${seg.label}: ${formatCurrency(seg.value)} (${seg.pct.toFixed(1)}%)`}
+                          style={{ width: `${seg.pct}%`, backgroundColor: seg.color }}
                         />
                       )) : <div style={{ width: '100%', backgroundColor: '#e5e7eb' }} />}
                     </div>
@@ -585,21 +644,11 @@ function CompareEstimatesView({ estimates, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, idx) => {
-                    const valA = parseFloat(totalsA[row.key]) || 0;
-                    const valB = parseFloat(totalsB[row.key]) || 0;
-                    const diff = valB - valA;
-                    const aIsLower = row.headline && valA > 0 && valA < valB;
-                    const bIsLower = row.headline && valB > 0 && valB < valA;
-                    // Per-kg normalizes line items across estimates of different
-                    // shipment sizes -- the headline rows are already either a
-                    // total or already a per-kg figure, so they don't need this.
-                    const perKgA = !row.headline && weightA > 0 ? valA / weightA : null;
-                    const perKgB = !row.headline && weightB > 0 ? valB / weightB : null;
-                    const pctDiff = valA !== 0 ? (diff / Math.abs(valA)) * 100 : null;
+                  {comparisonRows.map((row, idx) => {
+                    const { headline, valA, valB, diff, pctDiff, aIsLower, bIsLower, perKgA, perKgB } = row;
                     return (
-                      <tr key={row.key} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: row.headline ? '#fffbeb' : (idx % 2 === 0 ? 'transparent' : '#fafafa') }}>
-                        <td style={{ padding: '10px 12px', fontWeight: row.headline ? 700 : 500, color: '#0f172a' }}>{row.label}</td>
+                      <tr key={row.label} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: headline ? '#fffbeb' : (idx % 2 === 0 ? 'transparent' : '#fafafa') }}>
+                        <td style={{ padding: '10px 12px', fontWeight: headline ? 700 : 500, color: '#0f172a' }}>{row.label}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: aIsLower ? 700 : 400, backgroundColor: aIsLower ? '#dcfce7' : undefined, color: aIsLower ? '#166534' : 'var(--text-700)' }}>
                           {formatCurrency(valA)}{aIsLower && <span style={{ marginLeft: 6, fontSize: '0.7rem', fontWeight: 700 }}>LOWER</span>}
                           {perKgA !== null && <div style={{ fontSize: '0.72rem', color: 'var(--text-500)', fontWeight: 400 }}>{formatCurrency(perKgA)}/kg</div>}
