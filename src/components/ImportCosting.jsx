@@ -494,6 +494,8 @@ function CompareEstimatesView({ estimates, onClose }) {
       date: est.costing_date || est.created_at,
       weightKg: weight,
       productCount: (est.products || []).length,
+      roeOrigin: parseFloat(est.roe_origin) || 0,
+      roeEur: parseFloat(est.roe_eur) || 0,
     });
     generateCompareEstimatesPDF({
       estA: describe(estA, weightA),
@@ -596,6 +598,9 @@ function CompareEstimatesView({ estimates, onClose }) {
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '2px' }}>
                     {formatNumber(idx === 0 ? weightA : weightB)} kg · {(est.products || []).length} product line{(est.products || []).length !== 1 ? 's' : ''}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '2px' }}>
+                    ROE used: USD/ZAR {formatNumber(est.roe_origin || 0, 4)} · EUR/ZAR {formatNumber(est.roe_eur || 0, 4)}
                   </div>
                 </div>
               ))}

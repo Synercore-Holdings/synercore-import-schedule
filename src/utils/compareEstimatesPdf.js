@@ -32,7 +32,7 @@ const fmtDate = (d) => {
 
 /**
  * @param {Object} options
- * @param {Object} options.estA - { reference, supplier, modeLabel, date, weightKg, productCount }
+ * @param {Object} options.estA - { reference, supplier, modeLabel, date, weightKg, productCount, roeOrigin, roeEur }
  * @param {Object} options.estB - same shape as estA
  * @param {Array} options.compositionA - [{ label, color: '#rrggbb', value, pct }] for estA's cost composition bar
  * @param {Array} options.compositionB - same shape, for estB
@@ -69,7 +69,7 @@ export function generateCompareEstimatesPDF({ estA, estB, compositionA, composit
     const x = 14 + idx * (cardW + 6);
     doc.setDrawColor(...SURFACE_SOFT);
     doc.setFillColor(...SURFACE_SOFT);
-    doc.roundedRect(x, y, cardW, 30, 2, 2, 'F');
+    doc.roundedRect(x, y, cardW, 35, 2, 2, 'F');
     doc.setFontSize(7);
     doc.setTextColor(...BODY_MUTED);
     doc.setFont(undefined, 'bold');
@@ -84,8 +84,9 @@ export function generateCompareEstimatesPDF({ estA, estB, compositionA, composit
     doc.setTextColor(...BODY_MUTED);
     doc.text(`${est.modeLabel} · ${fmtDate(est.date)}`, x + 4, y + 23.5);
     doc.text(`${formatNumber(est.weightKg)} kg · ${est.productCount} product line(s)`, x + 4, y + 28);
+    doc.text(`ROE used: USD/ZAR ${formatNumber(est.roeOrigin || 0, 4)} · EUR/ZAR ${formatNumber(est.roeEur || 0, 4)}`, x + 4, y + 32.5);
   });
-  y += 38;
+  y += 43;
 
   // === Cost Composition — redrawn natively (the on-screen bar is a plain
   // div stack, not a Chart.js canvas, so there's no chart image to capture) ===
