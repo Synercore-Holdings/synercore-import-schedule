@@ -77,6 +77,11 @@ async function createQuoteRequestsTable() {
     // independent of gross_weight_kg (which stays the shipment-wide total).
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_weight_kg NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_2_weight_kg NUMERIC;`);
+    // Same idea, for the cargo value split (per-container value of goods),
+    // assumed to share cargo_value_currency -- mixed currencies per container
+    // aren't modelled here, matching cargo_value's own single-currency total.
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_value NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_2_value NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;`);

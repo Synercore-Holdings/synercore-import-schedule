@@ -126,7 +126,7 @@ const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', valu
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', quote_date: '', transport_mode: 'sea', container_type: '', container_type_2: '',
-  container_weight_kg: '', container_2_weight_kg: '', incoterm: '',
+  container_weight_kg: '', container_2_weight_kg: '', container_value: '', container_2_value: '', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', products: [{ ...EMPTY_PRODUCT_LINE }],
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
   pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
@@ -157,6 +157,8 @@ const toFormState = (req) => ({
   container_type_2: req.container_type_2 || '',
   container_weight_kg: req.container_weight_kg ?? '',
   container_2_weight_kg: req.container_2_weight_kg ?? '',
+  container_value: req.container_value ?? '',
+  container_2_value: req.container_2_value ?? '',
   incoterm: req.incoterm || '',
   origin: req.origin || '',
   destination: req.destination || '',
@@ -770,11 +772,20 @@ function QuoteRequestForm({ onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productWeightKey]);
 
-  const productValueKey = form.products.map(p => `${p.value}|${p.value_currency}`).join('|');
+  const productValueKey = form.products.map(p => `${p.value}|${p.value_currency}|${p.container_slot}`).join('|');
   useEffect(() => {
     const matching = form.products.filter(p => p.value_currency === form.cargo_value_currency);
     const valueSum = matching.reduce((sum, p) => sum + (parseFloat(p.value) || 0), 0);
     if (valueSum > 0) handleFieldChange('cargo_value', String(valueSum));
+
+    const slotValue = (slot) => matching.reduce((sum, p) => {
+      if (p.container_slot !== slot) return sum;
+      return sum + (parseFloat(p.value) || 0);
+    }, 0);
+    const slot1Value = slotValue('1');
+    const slot2Value = slotValue('2');
+    if (slot1Value > 0) handleFieldChange('container_value', String(slot1Value));
+    if (slot2Value > 0) handleFieldChange('container_2_value', String(slot2Value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productValueKey, form.cargo_value_currency]);
 
@@ -1375,6 +1386,8 @@ function QuoteRequestForm({ onClose }) {
                         container_type_2: mode === 'sea' ? prev.container_type_2 : '',
                         container_weight_kg: mode === 'sea' ? prev.container_weight_kg : '',
                         container_2_weight_kg: mode === 'sea' ? prev.container_2_weight_kg : '',
+                        container_value: mode === 'sea' ? prev.container_value : '',
+                        container_2_value: mode === 'sea' ? prev.container_2_value : '',
                       }));
                       setShowCustomOrigin(false);
                       setShowCustomDestination(false);
@@ -1407,30 +1420,6 @@ function QuoteRequestForm({ onClose }) {
                       Ask the forwarder to quote a second container size for the same shipment (e.g. 20FCL and 40FCL) in one request.
                     </div>
                   </div>
-                )}
-                {form.transport_mode === 'sea' && form.container_type_2 && (
-                  <>
-                    <div style={fieldWrap}>
-                      <label style={labelStyle}>Weight on {form.container_type || 'first container'} (kg)</label>
-                      <input type="number" min="0" step="any" style={inputStyle} value={form.container_weight_kg} onChange={e => handleFieldChange('container_weight_kg', e.target.value)} />
-                    </div>
-                    <div style={fieldWrap}>
-                      <label style={labelStyle}>Weight on {form.container_type_2} (kg)</label>
-                      <input type="number" min="0" step="any" style={inputStyle} value={form.container_2_weight_kg} onChange={e => handleFieldChange('container_2_weight_kg', e.target.value)} />
-                      {(() => {
-                        const splitSum = (parseFloat(form.container_weight_kg) || 0) + (parseFloat(form.container_2_weight_kg) || 0);
-                        const gross = parseFloat(form.gross_weight_kg) || 0;
-                        if (splitSum > 0 && gross > 0 && Math.round(splitSum) !== Math.round(gross)) {
-                          return (
-                            <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '4px' }}>
-                              ⚠ Split totals {splitSum.toLocaleString()} kg, but Gross Weight below is {gross.toLocaleString()} kg
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  </>
                 )}
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Incoterm</label>
@@ -1677,39 +1666,72 @@ function QuoteRequestForm({ onClose }) {
                   </button>
                 </div>
 
-                <div style={fieldWrap}>
-                  <label style={labelStyle}>Gross Weight (kg)</label>
-                  <input type="number" min="0" step="any" style={inputStyle} value={form.gross_weight_kg} onChange={e => handleFieldChange('gross_weight_kg', e.target.value)} />
-                  {form.products.some(p => parseFloat(p.weight_kg) > 0) && (
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
-                      Auto-calculated from product line weights
+                {form.transport_mode === 'sea' && form.container_type_2 ? (
+                  <>
+                    <div style={fieldWrap}>
+                      <label style={labelStyle}>Weight ({form.container_type || 'Container 1'}) (kg)</label>
+                      <input type="number" min="0" step="any" style={inputStyle} value={form.container_weight_kg} onChange={e => handleFieldChange('container_weight_kg', e.target.value)} />
                     </div>
-                  )}
-                </div>
-                <div style={fieldWrap}>
-                  <label style={labelStyle}>Value of Goods</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input type="number" min="0" step="any" style={{ ...inputStyle, flex: 1 }} value={form.cargo_value} onChange={e => handleFieldChange('cargo_value', e.target.value)} />
-                    <select style={{ ...inputStyle, width: '90px' }} value={form.cargo_value_currency} onChange={e => handleFieldChange('cargo_value_currency', e.target.value)}>
-                      {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  {(() => {
-                    const linesWithValue = form.products.filter(p => parseFloat(p.value) > 0);
-                    if (linesWithValue.length === 0) return null;
-                    const otherCurrencyCount = linesWithValue.filter(p => p.value_currency !== form.cargo_value_currency).length;
-                    return (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
-                        {otherCurrencyCount < linesWithValue.length && <div>Auto-calculated from product line values</div>}
-                        {otherCurrencyCount > 0 && (
-                          <div>
-                            {otherCurrencyCount} product line{otherCurrencyCount > 1 ? 's' : ''} valued in a different currency, not included above.
-                          </div>
-                        )}
+                    <div style={fieldWrap}>
+                      <label style={labelStyle}>Value ({form.container_type || 'Container 1'})</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" min="0" step="any" style={{ ...inputStyle, flex: 1 }} value={form.container_value} onChange={e => handleFieldChange('container_value', e.target.value)} />
+                        <select style={{ ...inputStyle, width: '90px' }} value={form.cargo_value_currency} onChange={e => handleFieldChange('cargo_value_currency', e.target.value)}>
+                          {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                       </div>
-                    );
-                  })()}
-                </div>
+                    </div>
+                    <div style={fieldWrap}>
+                      <label style={labelStyle}>Weight ({form.container_type_2}) (kg)</label>
+                      <input type="number" min="0" step="any" style={inputStyle} value={form.container_2_weight_kg} onChange={e => handleFieldChange('container_2_weight_kg', e.target.value)} />
+                    </div>
+                    <div style={fieldWrap}>
+                      <label style={labelStyle}>Value ({form.container_type_2}) ({form.cargo_value_currency})</label>
+                      <input type="number" min="0" step="any" style={inputStyle} value={form.container_2_value} onChange={e => handleFieldChange('container_2_value', e.target.value)} />
+                    </div>
+                    <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>
+                        Auto-calculated from each product line Container tag above. Combined total: {form.gross_weight_kg || 0} kg / {form.cargo_value_currency} {form.cargo_value || 0}.
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={fieldWrap}>
+                      <label style={labelStyle}>Gross Weight (kg)</label>
+                      <input type="number" min="0" step="any" style={inputStyle} value={form.gross_weight_kg} onChange={e => handleFieldChange('gross_weight_kg', e.target.value)} />
+                      {form.products.some(p => parseFloat(p.weight_kg) > 0) && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                          Auto-calculated from product line weights
+                        </div>
+                      )}
+                    </div>
+                    <div style={fieldWrap}>
+                      <label style={labelStyle}>Value of Goods</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" min="0" step="any" style={{ ...inputStyle, flex: 1 }} value={form.cargo_value} onChange={e => handleFieldChange('cargo_value', e.target.value)} />
+                        <select style={{ ...inputStyle, width: '90px' }} value={form.cargo_value_currency} onChange={e => handleFieldChange('cargo_value_currency', e.target.value)}>
+                          {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      {(() => {
+                        const linesWithValue = form.products.filter(p => parseFloat(p.value) > 0);
+                        if (linesWithValue.length === 0) return null;
+                        const otherCurrencyCount = linesWithValue.filter(p => p.value_currency !== form.cargo_value_currency).length;
+                        return (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                            {otherCurrencyCount < linesWithValue.length && <div>Auto-calculated from product line values</div>}
+                            {otherCurrencyCount > 0 && (
+                              <div>
+                                {otherCurrencyCount} product line{otherCurrencyCount > 1 ? 's' : ''} valued in a different currency, not included above.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </>
+                )}
 
                 <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Dimensions per Pallet/Package (cm) — Length x Width x Height x Qty</label>

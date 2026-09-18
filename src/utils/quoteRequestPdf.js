@@ -79,9 +79,6 @@ export function generateQuoteRequestPDF(req) {
     body: [
       ['Mode', TRANSPORT_LABELS[req.transport_mode] || fmt(req.transport_mode)],
       ...(req.container_type ? [['Container Type', [req.container_type, req.container_type_2].filter(Boolean).join(' and ')]] : []),
-      ...(req.container_type_2 && (req.container_weight_kg || req.container_2_weight_kg) ? [
-        ['Weight Split', `${req.container_type}: ${fmt(req.container_weight_kg, ' kg')}  /  ${req.container_type_2}: ${fmt(req.container_2_weight_kg, ' kg')}`],
-      ] : []),
       ['Incoterm', fmt(req.incoterm)],
       [req.transport_mode === 'sea' ? 'Origin Port' : 'Origin', fmt(req.origin)],
       ...(req.collection_address ? [['Collection Address', req.collection_address]] : []),
@@ -106,12 +103,21 @@ export function generateQuoteRequestPDF(req) {
       ['Supplier', fmt(req.supplier_name)],
       ...(hasProducts ? [] : [['Description', fmt(req.cargo_description)], ['HS Code', fmt(req.hs_code)]]),
       ['DG Classification', DG_LABELS[req.dg_classification] || DG_LABELS.non_dg],
-      ['Gross Weight', fmt(req.gross_weight_kg, ' kg')],
+      ...(req.container_type_2 ? [
+        [`Weight — ${req.container_type}`, fmt(req.container_weight_kg, ' kg')],
+        [`Value — ${req.container_type}`, req.container_value ? `${req.cargo_value_currency || 'USD'} ${Number(req.container_value).toLocaleString()}` : '—'],
+        [`Weight — ${req.container_type_2}`, fmt(req.container_2_weight_kg, ' kg')],
+        [`Value — ${req.container_type_2}`, req.container_2_value ? `${req.cargo_value_currency || 'USD'} ${Number(req.container_2_value).toLocaleString()}` : '—'],
+        ['Combined Weight', fmt(req.gross_weight_kg, ' kg')],
+        ['Combined Value', req.cargo_value ? `${req.cargo_value_currency || 'USD'} ${Number(req.cargo_value).toLocaleString()}` : '—'],
+      ] : [
+        ['Gross Weight', fmt(req.gross_weight_kg, ' kg')],
+        ['Value of Goods', req.cargo_value ? `${req.cargo_value_currency || 'USD'} ${Number(req.cargo_value).toLocaleString()}` : '—'],
+      ]),
       ['Dimensions per Pallet/Package (L x W x H)', (req.length_cm && req.width_cm && req.height_cm)
         ? `${req.length_cm} x ${req.width_cm} x ${req.height_cm} cm`
         : '—'],
       ['Pallets / Packages', fmt(req.pallet_count)],
-      ['Value of Goods', req.cargo_value ? `${req.cargo_value_currency || 'USD'} ${Number(req.cargo_value).toLocaleString()}` : '—'],
       ['Volume (Total)', fmt(req.volume_cbm, ' CBM')],
       ['Volumetric Weight', fmt(calcVolumetricWeight(req.volume_cbm, req.transport_mode), ' kg')],
     ],
