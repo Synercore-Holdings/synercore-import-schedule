@@ -18,9 +18,31 @@ export const convertToUSD = (amount, currency, fxRates = {}) => {
   return Number(amount) / Number(rate);
 };
 
-// Groups completed ("quoted") requests by route (origin + destination + mode) —
-// comparing sea to air rates, or different origins, would be misleading, so each
-// group is a like-for-like set of forwarder quotes, cheapest first.
+// A dual-container sea request (container_type/quoted_rate plus
+// container_type_2/quoted_rate_2 for the same shipment) contributes one
+// comparable entry per rate it actually has -- otherwise a 20FCL and a
+// 40FCL quote would get compared as if they were fungible. The second
+// entry overrides container_type/quoted_rate onto the SAME field names
+// (rather than introducing new ones) so every existing consumer of an
+// "entry" here keeps reading entry.quoted_rate/entry.container_type
+// unchanged; the two virtual copies always land in different route
+// groups (container_type is now part of the grouping key below), so
+// there's no key collision within any single group's entries.
+const explodeByContainerType = (requests) => {
+  const exploded = [];
+  (requests || []).forEach(req => {
+    if (req.quoted_rate) exploded.push(req);
+    if (req.container_type_2 && req.quoted_rate_2) {
+      exploded.push({ ...req, container_type: req.container_type_2, quoted_rate: req.quoted_rate_2 });
+    }
+  });
+  return exploded;
+};
+
+// Groups completed ("quoted") requests by route (origin + destination + mode
+// + container type) — comparing sea to air rates, different origins, or a
+// 20FCL rate to a 40FCL rate would all be misleading, so each group is a
+// like-for-like set of forwarder quotes, cheapest first.
 //
 // When fxRates covers every currency in a mixed-currency group, entries sort by
 // their USD equivalent so "cheapest" is actually correct across currencies;
@@ -28,11 +50,10 @@ export const convertToUSD = (amount, currency, fxRates = {}) => {
 // single currency, but harmless — same-currency order is identical either way).
 export const groupRatesByRoute = (completedRequests, fxRates = {}) => {
   const groups = new Map();
-  (completedRequests || []).forEach(req => {
-    if (!req.quoted_rate) return;
-    const key = `${normRoute(req.origin)}|${normRoute(req.destination)}|${req.transport_mode}`;
+  explodeByContainerType(completedRequests).forEach(req => {
+    const key = `${normRoute(req.origin)}|${normRoute(req.destination)}|${req.transport_mode}|${req.container_type || ''}`;
     if (!groups.has(key)) {
-      groups.set(key, { origin: req.origin || '—', destination: req.destination || '—', transport_mode: req.transport_mode, entries: [] });
+      groups.set(key, { origin: req.origin || '—', destination: req.destination || '—', transport_mode: req.transport_mode, container_type: req.container_type || null, entries: [] });
     }
     groups.get(key).entries.push(req);
   });

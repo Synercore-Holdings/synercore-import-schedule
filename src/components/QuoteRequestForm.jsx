@@ -36,7 +36,7 @@ const STATUS_LABELS = {
 };
 
 const CURRENCIES = ['USD', 'ZAR', 'EUR', 'GBP'];
-const EMPTY_RATE_FORM = { quoted_rate: '', quoted_rate_non_stackable: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '', rate_received_date: '' };
+const EMPTY_RATE_FORM = { quoted_rate: '', quoted_rate_non_stackable: '', quoted_rate_2: '', quoted_currency: 'USD', quote_reference: '', quoted_transit_days: '', quote_notes: '', rate_received_date: '' };
 
 const TRANSPORT_LABELS = { sea: 'Sea', air: 'Air', road: 'Road' };
 
@@ -125,7 +125,7 @@ const normalizePortOptions = (ports) => {
 const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', value: '', value_currency: 'USD' };
 
 const EMPTY_FORM = {
-  forwarder_name: '', forwarder_email: '', quote_date: '', transport_mode: 'sea', container_type: '', incoterm: '',
+  forwarder_name: '', forwarder_email: '', quote_date: '', transport_mode: 'sea', container_type: '', container_type_2: '', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', products: [{ ...EMPTY_PRODUCT_LINE }],
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
   pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
@@ -153,6 +153,7 @@ const toFormState = (req) => ({
   quote_date: toDateInput(req.sent_at),
   transport_mode: req.transport_mode || 'sea',
   container_type: req.container_type || '',
+  container_type_2: req.container_type_2 || '',
   incoterm: req.incoterm || '',
   origin: req.origin || '',
   destination: req.destination || '',
@@ -581,7 +582,7 @@ function QuoteRequestForm({ onClose }) {
       if (statusCounts[r.status] !== undefined) statusCounts[r.status]++;
     });
 
-    const routeGroups = groupRatesByRoute(filtered.filter(r => r.status === 'quoted' && r.quoted_rate), fxRates);
+    const routeGroups = groupRatesByRoute(filtered.filter(r => r.status === 'quoted' && (r.quoted_rate || r.quoted_rate_2)), fxRates);
 
     const monthKeys = [];
     const now = new Date();
@@ -872,7 +873,7 @@ function QuoteRequestForm({ onClose }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: revertStatus,
-          quoted_rate: '', quoted_rate_non_stackable: '', quote_reference: '', quoted_transit_days: '', quote_notes: '',
+          quoted_rate: '', quoted_rate_non_stackable: '', quoted_rate_2: '', quote_reference: '', quoted_transit_days: '', quote_notes: '',
         }),
       });
       if (response.ok) {
@@ -893,6 +894,7 @@ function QuoteRequestForm({ onClose }) {
     setRateForm({
       quoted_rate: req.quoted_rate ?? '',
       quoted_rate_non_stackable: req.quoted_rate_non_stackable ?? '',
+      quoted_rate_2: req.quoted_rate_2 ?? '',
       quoted_currency: req.quoted_currency || 'USD',
       quote_reference: req.quote_reference || '',
       quoted_transit_days: req.quoted_transit_days ?? '',
@@ -911,6 +913,7 @@ function QuoteRequestForm({ onClose }) {
     let payload = { ...rateForm };
     const hasStackable = Number(payload.quoted_rate) > 0;
     const hasNonStackable = Number(payload.quoted_rate_non_stackable) > 0;
+    const hasRate2 = Number(payload.quoted_rate_2) > 0;
     if (rateModalReq.transport_mode === 'air') {
       if (!hasStackable && !hasNonStackable) {
         showError?.('Enter at least one rate (stackable or non-stackable), greater than 0');
@@ -921,6 +924,13 @@ function QuoteRequestForm({ onClose }) {
       // so it belongs in quoted_rate (the field everything else compares on).
       if (!hasStackable) {
         payload = { ...payload, quoted_rate: payload.quoted_rate_non_stackable, quoted_rate_non_stackable: '' };
+      }
+    } else if (rateModalReq.container_type_2) {
+      // Two genuinely distinct container sizes, unlike air's stackable/non-
+      // stackable pair — either can be quoted without the other, no shuffling.
+      if (!hasStackable && !hasRate2) {
+        showError?.(`Enter a rate for ${rateModalReq.container_type} and/or ${rateModalReq.container_type_2}, greater than 0`);
+        return;
       }
     } else if (!hasStackable) {
       showError?.('Enter a rate greater than 0');
@@ -965,7 +975,10 @@ function QuoteRequestForm({ onClose }) {
       'Quote Date': r.sent_at ? new Date(r.sent_at).toLocaleDateString('en-ZA') : '',
       'Response Time (business days)': responseTimeDays(r) ?? '',
       'Quote Ref': r.quote_reference || '',
+      'Container Type': r.container_type || '',
+      'Container Type 2': r.container_type_2 || '',
       'Rate': r.quoted_rate || '',
+      'Rate 2': r.quoted_rate_2 || '',
       'Non-Stackable Rate': r.quoted_rate_non_stackable || '',
       'Currency': r.quoted_currency || '',
       'Transit Days': r.quoted_transit_days || '',
@@ -1213,6 +1226,11 @@ function QuoteRequestForm({ onClose }) {
                               {' '}(+{(((req.quoted_rate_non_stackable - req.quoted_rate) / req.quoted_rate) * 100).toFixed(0)}%)
                             </div>
                           )}
+                          {req.transport_mode === 'sea' && req.container_type_2 && req.quoted_rate_2 && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-500)' }}>
+                              {req.quoted_currency} {Number(req.quoted_rate_2).toLocaleString()} ({req.container_type_2})
+                            </div>
+                          )}
                           {req.quoted_transit_days && <div style={{ fontSize: '0.7rem', color: 'var(--text-500)' }}>{req.quoted_transit_days} days transit</div>}
                         </div>
                       ) : '—'}
@@ -1334,7 +1352,7 @@ function QuoteRequestForm({ onClose }) {
                     value={form.transport_mode}
                     onChange={e => {
                       const mode = e.target.value;
-                      setForm(prev => ({ ...prev, transport_mode: mode, container_type: mode === 'air' ? '' : prev.container_type }));
+                      setForm(prev => ({ ...prev, transport_mode: mode, container_type: mode === 'air' ? '' : prev.container_type, container_type_2: mode === 'sea' ? prev.container_type_2 : '' }));
                       setShowCustomOrigin(false);
                       setShowCustomDestination(false);
                     }}
@@ -1349,9 +1367,22 @@ function QuoteRequestForm({ onClose }) {
                     <label style={labelStyle}>Container Type</label>
                     <select style={inputStyle} value={form.container_type} onChange={e => handleFieldChange('container_type', e.target.value)}>
                       <option value="">— Select —</option>
-                      {CONTAINER_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
-                      <option value="LCL">LCL / Not Containerized</option>
+                      {CONTAINER_TYPES.map(ct => <option key={ct.value} value={ct.value} disabled={ct.value === form.container_type_2}>{ct.label}</option>)}
+                      <option value="LCL" disabled={form.container_type_2 === 'LCL'}>LCL / Not Containerized</option>
                     </select>
+                  </div>
+                )}
+                {form.transport_mode === 'sea' && (
+                  <div style={fieldWrap}>
+                    <label style={labelStyle}>Second Container Type (optional)</label>
+                    <select style={inputStyle} value={form.container_type_2} onChange={e => handleFieldChange('container_type_2', e.target.value)}>
+                      <option value="">— None —</option>
+                      {CONTAINER_TYPES.map(ct => <option key={ct.value} value={ct.value} disabled={ct.value === form.container_type}>{ct.label}</option>)}
+                      <option value="LCL" disabled={form.container_type === 'LCL'}>LCL / Not Containerized</option>
+                    </select>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                      Ask the forwarder to quote a second container size for the same shipment (e.g. 20FCL and 40FCL) in one request.
+                    </div>
                   </div>
                 )}
                 <div style={fieldWrap}>
@@ -1739,9 +1770,9 @@ function QuoteRequestForm({ onClose }) {
             <form onSubmit={handleSaveRate}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0 1rem' }}>
                 <div style={fieldWrap}>
-                  <label style={labelStyle}>{rateModalReq.transport_mode === 'air' ? 'Rate (Stackable)' : 'Rate *'}</label>
+                  <label style={labelStyle}>{rateModalReq.transport_mode === 'air' ? 'Rate (Stackable)' : rateModalReq.container_type_2 ? `Rate (${rateModalReq.container_type})` : 'Rate *'}</label>
                   <input
-                    type="number" min="0.01" step="any" required={rateModalReq.transport_mode !== 'air'} style={inputStyle}
+                    type="number" min="0.01" step="any" required={rateModalReq.transport_mode !== 'air' && !rateModalReq.container_type_2} style={inputStyle}
                     value={rateForm.quoted_rate}
                     onChange={e => setRateForm(prev => ({ ...prev, quoted_rate: e.target.value }))}
                   />
@@ -1774,6 +1805,21 @@ function QuoteRequestForm({ onClose }) {
                         {(((rateForm.quoted_rate_non_stackable - rateForm.quoted_rate) / rateForm.quoted_rate) * 100).toFixed(1)}% premium over the stackable rate
                       </div>
                     )}
+                  </div>
+                )}
+
+                {rateModalReq.transport_mode === 'sea' && rateModalReq.container_type_2 && (
+                  <div style={{ ...fieldWrap, gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Rate ({rateModalReq.container_type_2})</label>
+                    <input
+                      type="number" min="0.01" step="any" style={inputStyle}
+                      value={rateForm.quoted_rate_2}
+                      onChange={e => setRateForm(prev => ({ ...prev, quoted_rate_2: e.target.value }))}
+                      placeholder={`Only if the forwarder quoted a rate for ${rateModalReq.container_type_2}`}
+                    />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                      Fill in whichever container size(s) the forwarder actually quoted — either box alone is fine.
+                    </div>
                   </div>
                 )}
 

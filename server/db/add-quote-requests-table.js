@@ -66,6 +66,12 @@ async function createQuoteRequestsTable() {
     // the stackable figure (kept comparable with sea/road's single-rate shape) and this
     // column holds the non-stackable premium alongside it.
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate_non_stackable NUMERIC;`);
+    // Sea/FCL only: lets one request ask for both a 20FCL and a 40FCL rate
+    // for the same shipment instead of sending two near-identical requests.
+    // container_type_2 is the second size requested; quoted_rate_2 is its rate,
+    // independent of quoted_rate (either can be quoted without the other).
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_type_2 VARCHAR(30);`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS quoted_rate_2 NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;`);

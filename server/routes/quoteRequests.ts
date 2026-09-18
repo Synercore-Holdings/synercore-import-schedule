@@ -45,6 +45,7 @@ router.post(
     body('quote_date').optional({ checkFalsy: true }).isISO8601().withMessage('Quote date must be a valid date'),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
+    body('container_type_2').optional({ nullable: true }).trim(),
     body('incoterm').optional({ nullable: true }).trim(),
     body('origin').optional({ nullable: true }).trim(),
     body('destination').optional({ nullable: true }).trim(),
@@ -75,7 +76,7 @@ router.post(
   validate,
   asyncHandler(async (req: Request, res: Response) => {
     const {
-      forwarder_name, forwarder_email, quote_date, transport_mode = 'sea', container_type, incoterm,
+      forwarder_name, forwarder_email, quote_date, transport_mode = 'sea', container_type, container_type_2, incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
       dg_classification = 'non_dg', gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm,
       pallet_count, cargo_value, cargo_value_currency = 'USD', cargo_ready_date, required_date, notes,
@@ -97,8 +98,8 @@ router.post(
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode, container_type,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
         dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
-        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP))
+        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at, container_type_2
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP), $28)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode, container_type || null,
@@ -106,7 +107,7 @@ router.post(
         cargo_description || null, hs_code || null, JSON.stringify(products || []), dg_classification, gross_weight_kg || null,
         length_cm || null, width_cm || null, height_cm || null, volume_cbm || null,
         pallet_count || null, cargo_value || null, cargo_value_currency, cargo_ready_date || null, required_date || null, notes || null,
-        quote_date || null,
+        quote_date || null, container_type_2 || null,
       ]
     );
 
@@ -157,6 +158,7 @@ router.put(
     body('rate_received_date').optional({ checkFalsy: true }).isISO8601().withMessage('Rate received date must be a valid date'),
     body('transport_mode').optional().isIn(TRANSPORT_MODES),
     body('container_type').optional({ nullable: true }).trim(),
+    body('container_type_2').optional({ nullable: true }).trim(),
     body('products').optional({ nullable: true }).isArray().withMessage('Products must be an array'),
     body('products.*.name').optional({ nullable: true }).trim(),
     body('products.*.hs_code').optional({ nullable: true }).trim(),
@@ -177,6 +179,9 @@ router.put(
     body('quoted_rate_non_stackable').optional({ nullable: true })
       .custom(v => v === '' || v === null || v === undefined || Number(v) > 0)
       .withMessage('Non-stackable rate must be greater than 0'),
+    body('quoted_rate_2').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || Number(v) > 0)
+      .withMessage('Second container rate must be greater than 0'),
     body('quoted_currency').optional({ nullable: true }).trim(),
     body('quote_reference').optional({ nullable: true }).trim(),
     body('quoted_transit_days').optional({ checkFalsy: true }).isInt({ min: 0 }),
@@ -186,11 +191,11 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const allowedFields = [
-      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'incoterm', 'origin', 'destination',
+      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'container_type_2', 'incoterm', 'origin', 'destination',
       'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'products', 'dg_classification',
       'gross_weight_kg', 'length_cm', 'width_cm', 'height_cm', 'volume_cbm', 'pallet_count',
       'cargo_value', 'cargo_value_currency', 'cargo_ready_date', 'required_date', 'notes', 'status',
-      'quoted_rate', 'quoted_rate_non_stackable', 'quoted_currency', 'quote_reference', 'quoted_transit_days', 'quote_notes',
+      'quoted_rate', 'quoted_rate_non_stackable', 'quoted_rate_2', 'quoted_currency', 'quote_reference', 'quoted_transit_days', 'quote_notes',
     ];
 
     const updates: string[] = [];

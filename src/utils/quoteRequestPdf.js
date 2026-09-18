@@ -78,7 +78,7 @@ export function generateQuoteRequestPDF(req) {
     head: [['Shipment Details', '']],
     body: [
       ['Mode', TRANSPORT_LABELS[req.transport_mode] || fmt(req.transport_mode)],
-      ...(req.container_type ? [['Container Type', req.container_type]] : []),
+      ...(req.container_type ? [['Container Type', [req.container_type, req.container_type_2].filter(Boolean).join(' and ')]] : []),
       ['Incoterm', fmt(req.incoterm)],
       [req.transport_mode === 'sea' ? 'Origin Port' : 'Origin', fmt(req.origin)],
       ...(req.collection_address ? [['Collection Address', req.collection_address]] : []),
@@ -154,7 +154,7 @@ export function generateQuoteRequestPDF(req) {
   y += 4;
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
-  doc.text('Please reply with your rate, transit time, and validity period at your earliest convenience.', 14, y);
+  doc.text('Please reply with your rate(s), transit time, and validity period at your earliest convenience.', 14, y);
   y += 10;
   doc.setFont(undefined, 'bold');
   doc.text(`Requested by: ${req.requested_by_username || '—'}`, 14, y);
