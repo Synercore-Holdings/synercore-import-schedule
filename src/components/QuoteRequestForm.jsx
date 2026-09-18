@@ -126,7 +126,8 @@ const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', valu
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', quote_date: '', transport_mode: 'sea', container_type: '', container_type_2: '',
-  container_weight_kg: '', container_2_weight_kg: '', container_value: '', container_2_value: '', incoterm: '',
+  container_weight_kg: '', container_2_weight_kg: '', container_value: '', container_2_value: '',
+  container_temp_c: '', container_2_temp_c: '', incoterm: '',
   origin: '', destination: '', collection_address: '', supplier_name: '', products: [{ ...EMPTY_PRODUCT_LINE }],
   dg_classification: 'non_dg', gross_weight_kg: '', length_cm: '', width_cm: '', height_cm: '',
   pallet_count: '', cargo_value: '', cargo_value_currency: 'USD',
@@ -159,6 +160,8 @@ const toFormState = (req) => ({
   container_2_weight_kg: req.container_2_weight_kg ?? '',
   container_value: req.container_value ?? '',
   container_2_value: req.container_2_value ?? '',
+  container_temp_c: req.container_temp_c ?? '',
+  container_2_temp_c: req.container_2_temp_c ?? '',
   incoterm: req.incoterm || '',
   origin: req.origin || '',
   destination: req.destination || '',
@@ -1388,6 +1391,8 @@ function QuoteRequestForm({ onClose }) {
                         container_2_weight_kg: mode === 'sea' ? prev.container_2_weight_kg : '',
                         container_value: mode === 'sea' ? prev.container_value : '',
                         container_2_value: mode === 'sea' ? prev.container_2_value : '',
+                        container_temp_c: mode === 'sea' ? prev.container_temp_c : '',
+                        container_2_temp_c: mode === 'sea' ? prev.container_2_temp_c : '',
                       }));
                       setShowCustomOrigin(false);
                       setShowCustomDestination(false);
@@ -1401,23 +1406,55 @@ function QuoteRequestForm({ onClose }) {
                 {form.transport_mode !== 'air' && (
                   <div style={fieldWrap}>
                     <label style={labelStyle}>Container Type</label>
-                    <select style={inputStyle} value={form.container_type} onChange={e => handleFieldChange('container_type', e.target.value)}>
+                    <select
+                      style={inputStyle}
+                      value={form.container_type}
+                      onChange={e => {
+                        const nextType = e.target.value;
+                        setForm(prev => ({ ...prev, container_type: nextType, container_temp_c: nextType.includes('Reefer') ? prev.container_temp_c : '' }));
+                      }}
+                    >
                       <option value="">— Select —</option>
                       {CONTAINER_TYPES.map(ct => <option key={ct.value} value={ct.value} disabled={ct.value === form.container_type_2}>{ct.label}</option>)}
                       <option value="LCL" disabled={form.container_type_2 === 'LCL'}>LCL / Not Containerized</option>
                     </select>
                   </div>
                 )}
+                {form.transport_mode !== 'air' && form.container_type.includes('Reefer') && (
+                  <div style={fieldWrap}>
+                    <label style={labelStyle}>Temperature — {form.container_type} (°C)</label>
+                    <input type="number" step="any" style={inputStyle} placeholder="e.g. -18" value={form.container_temp_c} onChange={e => handleFieldChange('container_temp_c', e.target.value)} />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                      Set point the product must be kept at in this reefer.
+                    </div>
+                  </div>
+                )}
                 {form.transport_mode === 'sea' && (
                   <div style={fieldWrap}>
                     <label style={labelStyle}>Second Container Type (optional)</label>
-                    <select style={inputStyle} value={form.container_type_2} onChange={e => handleFieldChange('container_type_2', e.target.value)}>
+                    <select
+                      style={inputStyle}
+                      value={form.container_type_2}
+                      onChange={e => {
+                        const nextType = e.target.value;
+                        setForm(prev => ({ ...prev, container_type_2: nextType, container_2_temp_c: nextType.includes('Reefer') ? prev.container_2_temp_c : '' }));
+                      }}
+                    >
                       <option value="">— None —</option>
                       {CONTAINER_TYPES.map(ct => <option key={ct.value} value={ct.value} disabled={ct.value === form.container_type}>{ct.label}</option>)}
                       <option value="LCL" disabled={form.container_type === 'LCL'}>LCL / Not Containerized</option>
                     </select>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
                       Ask the forwarder to quote a second container size for the same shipment (e.g. 20FCL and 40FCL) in one request.
+                    </div>
+                  </div>
+                )}
+                {form.transport_mode === 'sea' && form.container_type_2.includes('Reefer') && (
+                  <div style={fieldWrap}>
+                    <label style={labelStyle}>Temperature — {form.container_type_2} (°C)</label>
+                    <input type="number" step="any" style={inputStyle} placeholder="e.g. -18" value={form.container_2_temp_c} onChange={e => handleFieldChange('container_2_temp_c', e.target.value)} />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-500)', marginTop: '4px' }}>
+                      Set point the product must be kept at in this reefer.
                     </div>
                   </div>
                 )}

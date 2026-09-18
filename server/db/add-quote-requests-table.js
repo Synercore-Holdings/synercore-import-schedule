@@ -82,6 +82,10 @@ async function createQuoteRequestsTable() {
     // aren't modelled here, matching cargo_value's own single-currency total.
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_value NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_2_value NUMERIC;`);
+    // Required set-point when a container is a reefer (20'/40' Reefer) --
+    // NUMERIC, not unsigned, since frozen cargo needs sub-zero values.
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_temp_c NUMERIC;`);
+    await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS container_2_temp_c NUMERIC;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by TEXT REFERENCES users(id) ON DELETE SET NULL;`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS updated_by_username VARCHAR(255);`);
     await pool.query(`ALTER TABLE quote_requests ADD COLUMN IF NOT EXISTS products JSONB DEFAULT '[]'::jsonb;`);

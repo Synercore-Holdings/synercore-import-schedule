@@ -31,6 +31,16 @@ const fmtDate = (d) => {
   return isNaN(parsed.getTime()) ? String(d) : parsed.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: '2-digit' });
 };
 
+// 0°C is a real, common reefer set point -- can't use truthy/fmt's usual
+// "empty means —" check here, or it would silently disappear.
+const hasTemp = (v) => v !== null && v !== undefined && v !== '';
+const buildTempControlRow = (req) => {
+  const parts = [];
+  if (hasTemp(req.container_temp_c)) parts.push(`${req.container_type}: ${req.container_temp_c}°C`);
+  if (hasTemp(req.container_2_temp_c)) parts.push(`${req.container_type_2}: ${req.container_2_temp_c}°C`);
+  return parts.length > 0 ? [['Temperature Control', parts.join('  /  ')]] : [];
+};
+
 export function generateQuoteRequestPDF(req) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -79,6 +89,7 @@ export function generateQuoteRequestPDF(req) {
     body: [
       ['Mode', TRANSPORT_LABELS[req.transport_mode] || fmt(req.transport_mode)],
       ...(req.container_type ? [['Container Type', [req.container_type, req.container_type_2].filter(Boolean).join(' and ')]] : []),
+      ...buildTempControlRow(req),
       ['Incoterm', fmt(req.incoterm)],
       [req.transport_mode === 'sea' ? 'Origin Port' : 'Origin', fmt(req.origin)],
       ...(req.collection_address ? [['Collection Address', req.collection_address]] : []),

@@ -50,6 +50,12 @@ router.post(
     body('container_2_weight_kg').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('container_value').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('container_2_value').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('container_temp_c').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || (Number(v) >= -30 && Number(v) <= 30))
+      .withMessage('Temperature must be between -30 and 30 degrees C'),
+    body('container_2_temp_c').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || (Number(v) >= -30 && Number(v) <= 30))
+      .withMessage('Temperature must be between -30 and 30 degrees C'),
     body('incoterm').optional({ nullable: true }).trim(),
     body('origin').optional({ nullable: true }).trim(),
     body('destination').optional({ nullable: true }).trim(),
@@ -81,7 +87,8 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const {
       forwarder_name, forwarder_email, quote_date, transport_mode = 'sea', container_type, container_type_2,
-      container_weight_kg, container_2_weight_kg, container_value, container_2_value, incoterm,
+      container_weight_kg, container_2_weight_kg, container_value, container_2_value,
+      container_temp_c, container_2_temp_c, incoterm,
       origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
       dg_classification = 'non_dg', gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm,
       pallet_count, cargo_value, cargo_value_currency = 'USD', cargo_ready_date, required_date, notes,
@@ -103,8 +110,8 @@ router.post(
         requested_by, requested_by_username, forwarder_name, forwarder_email, transport_mode, container_type,
         incoterm, origin, destination, collection_address, supplier_name, cargo_description, hs_code, products,
         dg_classification, gross_weight_kg, length_cm, width_cm, height_cm, volume_cbm, pallet_count,
-        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at, container_type_2, container_weight_kg, container_2_weight_kg, container_value, container_2_value
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP), $28, $29, $30, $31, $32)
+        cargo_value, cargo_value_currency, cargo_ready_date, required_date, notes, status, sent_at, container_type_2, container_weight_kg, container_2_weight_kg, container_value, container_2_value, container_temp_c, container_2_temp_c
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'sent', COALESCE($27, CURRENT_TIMESTAMP), $28, $29, $30, $31, $32, $33, $34)
       RETURNING *`,
       [
         userId, username, forwarder_name, forwarder_email || null, transport_mode, container_type || null,
@@ -114,6 +121,8 @@ router.post(
         pallet_count || null, cargo_value || null, cargo_value_currency, cargo_ready_date || null, required_date || null, notes || null,
         quote_date || null, container_type_2 || null, container_weight_kg || null, container_2_weight_kg || null,
         container_value || null, container_2_value || null,
+        container_temp_c === '' || container_temp_c === undefined ? null : container_temp_c,
+        container_2_temp_c === '' || container_2_temp_c === undefined ? null : container_2_temp_c,
       ]
     );
 
@@ -169,6 +178,12 @@ router.put(
     body('container_2_weight_kg').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('container_value').optional({ checkFalsy: true }).isFloat({ min: 0 }),
     body('container_2_value').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('container_temp_c').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || (Number(v) >= -30 && Number(v) <= 30))
+      .withMessage('Temperature must be between -30 and 30 degrees C'),
+    body('container_2_temp_c').optional({ nullable: true })
+      .custom(v => v === '' || v === null || v === undefined || (Number(v) >= -30 && Number(v) <= 30))
+      .withMessage('Temperature must be between -30 and 30 degrees C'),
     body('products').optional({ nullable: true }).isArray().withMessage('Products must be an array'),
     body('products.*.name').optional({ nullable: true }).trim(),
     body('products.*.hs_code').optional({ nullable: true }).trim(),
@@ -201,7 +216,7 @@ router.put(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const allowedFields = [
-      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'container_type_2', 'container_weight_kg', 'container_2_weight_kg', 'container_value', 'container_2_value', 'incoterm', 'origin', 'destination',
+      'forwarder_name', 'forwarder_email', 'transport_mode', 'container_type', 'container_type_2', 'container_weight_kg', 'container_2_weight_kg', 'container_value', 'container_2_value', 'container_temp_c', 'container_2_temp_c', 'incoterm', 'origin', 'destination',
       'collection_address', 'supplier_name', 'cargo_description', 'hs_code', 'products', 'dg_classification',
       'gross_weight_kg', 'length_cm', 'width_cm', 'height_cm', 'volume_cbm', 'pallet_count',
       'cargo_value', 'cargo_value_currency', 'cargo_ready_date', 'required_date', 'notes', 'status',
