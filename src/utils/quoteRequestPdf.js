@@ -125,19 +125,50 @@ export function generateQuoteRequestPDF(req) {
   y = doc.lastAutoTable.finalY + 8;
 
   if (hasProducts) {
-    autoTable(doc, {
-      startY: y,
-      head: [['Product', 'HS Code', 'Qty', 'Weight', 'Value']],
-      body: req.products.map(p => [
-        fmt(p.name), fmt(p.hs_code), fmt(p.qty), fmt(p.weight_kg, ' kg'),
-        p.value ? `${p.value_currency || req.cargo_value_currency || 'USD'} ${Number(p.value).toLocaleString()}` : '—',
-      ]),
-      theme: 'plain',
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: ROW_ALT },
-    });
-    y = doc.lastAutoTable.finalY + 8;
+    const productRow = (p) => [
+      fmt(p.name), fmt(p.hs_code), fmt(p.qty), fmt(p.weight_kg, ' kg'),
+      p.value ? `${p.value_currency || req.cargo_value_currency || 'USD'} ${Number(p.value).toLocaleString()}` : '—',
+    ];
+    // Split into one table per container when at least one line has been
+    // tagged, so the forwarder can quote each container size against its
+    // own cargo instead of one combined list -- lines left untagged (e.g.
+    // requests made before this existed) fall into a shared section rather
+    // than being silently dropped from either container's table.
+    const isTagged = (p) => p.container_slot === '1' || p.container_slot === '2';
+    const hasContainerSplit = req.container_type_2 && req.products.some(isTagged);
+
+    if (hasContainerSplit) {
+      const sections = [
+        { label: req.container_type, lines: req.products.filter(p => p.container_slot === '1') },
+        { label: req.container_type_2, lines: req.products.filter(p => p.container_slot === '2') },
+        { label: 'Either Container', lines: req.products.filter(p => !isTagged(p)) },
+      ].filter(s => s.lines.length > 0);
+
+      sections.forEach(section => {
+        autoTable(doc, {
+          startY: y,
+          head: [[`Products — ${section.label}`, 'HS Code', 'Qty', 'Weight', 'Value']],
+          body: section.lines.map(productRow),
+          theme: 'plain',
+          styles: { fontSize: 9, cellPadding: 3 },
+          headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: ROW_ALT },
+        });
+        y = doc.lastAutoTable.finalY + 6;
+      });
+      y += 2;
+    } else {
+      autoTable(doc, {
+        startY: y,
+        head: [['Product', 'HS Code', 'Qty', 'Weight', 'Value']],
+        body: req.products.map(productRow),
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: ROW_ALT },
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
   }
 
   if (req.notes) {

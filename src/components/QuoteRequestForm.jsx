@@ -122,7 +122,7 @@ const normalizePortOptions = (ports) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
-const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', value: '', value_currency: 'USD' };
+const EMPTY_PRODUCT_LINE = { name: '', hs_code: '', qty: '', weight_kg: '', value: '', value_currency: 'USD', container_slot: '' };
 
 const EMPTY_FORM = {
   forwarder_name: '', forwarder_email: '', quote_date: '', transport_mode: 'sea', container_type: '', container_type_2: '',
@@ -744,7 +744,7 @@ function QuoteRequestForm({ onClose }) {
   // totals, so requests without a line-item breakdown still work as before.
   // Weight is per unit (like the L x W x H x Qty volume calc above), so each
   // line's contribution is weight_kg x qty, not the raw weight_kg alone.
-  const productWeightKey = form.products.map(p => `${p.weight_kg}|${p.qty}`).join('|');
+  const productWeightKey = form.products.map(p => `${p.weight_kg}|${p.qty}|${p.container_slot}`).join('|');
   useEffect(() => {
     const weightSum = form.products.reduce((sum, p) => {
       const weight = parseFloat(p.weight_kg) || 0;
@@ -753,6 +753,20 @@ function QuoteRequestForm({ onClose }) {
       return sum + weight * qty;
     }, 0);
     if (weightSum > 0) handleFieldChange('gross_weight_kg', String(weightSum));
+
+    // If any line is tagged to a specific container, derive that container's
+    // share of the weight from its tagged lines rather than requiring the
+    // split to be kept in sync by hand.
+    const slotWeight = (slot) => form.products.reduce((sum, p) => {
+      if (p.container_slot !== slot) return sum;
+      const weight = parseFloat(p.weight_kg) || 0;
+      if (!weight) return sum;
+      return sum + weight * (parseFloat(p.qty) || 1);
+    }, 0);
+    const slot1Weight = slotWeight('1');
+    const slot2Weight = slotWeight('2');
+    if (slot1Weight > 0) handleFieldChange('container_weight_kg', String(slot1Weight));
+    if (slot2Weight > 0) handleFieldChange('container_2_weight_kg', String(slot2Weight));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productWeightKey]);
 
@@ -1621,7 +1635,7 @@ function QuoteRequestForm({ onClose }) {
                           ×
                         </button>
                       </div>
-                      <div className="qr-product-row2" style={{ display: 'grid', gridTemplateColumns: '70px 90px 90px 70px', gap: '0.5rem' }}>
+                      <div className="qr-product-row2" style={{ display: 'grid', gridTemplateColumns: (form.transport_mode === 'sea' && form.container_type_2) ? '70px 90px 90px 70px 130px' : '70px 90px 90px 70px', gap: '0.5rem' }}>
                         <div>
                           <label style={miniLabel}>Qty</label>
                           <input type="number" min="0" step="any" style={inputStyle} placeholder="Qty" value={line.qty} onChange={e => updateProductLine(idx, 'qty', e.target.value)} />
@@ -1640,6 +1654,16 @@ function QuoteRequestForm({ onClose }) {
                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
+                        {(form.transport_mode === 'sea' && form.container_type_2) && (
+                          <div>
+                            <label style={miniLabel}>Container</label>
+                            <select style={inputStyle} value={line.container_slot} onChange={e => updateProductLine(idx, 'container_slot', e.target.value)}>
+                              <option value="">— Either —</option>
+                              <option value="1">{form.container_type}</option>
+                              <option value="2">{form.container_type_2}</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
                     </div>
                     );
