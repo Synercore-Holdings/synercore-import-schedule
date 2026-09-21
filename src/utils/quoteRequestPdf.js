@@ -151,7 +151,7 @@ export function generateQuoteRequestPDF(req) {
       startY: y,
       head: [['Quoted Rate', '']],
       body: [
-        ['Rate', `${currency} ${Number(req.quoted_rate).toLocaleString()}`],
+        [req.container_type_2 ? `Rate — ${req.container_type}` : 'Rate', `${currency} ${Number(req.quoted_rate).toLocaleString()}`],
         ...(req.transport_mode === 'air' && req.quoted_rate_non_stackable ? [
           ['Non-Stackable Rate', `${currency} ${Number(req.quoted_rate_non_stackable).toLocaleString()}${premiumPct ? ` (+${premiumPct}%)` : ''}`],
         ] : []),
