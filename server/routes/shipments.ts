@@ -113,6 +113,8 @@ const validateUpdateShipment = [
   body('receivingWarehouse').optional().trim(),
   body('forwardingAgent').optional().trim(),
   body('vesselName').optional().trim(),
+  body('expectedNextVessel').optional({ nullable: true, checkFalsy: true }).trim(),
+  body('expectedVesselDate').optional({ nullable: true, checkFalsy: true }).trim(),
   body('bolNumber').optional().trim(),
   body('containerNumber').optional().trim(),
   body('shippingLine').optional().trim(),

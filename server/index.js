@@ -405,6 +405,13 @@ async function start() {
     }
 
     try {
+      const addExpectedVesselFields = await import('./db/add-expected-vessel-fields.js');
+      await addExpectedVesselFields.default();
+    } catch (error) {
+      logWarn('Expected vessel fields migration warning', { error: error.message });
+    }
+
+    try {
       const { addPerformanceIndexes } = await import('./db/add-performance-indexes.js');
       await addPerformanceIndexes();
     } catch (error) {

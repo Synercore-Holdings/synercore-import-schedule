@@ -984,8 +984,9 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           type="button"
                           ref={vesselHistory.shipmentId === shipment.id ? vesselHistoryBtnRef : undefined}
                           onClick={(e) => handleToggleVesselHistory(shipment.id, e.currentTarget)}
-                          title="View vessel change history"
+                          title={shipment.expectedNextVessel ? 'Vessel history — transshipment expected' : 'View vessel change history'}
                           style={{
+                            position: 'relative',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1000,6 +1001,12 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
+                          {shipment.expectedNextVessel && (
+                            <span style={{
+                              position: 'absolute', top: 1, right: 1, width: '7px', height: '7px',
+                              borderRadius: '50%', backgroundColor: '#f59e0b', border: '1px solid white',
+                            }} />
+                          )}
                         </button>
                       )}
                       {vesselHistory.shipmentId === shipment.id && vesselHistory.pos && createPortal(
@@ -1023,6 +1030,18 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                           }}
                         >
                           <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Vessel History</div>
+                          {shipment.expectedNextVessel && (
+                            <div style={{
+                              padding: '0.35rem 0.5rem', marginBottom: '0.5rem', borderRadius: '4px',
+                              backgroundColor: '#fffbeb', border: '1px solid #fde68a',
+                            }}>
+                              <div style={{ color: '#92400e', fontWeight: 600, fontSize: '0.75rem' }}>Expected next</div>
+                              <div>{shipment.expectedNextVessel}</div>
+                              {shipment.expectedVesselDate && (
+                                <div style={{ color: 'var(--text-500)', fontSize: '0.7rem' }}>{shipment.expectedVesselDate}</div>
+                              )}
+                            </div>
+                          )}
                           {vesselHistory.loading && <div style={{ color: 'var(--text-500)' }}>Loading…</div>}
                           {!vesselHistory.loading && vesselHistory.entries.length === 0 && (
                             <div style={{ color: 'var(--text-500)' }}>No changes recorded yet.</div>

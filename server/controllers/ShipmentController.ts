@@ -75,6 +75,8 @@ export interface UpdateShipmentRequest {
   receivingWarehouse?: string;
   forwardingAgent?: string;
   vesselName?: string;
+  expectedNextVessel?: string | null;
+  expectedVesselDate?: string | null;
   bolNumber?: string;
   containerNumber?: string;
   shippingLine?: string;
@@ -349,6 +351,12 @@ export class ShipmentController {
     }
     if (data.vesselName !== undefined) {
       dbData.vessel_name = data.vesselName;
+    }
+    if (data.expectedNextVessel !== undefined) {
+      dbData.expected_next_vessel = data.expectedNextVessel || null;
+    }
+    if (data.expectedVesselDate !== undefined) {
+      dbData.expected_vessel_date = data.expectedVesselDate || null;
     }
     if (data.bolNumber !== undefined) {
       dbData.bol_number = data.bolNumber;

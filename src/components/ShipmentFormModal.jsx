@@ -18,6 +18,8 @@ const EMPTY_FORM = {
   receivingWarehouse: '',
   forwardingAgent: '',
   vesselName: '',
+  expectedNextVessel: '',
+  expectedVesselDate: '',
   bolNumber: '',
   containerNumber: '',
   shippingLine: '',
@@ -40,6 +42,7 @@ export const ORDER_LEVEL_FIELDS = [
   'dateShipped', 'etd',
   'receivingWarehouse', 'forwardingAgent', 'vesselName', 'bolNumber',
   'containerNumber', 'shippingLine', 'incoterm',
+  'expectedNextVessel', 'expectedVesselDate',
 ];
 
 export function extractOrderLevelFields(shipmentData) {
@@ -659,6 +662,48 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
             placeholder={isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) ? 'AWB number' : 'Vessel name'}
           />
         </div>
+
+        {/* Expected Next Vessel — a heads-up note for a transshipment known
+            in advance, kept separate from Vessel Name (which stays the
+            actual current vessel used for live tracking links) until it's
+            confirmed. */}
+        {!isAirfreight(formData.latestStatus, formData.forwardingAgent, formData.vesselName) && (
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-900)' }}>
+              Expected Next Vessel <span style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--text-500)' }}>(optional — if you already know a transshipment is coming)</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={formData.expectedNextVessel || ''}
+                onChange={(e) => handleInputChange('expectedNextVessel', e.target.value)}
+                className="input"
+                style={{ flex: 2 }}
+                placeholder="e.g. MSC EDNA"
+              />
+              <input
+                type="text"
+                value={formData.expectedVesselDate || ''}
+                onChange={(e) => handleInputChange('expectedVesselDate', e.target.value)}
+                className="input"
+                style={{ flex: 1 }}
+                placeholder="Expected date (e.g. ~Oct 5)"
+              />
+            </div>
+            {formData.expectedNextVessel && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, vesselName: prev.expectedNextVessel, expectedNextVessel: '', expectedVesselDate: '' }));
+                }}
+                className="btn btn-secondary"
+                style={{ marginTop: '0.5rem', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+              >
+                It's happened now → move to Vessel Name
+              </button>
+            )}
+          </div>
+        )}
 
         {/* BOL Number */}
         <div>

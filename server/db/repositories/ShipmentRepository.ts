@@ -39,6 +39,8 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'receiving_warehouse',
     'forwarding_agent',
     'vessel_name',
+    'expected_next_vessel',
+    'expected_vessel_date',
     'bol_number',
     'container_number',
     'shipping_line',

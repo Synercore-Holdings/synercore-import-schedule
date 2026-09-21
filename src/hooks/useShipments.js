@@ -108,6 +108,8 @@ export function useShipments() {
         receivingWarehouse: s.receiving_warehouse || s.receivingWarehouse,
         forwardingAgent: s.forwarding_agent || s.forwardingAgent,
         vesselName: s.vessel_name || s.vesselName,
+        expectedNextVessel: s.expected_next_vessel || s.expectedNextVessel || '',
+        expectedVesselDate: s.expected_vessel_date || s.expectedVesselDate || '',
         bolNumber: s.bol_number || s.bolNumber || '',
         containerNumber: s.container_number || s.containerNumber || '',
         shippingLine: s.shipping_line || s.shippingLine || '',
