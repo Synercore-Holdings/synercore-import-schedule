@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ShipmentStatus, isDelayedStatus, SHIPPING_EXCLUDED_STATUSES } from '../types/shipment';
 import { getCurrentWeekNumber } from '../utils/dateUtils';
 import { isAirfreight, getShippingProgress, getForwardingAgents, getAwbTrackingUrl, getBolTrackingUrl, getContainerTrackingUrl } from '../utils/shipmentConstants';
@@ -34,15 +35,17 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [orderDetailsShipment, setOrderDetailsShipment] = useState(null);
   const [edits, setEdits] = useState({}); // Track unsaved changes per shipment
-  const [vesselHistory, setVesselHistory] = useState({ shipmentId: null, entries: [], loading: false });
-  const vesselHistoryRef = useRef(null);
+  const [vesselHistory, setVesselHistory] = useState({ shipmentId: null, entries: [], loading: false, pos: null });
+  const vesselHistoryBtnRef = useRef(null);
+  const vesselHistoryPopoverRef = useRef(null);
 
   useEffect(() => {
     if (!vesselHistory.shipmentId) return;
     const handleClickOutside = (e) => {
-      if (vesselHistoryRef.current && !vesselHistoryRef.current.contains(e.target)) {
-        setVesselHistory({ shipmentId: null, entries: [], loading: false });
+      if (vesselHistoryBtnRef.current?.contains(e.target) || vesselHistoryPopoverRef.current?.contains(e.target)) {
+        return;
       }
+      setVesselHistory({ shipmentId: null, entries: [], loading: false, pos: null });
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -500,18 +503,27 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
   };
 
 
-  const handleToggleVesselHistory = async (shipmentId) => {
+  const handleToggleVesselHistory = async (shipmentId, btnEl) => {
     if (vesselHistory.shipmentId === shipmentId) {
-      setVesselHistory({ shipmentId: null, entries: [], loading: false });
+      setVesselHistory({ shipmentId: null, entries: [], loading: false, pos: null });
       return;
     }
-    setVesselHistory({ shipmentId, entries: [], loading: true });
+    const POPOVER_WIDTH = 280;
+    const POPOVER_EST_HEIGHT = 180;
+    const rect = btnEl.getBoundingClientRect();
+    const openUpward = window.innerHeight - rect.bottom < POPOVER_EST_HEIGHT && rect.top > POPOVER_EST_HEIGHT;
+    const pos = {
+      left: Math.min(Math.max(rect.left, 8), window.innerWidth - POPOVER_WIDTH - 8),
+      top: openUpward ? undefined : rect.bottom + 4,
+      bottom: openUpward ? window.innerHeight - rect.top + 4 : undefined,
+    };
+    setVesselHistory({ shipmentId, entries: [], loading: true, pos });
     try {
       const res = await authFetch(getApiUrl(`/api/shipments/${shipmentId}/vessel-history`));
       const data = res.ok ? await res.json() : { data: [] };
-      setVesselHistory({ shipmentId, entries: data.data || [], loading: false });
+      setVesselHistory(prev => (prev.shipmentId === shipmentId ? { ...prev, entries: data.data || [], loading: false } : prev));
     } catch (err) {
-      setVesselHistory({ shipmentId, entries: [], loading: false });
+      setVesselHistory(prev => (prev.shipmentId === shipmentId ? { ...prev, loading: false } : prev));
       showError('Failed to load vessel history');
     }
   };
@@ -968,69 +980,68 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                         </a>
                       )}
                       {shipment.vesselName && !isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && (
-                        <span
-                          ref={vesselHistory.shipmentId === shipment.id ? vesselHistoryRef : undefined}
-                          style={{ position: 'relative', display: 'inline-flex' }}
+                        <button
+                          type="button"
+                          ref={vesselHistory.shipmentId === shipment.id ? vesselHistoryBtnRef : undefined}
+                          onClick={(e) => handleToggleVesselHistory(shipment.id, e.currentTarget)}
+                          title="View vessel change history"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0.25rem',
+                            color: vesselHistory.shipmentId === shipment.id ? '#1565c0' : '#1976d2',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
                         >
-                          <button
-                            type="button"
-                            onClick={() => handleToggleVesselHistory(shipment.id)}
-                            title="View vessel change history"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '0.25rem',
-                              color: vesselHistory.shipmentId === shipment.id ? '#1565c0' : '#1976d2',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                          </button>
-                          {vesselHistory.shipmentId === shipment.id && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                zIndex: 20,
-                                marginTop: '4px',
-                                minWidth: '260px',
-                                maxWidth: '320px',
-                                background: 'var(--surface, #fff)',
-                                border: '1px solid var(--border, #ddd)',
-                                borderRadius: '6px',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                padding: '0.5rem 0.75rem',
-                                fontSize: '0.8rem',
-                              }}
-                            >
-                              <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Vessel History</div>
-                              {vesselHistory.loading && <div style={{ color: 'var(--text-500)' }}>Loading…</div>}
-                              {!vesselHistory.loading && vesselHistory.entries.length === 0 && (
-                                <div style={{ color: 'var(--text-500)' }}>No changes recorded yet.</div>
-                              )}
-                              {!vesselHistory.loading && vesselHistory.entries.map((entry) => (
-                                <div key={entry.id} style={{ padding: '0.35rem 0', borderTop: '1px solid var(--border, #eee)' }}>
-                                  <div>
-                                    <span style={{ color: 'var(--text-500)' }}>{entry.old_vessel_name || '—'}</span>
-                                    {' → '}
-                                    <strong>{entry.new_vessel_name || '—'}</strong>
-                                  </div>
-                                  <div style={{ color: 'var(--text-500)', fontSize: '0.7rem' }}>
-                                    {new Date(entry.changed_at).toLocaleString('en-ZA')}
-                                    {entry.changed_by_username ? ` · ${entry.changed_by_username}` : ''}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                          </svg>
+                        </button>
+                      )}
+                      {vesselHistory.shipmentId === shipment.id && vesselHistory.pos && createPortal(
+                        <div
+                          ref={vesselHistoryPopoverRef}
+                          style={{
+                            position: 'fixed',
+                            top: vesselHistory.pos.top,
+                            bottom: vesselHistory.pos.bottom,
+                            left: vesselHistory.pos.left,
+                            zIndex: 2000,
+                            width: '280px',
+                            maxHeight: '260px',
+                            overflowY: 'auto',
+                            background: 'var(--surface, #fff)',
+                            border: '1px solid var(--border, #ddd)',
+                            borderRadius: '6px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            padding: '0.5rem 0.75rem',
+                            fontSize: '0.8rem',
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Vessel History</div>
+                          {vesselHistory.loading && <div style={{ color: 'var(--text-500)' }}>Loading…</div>}
+                          {!vesselHistory.loading && vesselHistory.entries.length === 0 && (
+                            <div style={{ color: 'var(--text-500)' }}>No changes recorded yet.</div>
                           )}
-                        </span>
+                          {!vesselHistory.loading && vesselHistory.entries.map((entry) => (
+                            <div key={entry.id} style={{ padding: '0.35rem 0', borderTop: '1px solid var(--border, #eee)' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-500)' }}>{entry.old_vessel_name || '—'}</span>
+                                {' → '}
+                                <strong>{entry.new_vessel_name || '—'}</strong>
+                              </div>
+                              <div style={{ color: 'var(--text-500)', fontSize: '0.7rem' }}>
+                                {new Date(entry.changed_at).toLocaleString('en-ZA')}
+                                {entry.changed_by_username ? ` · ${entry.changed_by_username}` : ''}
+                              </div>
+                            </div>
+                          ))}
+                        </div>,
+                        document.body
                       )}
                     </div>
                   </td>
