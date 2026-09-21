@@ -141,6 +141,50 @@ export function generateQuoteRequestPDF(req) {
 
   y = doc.lastAutoTable.finalY + 8;
 
+  if (req.quoted_rate) {
+    const currency = req.quoted_currency || 'USD';
+    const premiumPct = req.quoted_rate_non_stackable
+      ? (((Number(req.quoted_rate_non_stackable) - Number(req.quoted_rate)) / Number(req.quoted_rate)) * 100).toFixed(0)
+      : null;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Quoted Rate', '']],
+      body: [
+        ['Rate', `${currency} ${Number(req.quoted_rate).toLocaleString()}`],
+        ...(req.transport_mode === 'air' && req.quoted_rate_non_stackable ? [
+          ['Non-Stackable Rate', `${currency} ${Number(req.quoted_rate_non_stackable).toLocaleString()}${premiumPct ? ` (+${premiumPct}%)` : ''}`],
+        ] : []),
+        ...(req.transport_mode === 'sea' && req.container_type_2 && req.quoted_rate_2 ? [
+          [`Rate — ${req.container_type_2}`, `${currency} ${Number(req.quoted_rate_2).toLocaleString()}`],
+        ] : []),
+        ...(req.quote_reference ? [['Quote Reference', req.quote_reference]] : []),
+        ['Transit Time', fmt(req.quoted_transit_days, ' days')],
+        ['Rate Received', fmtDate(req.quoted_at)],
+      ],
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: ROW_ALT },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+
+    if (req.quote_notes) {
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...BRAND_DARK);
+      doc.text('Quote Notes', 14, y);
+      y += 5;
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 60);
+      const quoteNoteLines = doc.splitTextToSize(req.quote_notes, pageWidth - 28);
+      doc.text(quoteNoteLines, 14, y);
+      y += quoteNoteLines.length * 4.5 + 6;
+    }
+  }
+
   if (hasProducts) {
     const productRow = (p) => [
       fmt(p.name), fmt(p.hs_code), fmt(p.qty), fmt(p.weight_kg, ' kg'),
