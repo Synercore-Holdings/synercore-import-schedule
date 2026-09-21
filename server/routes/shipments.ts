@@ -18,6 +18,7 @@ import ShipmentController, {
 } from '../controllers/ShipmentController.js';
 import type { BodyRequest } from '../types/api.js';
 import { AuditRepository } from '../db/repositories/AuditRepository.ts';
+import { VesselHistoryRepository } from '../db/repositories/VesselHistoryRepository.ts';
 
 const damagePhotoUpload = createMultipleFileUpload();
 
@@ -535,9 +536,9 @@ router.put(
   asyncHandler(async (req: BodyRequest<UpdateShipmentRequest>, res: Response) => {
     if (!handleValidationErrors(req, res)) return;
 
-    const shipment = await ShipmentController.updateShipment(req.params.id!, req.body);
-
     const user = (req as any).user;
+    const shipment = await ShipmentController.updateShipment(req.params.id!, req.body, user);
+
     if (user) {
       AuditRepository.logAudit(user.id, user.username || user.email, 'update', 'shipment', req.params.id!, shipment.orderRef || req.params.id!, req.body);
     }
@@ -545,6 +546,21 @@ router.put(
     res.status(200).json({
       data: shipment,
       message: 'Shipment updated successfully'
+    });
+  })
+);
+
+/**
+ * GET /api/shipments/:id/vessel-history
+ * List vessel name changes recorded for a shipment (e.g. transshipments)
+ */
+router.get(
+  '/:id/vessel-history',
+  asyncHandler(async (req: Request, res: Response) => {
+    const history = await VesselHistoryRepository.getByShipment(req.params.id!);
+
+    res.status(200).json({
+      data: history
     });
   })
 );

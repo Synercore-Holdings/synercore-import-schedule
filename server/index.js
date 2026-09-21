@@ -398,6 +398,13 @@ async function start() {
     }
 
     try {
+      const addVesselHistoryTable = await import('./db/add-vessel-history-table.js');
+      await addVesselHistoryTable.default();
+    } catch (error) {
+      logWarn('Vessel history migration warning', { error: error.message });
+    }
+
+    try {
       const { addPerformanceIndexes } = await import('./db/add-performance-indexes.js');
       await addPerformanceIndexes();
     } catch (error) {

@@ -34,6 +34,19 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [orderDetailsShipment, setOrderDetailsShipment] = useState(null);
   const [edits, setEdits] = useState({}); // Track unsaved changes per shipment
+  const [vesselHistory, setVesselHistory] = useState({ shipmentId: null, entries: [], loading: false });
+  const vesselHistoryRef = useRef(null);
+
+  useEffect(() => {
+    if (!vesselHistory.shipmentId) return;
+    const handleClickOutside = (e) => {
+      if (vesselHistoryRef.current && !vesselHistoryRef.current.contains(e.target)) {
+        setVesselHistory({ shipmentId: null, entries: [], loading: false });
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [vesselHistory.shipmentId]);
 
   // Mobile responsiveness
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -487,6 +500,22 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
   };
 
 
+  const handleToggleVesselHistory = async (shipmentId) => {
+    if (vesselHistory.shipmentId === shipmentId) {
+      setVesselHistory({ shipmentId: null, entries: [], loading: false });
+      return;
+    }
+    setVesselHistory({ shipmentId, entries: [], loading: true });
+    try {
+      const res = await authFetch(getApiUrl(`/api/shipments/${shipmentId}/vessel-history`));
+      const data = res.ok ? await res.json() : { data: [] };
+      setVesselHistory({ shipmentId, entries: data.data || [], loading: false });
+    } catch (err) {
+      setVesselHistory({ shipmentId, entries: [], loading: false });
+      showError('Failed to load vessel history');
+    }
+  };
+
   const handleBulkStatusUpdate = async (shipmentIds, newStatus) => {
     try {
       setBulkUpdateLoading(true);
@@ -937,6 +966,71 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                             <line x1="16" y1="7" x2="16" y2="17"></line>
                           </svg>
                         </a>
+                      )}
+                      {shipment.vesselName && !isAirfreight(shipment.latestStatus, shipment.forwardingAgent, shipment.vesselName) && (
+                        <span
+                          ref={vesselHistory.shipmentId === shipment.id ? vesselHistoryRef : undefined}
+                          style={{ position: 'relative', display: 'inline-flex' }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleToggleVesselHistory(shipment.id)}
+                            title="View vessel change history"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0.25rem',
+                              color: vesselHistory.shipmentId === shipment.id ? '#1565c0' : '#1976d2',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                          </button>
+                          {vesselHistory.shipmentId === shipment.id && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                zIndex: 20,
+                                marginTop: '4px',
+                                minWidth: '260px',
+                                maxWidth: '320px',
+                                background: 'var(--surface, #fff)',
+                                border: '1px solid var(--border, #ddd)',
+                                borderRadius: '6px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                padding: '0.5rem 0.75rem',
+                                fontSize: '0.8rem',
+                              }}
+                            >
+                              <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Vessel History</div>
+                              {vesselHistory.loading && <div style={{ color: 'var(--text-500)' }}>Loading…</div>}
+                              {!vesselHistory.loading && vesselHistory.entries.length === 0 && (
+                                <div style={{ color: 'var(--text-500)' }}>No changes recorded yet.</div>
+                              )}
+                              {!vesselHistory.loading && vesselHistory.entries.map((entry) => (
+                                <div key={entry.id} style={{ padding: '0.35rem 0', borderTop: '1px solid var(--border, #eee)' }}>
+                                  <div>
+                                    <span style={{ color: 'var(--text-500)' }}>{entry.old_vessel_name || '—'}</span>
+                                    {' → '}
+                                    <strong>{entry.new_vessel_name || '—'}</strong>
+                                  </div>
+                                  <div style={{ color: 'var(--text-500)', fontSize: '0.7rem' }}>
+                                    {new Date(entry.changed_at).toLocaleString('en-ZA')}
+                                    {entry.changed_by_username ? ` · ${entry.changed_by_username}` : ''}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </span>
                       )}
                     </div>
                   </td>

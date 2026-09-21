@@ -8,6 +8,7 @@ import path from 'path';
 import type { Shipment, ShipmentStatus } from '../types/index.js';
 import { AppError } from '../utils/AppError.ts';
 import { shipmentRepository } from '../db/repositories/index.js';
+import { VesselHistoryRepository } from '../db/repositories/VesselHistoryRepository.ts';
 import archiveService from '../services/archiveService.js';
 import { getPool, queryAll, queryOne, transaction } from '../db/connection.js';
 
@@ -290,7 +291,11 @@ export class ShipmentController {
   /**
    * Update shipment
    */
-  static async updateShipment(id: string, data: UpdateShipmentRequest): Promise<Shipment> {
+  static async updateShipment(
+    id: string,
+    data: UpdateShipmentRequest,
+    user?: { id: string; username?: string; email?: string } | null
+  ): Promise<Shipment> {
     // Verify shipment exists
     const existing = await this.getShipment(id);
 
@@ -396,6 +401,18 @@ export class ShipmentController {
 
     // Update shipment
     const shipment = await shipmentRepository.update(id, dbData as Partial<Shipment>);
+
+    // Vessel changed (e.g. a mid-voyage transshipment onto a different
+    // vessel) -- keep the old value on record instead of silently losing it.
+    if (dbData.vessel_name !== undefined && dbData.vessel_name !== (existing as any).vessel_name) {
+      VesselHistoryRepository.logChange(
+        id,
+        (existing as any).vessel_name || null,
+        dbData.vessel_name || null,
+        user?.id || null,
+        user?.username || user?.email || null
+      );
+    }
 
     return shipment;
   }
