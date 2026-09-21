@@ -682,12 +682,11 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
                 placeholder="e.g. MSC EDNA"
               />
               <input
-                type="text"
-                value={formData.expectedVesselDate || ''}
+                type="date"
+                value={formData.expectedVesselDate ? formData.expectedVesselDate.split('T')[0] : ''}
                 onChange={(e) => handleInputChange('expectedVesselDate', e.target.value)}
                 className="input"
                 style={{ flex: 1 }}
-                placeholder="Expected date (e.g. ~Oct 5)"
               />
             </div>
             {formData.expectedNextVessel && (

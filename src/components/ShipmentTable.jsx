@@ -1038,7 +1038,9 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                               <div style={{ color: '#92400e', fontWeight: 600, fontSize: '0.75rem' }}>Expected next</div>
                               <div>{shipment.expectedNextVessel}</div>
                               {shipment.expectedVesselDate && (
-                                <div style={{ color: 'var(--text-500)', fontSize: '0.7rem' }}>{shipment.expectedVesselDate}</div>
+                                <div style={{ color: 'var(--text-500)', fontSize: '0.7rem' }}>
+                                  {new Date(shipment.expectedVesselDate).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: '2-digit' })}
+                                </div>
                               )}
                             </div>
                           )}
