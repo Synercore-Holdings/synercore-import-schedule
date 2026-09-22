@@ -260,10 +260,10 @@ const buildLastMileNote = (totals) => {
 
   if (lines.length === 1 && (lines[0].calculated.weight_kg || 0) > 0) {
     const { subtotal_zar, weight_kg } = lines[0].calculated;
-    return `+ ${formatCurrency(subtotal_zar / weight_kg)}/kg for ${formatNumber(weight_kg)}kg via last mile (see below)`;
+    return `+ ${formatCurrency(subtotal_zar / weight_kg)}/kg for ${formatNumber(weight_kg)}kg via last mile (see above)`;
   }
 
-  return '+ last mile charges apply to part of this shipment (see below)';
+  return '+ last mile charges apply to part of this shipment (see above)';
 };
 
 const buildWarehouseChargeRows = (estimate, totals) => {
@@ -1130,6 +1130,19 @@ export function generateEstimatePDF(estimate) {
     renderLastMileTable(doc, lastMileRows, lastMileY + 1);
   }
 
+  // === NOTES ===
+  if (estimate.notes && estimate.notes.trim()) {
+    let notesY = checkPageBreak(doc, doc.lastAutoTable.finalY + 4, 20);
+    notesY = drawSectionDivider(doc, notesY, 'Notes', THEME.bodyMuted);
+    doc.setFontSize(8.5);
+    doc.setTextColor(THEME.bodyDark[0], THEME.bodyDark[1], THEME.bodyDark[2]);
+    doc.setFont(undefined, 'normal');
+    const noteLines = doc.splitTextToSize(estimate.notes, pageWidth - 28);
+    notesY = checkPageBreak(doc, notesY, noteLines.length * 4 + 4);
+    doc.text(noteLines, 14, notesY + 3);
+    doc.lastAutoTable = { finalY: notesY + noteLines.length * 4 };
+  }
+
   // === SUMMARY SECTION (prominent dark box) ===
   // Custom-drawn summary card to give the figures proper typographic
   // hierarchy: large bold ZAR primary, smaller muted foreign-currency
@@ -1588,6 +1601,19 @@ export function generateEstimatePDFBase64(estimate) {
   }
   if (lastMileEmailRows.length > 0) {
     renderLastMileTable(doc, lastMileEmailRows, doc.lastAutoTable.finalY + 10, { theme: 'grid' });
+  }
+
+  if (estimate.notes && estimate.notes.trim()) {
+    const notesStartY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(THEME.bodyDark[0], THEME.bodyDark[1], THEME.bodyDark[2]);
+    doc.text('Notes', 14, notesStartY);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    const noteLinesEmail = doc.splitTextToSize(estimate.notes, doc.internal.pageSize.getWidth() - 28);
+    doc.text(noteLinesEmail, 14, notesStartY + 5);
+    doc.lastAutoTable = { finalY: notesStartY + 5 + noteLinesEmail.length * 4 };
   }
 
   // Summary
