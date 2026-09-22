@@ -6,6 +6,8 @@ import {
   INCO_TERMS,
   AFRICAN_PORTS,
   LOAD_TYPES,
+  ROAD_LOAD_TYPES,
+  BORDER_POSTS,
   PORTS_OF_LOADING,
   SHIPPING_LINES,
   AIRPORTS_OF_DEPARTURE,
@@ -159,6 +161,12 @@ function CostingFormSections({
         : Math.max((calculatedTotals.total_shipping_cost_zar || 0) - lastMileTotal, 0);
     }
 
+    if (formData.transport_mode === 'road') {
+      return freightIncluded
+        ? (calculatedTotals.road_local_charges_subtotal_zar || 0) + (calculatedTotals.road_freight_insurance_zar || 0)
+        : Math.max((calculatedTotals.total_shipping_cost_zar || 0) - lastMileTotal, 0);
+    }
+
     return freightIncluded
       ? (calculatedTotals.local_charges_subtotal_zar || 0) + (calculatedTotals.destination_charges_subtotal_zar || 0)
       : Math.max((calculatedTotals.total_shipping_cost_zar || 0) - lastMileTotal, 0);
@@ -267,7 +275,9 @@ function CostingFormSections({
       {/* Section: Header Details */}
       <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
         <h4 style={{ margin: '0 0 1rem', color: '#0f172a', fontSize: '1rem' }}>
-          {formData.transport_mode === 'air' ? 'Shipment Details (Air Freight)' : 'Shipment Details'}
+          {formData.transport_mode === 'air' ? 'Shipment Details (Air Freight)'
+            : formData.transport_mode === 'road' ? 'Shipment Details (Road Freight)'
+            : 'Shipment Details'}
           {' '}<InfoTip text="Core shipment info: supplier, origin, ports, and shipping terms." />
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
@@ -339,6 +349,12 @@ function CostingFormSections({
               {select('Airline', 'airline_name', AIRLINES)}
               {input('Flight Number', 'flight_number')}
             </>
+          ) : formData.transport_mode === 'road' ? (
+            <>
+              {select('Border Post', 'border_post', BORDER_POSTS, 'The land border crossing the truck uses to enter South Africa.')}
+              {input('Trucking Operator', 'trucking_operator')}
+              {select('Load Type', 'road_load_type', ROAD_LOAD_TYPES, 'FTL = Full Truck Load (exclusive use). LTL = Part Load (shared).')}
+            </>
           ) : (
             <>
               {renderPortSelect('Port of Loading', 'port_of_loading', originPortOptions || PORTS_OF_LOADING, onAddOriginPort)}
@@ -349,9 +365,10 @@ function CostingFormSections({
           )}
           {select('INCO Terms', 'inco_terms', INCO_TERMS, 'International Commercial Terms — defines who pays freight, insurance, and risk transfer point (e.g. FOB, CIF, EXW).')}
           {input('INCO Term Place', 'inco_term_place', 'text', {}, "The named location for the Incoterm, e.g. 'Shanghai' for FOB Shanghai.")}
-          {input('Transit Time (days)', 'transit_time_days', 'number', {}, formData.transport_mode === 'air' ? 'Estimated days from departure to arrival.' : 'Estimated number of days from port of loading to port of discharge.')}
-          {formData.transport_mode !== 'air' && select('Shipping Line', 'shipping_line', SHIPPING_LINES)}
-          {formData.transport_mode !== 'air' && input('No. of Containers', 'quantity', 'number')}
+          {input('Transit Time (days)', 'transit_time_days', 'number', {}, formData.transport_mode === 'air' ? 'Estimated days from departure to arrival.' : formData.transport_mode === 'road' ? 'Estimated days from origin to border to final destination.' : 'Estimated number of days from port of loading to port of discharge.')}
+          {formData.transport_mode === 'sea' && select('Shipping Line', 'shipping_line', SHIPPING_LINES)}
+          {formData.transport_mode === 'sea' && input('No. of Containers', 'quantity', 'number')}
+          {formData.transport_mode === 'road' && input('No. of Trucks', 'quantity', 'number')}
           {input('Costing Date', 'costing_date', 'date')}
           {input('Validity Date', 'validity_date', 'date')}
           {select('Payment Terms', 'payment_terms', PAYMENT_TERMS)}
@@ -605,7 +622,7 @@ function CostingFormSections({
       </div>
 
       {/* === SEA FREIGHT SECTIONS === */}
-      {formData.transport_mode !== 'air' && (
+      {formData.transport_mode === 'sea' && (
       <>
       {/* Section: Ocean Freight (hidden under export-FOB — buyer pays freight) */}
       {!(isExport && (formData.inco_terms || '').toUpperCase() === 'FOB') && (
@@ -1066,6 +1083,36 @@ function CostingFormSections({
         </div>
       </div>
       </>
+      )}
+
+      {/* === ROAD FREIGHT SECTIONS === */}
+      {formData.transport_mode === 'road' && (
+      <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '2px solid #b45309' }}>
+        <h4 style={{ margin: '0 0 1rem', color: '#92400e', fontSize: '1rem' }}>Road Freight <InfoTip text="Overland trucking charges, quoted directly in ZAR by the trucking operator, plus the land-border customs clearance fee." /></h4>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          {currencyInput('Road Freight', 'road_freight_zar', 'ZAR')}
+          {currencyInput('Border Crossing / Customs Clearance', 'border_crossing_fee_zar', 'ZAR', 'Customs clearance fee charged at the land border post.')}
+          {currencyInput('Road Documentation Fee', 'road_documentation_fee_zar', 'ZAR')}
+          {currencyInput('Insurance %', 'road_freight_insurance_percent', '%')}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.85rem', fontWeight: '500', color: '#92400e' }}>
+              Insurance Amount (ZAR)
+            </label>
+            <div style={{ padding: '8px 12px', backgroundColor: '#fef3c7', borderRadius: '6px', fontWeight: '600', color: '#92400e' }}>
+              {formatCurrency(calculatedTotals.road_freight_insurance_zar || 0)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '1rem', padding: '12px', backgroundColor: '#b45309', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '500', color: 'white' }}>Total Road Freight Cost (ZAR)</span>
+            <span style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
+              {formatCurrency(calculatedTotals.total_road_freight_cost_zar || 0)}
+            </span>
+          </div>
+        </div>
+      </div>
       )}
 
       {/* Section: Warehouse Handling & Storage */}

@@ -13,6 +13,7 @@ const THEME = {
   // Brand panels
   panelDark:    [14, 37, 68],     // #0E2544 — primary navy used in cover bar + Summary card
   panelDarkAir: [55, 28, 130],    // #371C82 — air freight variant
+  panelDarkRoad: [120, 53, 15],   // #78350F — road freight variant
 
   // Section accents (used for divider bars + autoTable head fills)
   navy:    [14, 37, 68],
@@ -446,6 +447,10 @@ const getProductCostBreakdown = (product, estimate, totals, productTotals) => {
     shippingToAllocate = freightIncluded
       ? (totals.air_local_charges_subtotal_zar || 0) + (totals.warehouse_charges_subtotal_zar || 0) + (totals.airfreight_insurance_zar || 0)
       : Math.max((totals.total_shipping_cost_zar || 0) - (totals.last_mile_charges_subtotal_zar || 0), 0);
+  } else if (estimate.transport_mode === 'road') {
+    shippingToAllocate = freightIncluded
+      ? (totals.road_local_charges_subtotal_zar || 0) + (totals.warehouse_charges_subtotal_zar || 0) + (totals.road_freight_insurance_zar || 0)
+      : Math.max((totals.total_shipping_cost_zar || 0) - (totals.last_mile_charges_subtotal_zar || 0), 0);
   } else if (freightIncluded) {
     shippingToAllocate = (totals.local_charges_subtotal_zar || 0) + (totals.destination_charges_subtotal_zar || 0);
   } else {
@@ -508,6 +513,7 @@ const getPresentation = (estimate) => {
 const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
   const products = estimate.products || [];
   const isAir = (estimate.transport_mode || 'sea') === 'air';
+  const isRoad = estimate.transport_mode === 'road';
   const isExport = estimate.direction === 'export';
   const pageWidth = doc.internal.pageSize.width;
   const { currency: presCur, toPresentation } = getPresentation(estimate);
@@ -519,7 +525,7 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
   const costingCurrencies = [...new Set(products.map(p => p.currency || 'USD'))].join(' / ');
 
   // === FULL-WIDTH COLOR BAR ===
-  const barColor = isAir ? THEME.panelDarkAir : THEME.panelDark;
+  const barColor = isAir ? THEME.panelDarkAir : isRoad ? THEME.panelDarkRoad : THEME.panelDark;
   doc.setFillColor(barColor[0], barColor[1], barColor[2]);
   doc.rect(0, 0, pageWidth, 16, 'F');
 
@@ -533,7 +539,9 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
   doc.setFontSize(11);
   doc.setFont(undefined, 'normal');
   const direction = isExport ? 'Export' : 'Import';
-  const titleText = isAir ? `Air Freight ${direction} Cost Estimate` : `${direction} Cost Estimate`;
+  const titleText = isAir ? `Air Freight ${direction} Cost Estimate`
+    : isRoad ? `Road Freight ${direction} Cost Estimate`
+    : `${direction} Cost Estimate`;
   const titleWidth = doc.getTextWidth(titleText);
   doc.text(titleText, pageWidth - titleWidth - 10, 11);
 
@@ -588,6 +596,17 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
         ['Actual Weight', `${formatNumber(estimate.actual_weight_kg || 0)} kg`],
         ['Chargeable Weight', `${formatNumber(totals.chargeable_weight_kg || 0)} kg`],
         ['Total Product Weight', `${formatNumber(productTotals.totalWeight || 0)} kg`],
+      ])
+    : isRoad
+    ? filterZeroRows([
+        ['Country of Origin', estimate.country_of_origin || '-'],
+        ['Border Post', estimate.border_post || '-'],
+        ['Trucking Operator', estimate.trucking_operator || '-'],
+        ['Load Type', estimate.road_load_type || '-'],
+        ['INCO Terms', estimate.inco_terms || '-'],
+        ['Costing Currency', costingCurrencies || '-'],
+        ['Transit Time', estimate.transit_time_days ? `${estimate.transit_time_days} days` : '-'],
+        ['Total Weight', `${formatNumber(productTotals.totalWeight || estimate.total_gross_weight_kg)} kg`],
       ])
     : filterZeroRows([
         ['Country of Origin', estimate.country_of_origin || '-'],
@@ -754,13 +773,14 @@ export function generateEstimatePDF(estimate) {
   buildEstimateHeader(doc, estimate, productTotals, totals);
 
   const isAir = (estimate.transport_mode || 'sea') === 'air';
-  const themeColor = isAir ? THEME.panelDarkAir : THEME.panelDark;
+  const isRoad = estimate.transport_mode === 'road';
+  const themeColor = isAir ? THEME.panelDarkAir : isRoad ? THEME.panelDarkRoad : THEME.panelDark;
   const pageWidth = doc.internal.pageSize.width;
   const { isExport, currency: presCur, toPresentation } = getPresentation(estimate);
   const agencyFeeMinLabel = isExport
     ? `@ 3.5% min R${Math.round(parseFloat(estimate.agency_fee_min) || 1270)}`
     : `@ 3.5% min R${Math.round(parseFloat(estimate.agency_fee_min) || 1187)}`;
-  let airFinalLandsideRows = [];
+  let finalLandsideRows = [];
 
   // Helper to style sub-total rows in charge tables
   const chargeTableSubTotalHook = (rows) => (data) => {
@@ -839,7 +859,21 @@ export function generateEstimatePDF(estimate) {
     if (totals.air_local_charges_subtotal_zar > 0 || totals.airfreight_insurance_zar > 0) {
       airLocalRows.push(['Sub-Total', formatCurrency((totals.air_local_charges_subtotal_zar || 0) + (totals.airfreight_insurance_zar || 0))]);
     }
-    airFinalLandsideRows = airLocalRows;
+    finalLandsideRows = airLocalRows;
+
+  } else if (isRoad) {
+    // === ROAD FREIGHT PDF SECTIONS ===
+
+    const roadRows = filterZeroRows([
+      ['Road Freight', formatCurrency(estimate.road_freight_zar)],
+      ['Border Crossing / Customs Clearance', formatCurrency(estimate.border_crossing_fee_zar)],
+      ['Road Documentation Fee', formatCurrency(estimate.road_documentation_fee_zar)],
+      ['Insurance', formatCurrency(totals.road_freight_insurance_zar)],
+    ]);
+    if (totals.total_road_freight_cost_zar > 0) {
+      roadRows.push(['Total Road Freight Cost', formatCurrency(totals.total_road_freight_cost_zar)]);
+    }
+    finalLandsideRows = roadRows;
 
   } else {
     // === SEA FREIGHT PDF SECTIONS ===
@@ -1051,11 +1085,13 @@ export function generateEstimatePDF(estimate) {
     customsRows.push(['Sub-Total (excl. Import VAT)', formatCurrency(totals.customs_subtotal_zar)]);
   }
   const lastMileRows = buildLastMileRows(totals);
-  const finalChargeRows = buildFinalChargeRows(airFinalLandsideRows, customsRows);
+  const finalChargeRows = buildFinalChargeRows(finalLandsideRows, customsRows);
   if (finalChargeRows.length > 0) {
     let secY = checkPageBreak(doc, doc.lastAutoTable.finalY + 4, 70);
-    const finalChargeTitle = airFinalLandsideRows.length > 0
-      ? 'SA Landside & Customs'
+    const finalChargeTitle = finalLandsideRows.length === 0
+      ? 'Final Charges'
+      : isAir ? 'SA Landside & Customs'
+      : isRoad ? 'Road Charges & Customs'
       : 'Final Charges';
     secY = drawSectionDivider(doc, secY, finalChargeTitle, THEME.amber);
     autoTable(doc, {
@@ -1445,6 +1481,26 @@ export function generateEstimatePDFBase64(estimate) {
       airLocalRows.push(['Sub-Total', formatCurrency((totals.air_local_charges_subtotal_zar || 0) + (totals.airfreight_insurance_zar || 0))]);
     }
     airEmailLandsideRows = airLocalRows;
+  } else if (estimate.transport_mode === 'road') {
+    // Road freight summary for email
+    const roadSummaryRows = filterZeroRows([
+      ['Road Freight', formatCurrency(estimate.road_freight_zar)],
+      ['Border Crossing / Customs Clearance', formatCurrency(estimate.border_crossing_fee_zar)],
+      ['Road Documentation Fee', formatCurrency(estimate.road_documentation_fee_zar)],
+      ['Insurance', formatCurrency(totals.road_freight_insurance_zar)],
+    ]);
+    if (totals.total_road_freight_cost_zar > 0) {
+      roadSummaryRows.push(['Total Road Freight Cost', formatCurrency(totals.total_road_freight_cost_zar)]);
+    }
+    if (roadSummaryRows.length > 0) {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [['Road Freight Charges', 'ZAR']],
+        body: roadSummaryRows,
+        theme: 'grid',
+        headStyles: { fillColor: THEME.panelDarkRoad },
+      });
+    }
   } else {
     // Sea freight summary for email
     const seaSummaryRows = filterZeroRows([
@@ -1589,7 +1645,7 @@ export async function generateReportPDF({ chartData, selectedProduct, selectedSu
   const doc = new jsPDF();
   const productLabel = selectedProduct === 'all' ? 'All Products' : selectedProduct;
   const supplierLabel = selectedSupplier === 'all' ? 'All Suppliers' : selectedSupplier;
-  const modeLabel = transportModeFilter === 'sea' ? 'Sea Freight' : transportModeFilter === 'air' ? 'Air Freight' : 'All Modes';
+  const modeLabel = transportModeFilter === 'sea' ? 'Sea Freight' : transportModeFilter === 'air' ? 'Air Freight' : transportModeFilter === 'road' ? 'Road Freight' : 'All Modes';
 
   // Header
   doc.setFillColor(91, 33, 182);

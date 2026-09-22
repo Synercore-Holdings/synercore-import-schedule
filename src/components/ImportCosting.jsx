@@ -148,6 +148,15 @@ const INITIAL_FORM_STATE = {
   air_import_documentation_zar: 0,
   airline_landside_delivery_zar: 0,
   airfreight_insurance_percent: 0,
+  // Roadfreight fields - overland transport from African regions (no port/airport,
+  // quoted directly in ZAR by the trucking operator rather than USD/EUR)
+  border_post: '',
+  trucking_operator: '',
+  road_load_type: 'FTL',
+  road_freight_zar: 0,
+  border_crossing_fee_zar: 0,
+  road_documentation_fee_zar: 0,
+  road_freight_insurance_percent: 0,
   // Last Mile Charges - AFI/ALLMARK April 2026
   last_mile_service_type: '',
   last_mile_route: '',
@@ -182,6 +191,13 @@ const createCustomPortOption = (name) => {
   const label = String(name || '').trim();
   if (!label) return null;
   return { value: label, label: `${label} (Custom)` };
+};
+
+// Mode label + its mode-specific secondary identifier (airline / container / trucking operator)
+const getEstimateModeLabel = (est) => {
+  if (est.transport_mode === 'air') return `Air · ${est.airline_name || '—'}`;
+  if (est.transport_mode === 'road') return `Road · ${est.trucking_operator || '—'}`;
+  return `Sea · ${est.container_type || '—'}`;
 };
 
 const getEstimateDateValue = (estimate) => {
@@ -392,7 +408,10 @@ function ReferenceChangeView({ estimates, onClose }) {
 // "is this shipment freight-heavy or customs-heavy", not exact line items.
 const COMPOSITION_SEGMENTS = [
   { label: 'Goods Value', color: '#94a3b8', getValue: (t) => t.customs_value_zar || 0 },
-  { label: 'Freight', color: '#3b82f6', getValue: (t, est) => (est.transport_mode === 'air' ? t.total_airfreight_cost_zar : t.total_ocean_freight_zar) || 0 },
+  {
+    label: 'Freight', color: '#3b82f6',
+    getValue: (t, est) => (est.transport_mode === 'air' ? t.total_airfreight_cost_zar : est.transport_mode === 'road' ? t.total_road_freight_cost_zar : t.total_ocean_freight_zar) || 0,
+  },
   {
     label: 'Local & Destination Handling', color: '#f59e0b',
     getValue: (t) => (t.local_charges_subtotal_zar || 0) + (t.destination_charges_subtotal_zar || 0) + (t.warehouse_charges_subtotal_zar || 0) + (t.last_mile_charges_subtotal_zar || 0),
@@ -417,6 +436,7 @@ const COMPARE_METRIC_ROWS = [
   { label: 'Total Shipping Cost', key: 'total_shipping_cost_zar' },
   { label: 'Ocean Freight', key: 'total_ocean_freight_zar', seaOnly: true },
   { label: 'Airfreight Total', key: 'total_airfreight_cost_zar', airOnly: true },
+  { label: 'Road Freight Total', key: 'total_road_freight_cost_zar', roadOnly: true },
   { label: 'Origin Charges', key: 'total_origin_charges_zar' },
   { label: 'Local Charges', key: 'local_charges_subtotal_zar' },
   { label: 'Destination Charges', key: 'destination_charges_subtotal_zar', seaOnly: true },
@@ -451,8 +471,9 @@ function CompareEstimatesView({ estimates, onClose }) {
   const optionLabel = (est) => `${est.reference_number || est.id} — ${est.supplier_name || '—'} (${formatEstimateDate(est)})`;
 
   const rows = (totalsA && totalsB) ? COMPARE_METRIC_ROWS.filter(row => {
-    if (row.seaOnly && estA.transport_mode === 'air' && estB.transport_mode === 'air') return false;
+    if (row.seaOnly && estA.transport_mode !== 'sea' && estB.transport_mode !== 'sea') return false;
     if (row.airOnly && estA.transport_mode !== 'air' && estB.transport_mode !== 'air') return false;
+    if (row.roadOnly && estA.transport_mode !== 'road' && estB.transport_mode !== 'road') return false;
     if (row.headline) return true;
     const valA = parseFloat(totalsA[row.key]) || 0;
     const valB = parseFloat(totalsB[row.key]) || 0;
@@ -490,7 +511,7 @@ function CompareEstimatesView({ estimates, onClose }) {
     const describe = (est, weight) => ({
       reference: est.reference_number || est.id,
       supplier: est.supplier_name || '—',
-      modeLabel: `${est.transport_mode === 'air' ? 'Air' : 'Sea'} · ${est.transport_mode === 'air' ? (est.airline_name || '—') : (est.container_type || '—')}`,
+      modeLabel: getEstimateModeLabel(est),
       date: est.costing_date || est.created_at,
       weightKg: weight,
       productCount: (est.products || []).length,
@@ -594,7 +615,7 @@ function CompareEstimatesView({ estimates, onClose }) {
                   <div style={{ fontWeight: 700, color: '#0f172a' }}>{est.reference_number || est.id}</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-700)' }}>{est.supplier_name || '—'}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '4px' }}>
-                    {est.transport_mode === 'air' ? 'Air' : 'Sea'} · {est.transport_mode === 'air' ? (est.airline_name || '—') : (est.container_type || '—')} · {formatEstimateDate(est)}
+                    {getEstimateModeLabel(est)} · {formatEstimateDate(est)}
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-500)', marginTop: '2px' }}>
                     {formatNumber(idx === 0 ? weightA : weightB)} kg · {(est.products || []).length} product line{(est.products || []).length !== 1 ? 's' : ''}
@@ -931,7 +952,7 @@ function ImportCosting() {
       if (field === 'inco_terms' && ['FOB', 'FCA', 'EXW'].includes(String(value || '').toUpperCase())) {
         const currentOceanFreightUsd = parseFloat(updated.ocean_freight_usd) || 0;
         const currentOceanFreightEur = parseFloat(updated.ocean_freight_eur) || 0;
-        if (updated.transport_mode !== 'air' && currentOceanFreightUsd === 0 && currentOceanFreightEur === 0) {
+        if (updated.transport_mode === 'sea' && currentOceanFreightUsd === 0 && currentOceanFreightEur === 0) {
           const rate = lookupOceanFreightRate(
             updated.port_of_loading,
             updated.shipping_line,
@@ -1081,6 +1102,12 @@ function ImportCosting() {
         ? (calculatedTotals.air_local_charges_subtotal_zar || 0)
           + (calculatedTotals.warehouse_charges_subtotal_zar || 0)
           + (calculatedTotals.airfreight_insurance_zar || 0)
+        : Math.max((calculatedTotals.total_shipping_cost_zar || 0) - (calculatedTotals.last_mile_charges_subtotal_zar || 0), 0);
+    } else if (formData.transport_mode === 'road') {
+      shippingToAllocate = freightIncluded
+        ? (calculatedTotals.road_local_charges_subtotal_zar || 0)
+          + (calculatedTotals.warehouse_charges_subtotal_zar || 0)
+          + (calculatedTotals.road_freight_insurance_zar || 0)
         : Math.max((calculatedTotals.total_shipping_cost_zar || 0) - (calculatedTotals.last_mile_charges_subtotal_zar || 0), 0);
     } else if (freightIncluded) {
       shippingToAllocate = (calculatedTotals.local_charges_subtotal_zar || 0)
@@ -1522,6 +1549,17 @@ function ImportCosting() {
                     }}
                   >
                     Air Freight
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('transport_mode', 'road')}
+                    style={{
+                      padding: '6px 16px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem',
+                      backgroundColor: formData.transport_mode === 'road' ? '#b45309' : '#f3f4f6',
+                      color: formData.transport_mode === 'road' ? 'white' : '#6b7280',
+                    }}
+                  >
+                    Road Freight
                   </button>
                 </div>
               </div>

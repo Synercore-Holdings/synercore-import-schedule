@@ -556,6 +556,7 @@ export const calculateAllTotals = (data) => {
         : calculateCustomsSubtotal(data, agencyFeeZar));
 
   const isAirfreight = (data.transport_mode || 'sea') === 'air';
+  const isRoadfreight = data.transport_mode === 'road';
 
   // === Airfreight-specific calculations ===
   const volumetricWeightKg = calculateVolumetricWeight(data);
@@ -595,7 +596,22 @@ export const calculateAllTotals = (data) => {
   const totalAirfreightCostZar = airfreightTotalZar + fuelSurchargeTotalZar + securitySurchargeTotalZar
     + airfreightOriginZar + airLocalChargesSubtotalZar + warehouseChargesSubtotalZar + airfreightInsuranceZar + lastMileChargesSubtotalZar;
 
-  // === Unified shipping cost (sea or air) ===
+  // === Roadfreight-specific calculations ===
+  // Quoted directly in ZAR by the trucking operator -- no USD/EUR conversion,
+  // no port/container concept. "Local charges" here is just the border
+  // crossing + documentation fees (the road equivalent of air's landside
+  // charges), kept included even when freightIncluded bundles the freight
+  // rate itself into the product price.
+  const roadFreightZar = parseFloat(data.road_freight_zar) || 0;
+  const borderCrossingFeeZar = parseFloat(data.border_crossing_fee_zar) || 0;
+  const roadDocumentationFeeZar = parseFloat(data.road_documentation_fee_zar) || 0;
+  const roadLocalChargesSubtotalZar = borderCrossingFeeZar + roadDocumentationFeeZar;
+  const roadInsurancePercent = parseFloat(data.road_freight_insurance_percent) || 0;
+  const roadFreightInsuranceZar = customsValueZar * (roadInsurancePercent / 100);
+  const totalRoadFreightCostZar = roadFreightZar + roadLocalChargesSubtotalZar
+    + warehouseChargesSubtotalZar + roadFreightInsuranceZar + lastMileChargesSubtotalZar;
+
+  // === Unified shipping cost (sea, air, or road) ===
   // Sea freight total. Origin Charges is omitted under FOB/FCA/EXW (it's goods value,
   // not a shipping fee); included under other terms where it represents real origin
   // port handling fees.
@@ -611,7 +627,9 @@ export const calculateAllTotals = (data) => {
     + lastMileChargesSubtotalZar;
 
   // Use the right total based on transport mode
-  const totalShippingCostZar = isAirfreight ? totalAirfreightCostZar : totalShippingCostSeaZar;
+  const totalShippingCostZar = isAirfreight ? totalAirfreightCostZar
+    : isRoadfreight ? totalRoadFreightCostZar
+    : totalShippingCostSeaZar;
 
   // For CIF/CIP/CFR, ocean freight and origin charges are in the product price —
   // only local + destination charges are additional shipping costs
@@ -623,6 +641,10 @@ export const calculateAllTotals = (data) => {
     shippingToAllocateZar = freightIncluded
       ? airLocalChargesSubtotalZar + warehouseChargesSubtotalZar + airfreightInsuranceZar + lastMileChargesSubtotalZar
       : totalAirfreightCostZar;
+  } else if (isRoadfreight) {
+    shippingToAllocateZar = freightIncluded
+      ? roadLocalChargesSubtotalZar + warehouseChargesSubtotalZar + roadFreightInsuranceZar + lastMileChargesSubtotalZar
+      : totalRoadFreightCostZar;
   } else {
     shippingToAllocateZar = freightIncluded
       ? localChargesSubtotalZar + destinationChargesSubtotalZar + lastMileChargesSubtotalZar
@@ -691,6 +713,11 @@ export const calculateAllTotals = (data) => {
     air_local_charges_subtotal_zar: r(airLocalChargesSubtotalZar),
     airfreight_insurance_zar: r(airfreightInsuranceZar),
     total_airfreight_cost_zar: r(totalAirfreightCostZar),
+    // Roadfreight calculated fields
+    road_freight_total_zar: r(roadFreightZar),
+    road_local_charges_subtotal_zar: r(roadLocalChargesSubtotalZar),
+    road_freight_insurance_zar: r(roadFreightInsuranceZar),
+    total_road_freight_cost_zar: r(totalRoadFreightCostZar),
     // Display-only fields (not saved to database, used for form display)
     _last_mile_charge_lines: lastMile.lines,
     _last_mile_weight_kg: r(lastMile.lines[0]?.calculated.weight_kg || 0),
@@ -1080,6 +1107,27 @@ export const WORLD_PORTS = [
 export const LOAD_TYPES = [
   { value: 'FCL', label: 'FCL - Full Container Load' },
   { value: 'LCL', label: 'LCL - Less than Container Load' },
+];
+
+/**
+ * Road load type (cross-border trucking has no container concept)
+ */
+export const ROAD_LOAD_TYPES = [
+  { value: 'FTL', label: 'FTL - Full Truck Load' },
+  { value: 'LTL', label: 'LTL - Part Load' },
+];
+
+/**
+ * Common SADC land border posts used for road freight into South Africa
+ */
+export const BORDER_POSTS = [
+  { value: 'Beitbridge', label: 'Beitbridge (Zimbabwe)' },
+  { value: 'Kopfontein', label: 'Kopfontein (Botswana)' },
+  { value: 'Lebombo', label: 'Lebombo (Mozambique)' },
+  { value: 'Oshoek', label: 'Oshoek (Eswatini)' },
+  { value: 'Ficksburg', label: 'Ficksburg (Lesotho)' },
+  { value: 'Nakop', label: 'Nakop (Namibia)' },
+  { value: 'Kazungula', label: 'Kazungula (Zambia)' },
 ];
 
 /**

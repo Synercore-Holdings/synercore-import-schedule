@@ -27,8 +27,13 @@ ChartJS.register(
 );
 
 // Transport mode badge component
+const MODE_BADGE_STYLES = {
+  sea: { bg: '#dbeafe', fg: '#1d4ed8', border: '#93c5fd' },
+  air: { bg: '#ede9fe', fg: '#7c3aed', border: '#c4b5fd' },
+  road: { bg: '#fef3c7', fg: '#b45309', border: '#fcd34d' },
+};
 const ModeBadge = ({ mode }) => {
-  const isSea = mode === 'sea';
+  const style = MODE_BADGE_STYLES[mode] || MODE_BADGE_STYLES.sea;
   return (
     <span style={{
       display: 'inline-block',
@@ -38,11 +43,11 @@ const ModeBadge = ({ mode }) => {
       fontWeight: '700',
       letterSpacing: '0.05em',
       textTransform: 'uppercase',
-      backgroundColor: isSea ? '#dbeafe' : '#ede9fe',
-      color: isSea ? '#1d4ed8' : '#7c3aed',
-      border: `1px solid ${isSea ? '#93c5fd' : '#c4b5fd'}`,
+      backgroundColor: style.bg,
+      color: style.fg,
+      border: `1px solid ${style.border}`,
     }}>
-      {isSea ? 'SEA' : 'AIR'}
+      {mode.toUpperCase()}
     </span>
   );
 };
@@ -100,7 +105,7 @@ function CostingReportsPanel({ estimates, onClose }) {
 
       if (!data[supplier]) {
         const empty = () => ({ totalCost: 0, totalWeight: 0, costPerKg: 0, estimateCount: 0, totalInvoiceValue: 0 });
-        data[supplier] = { sea: empty(), air: empty(), combined: empty() };
+        data[supplier] = { sea: empty(), air: empty(), road: empty(), combined: empty() };
       }
 
       const totals = calculateAllTotals(est);
@@ -132,7 +137,7 @@ function CostingReportsPanel({ estimates, onClose }) {
 
     // Calculate cost per kg
     Object.values(data).forEach(supplier => {
-      ['sea', 'air', 'combined'].forEach(key => {
+      ['sea', 'air', 'road', 'combined'].forEach(key => {
         const d = supplier[key];
         d.costPerKg = d.totalWeight > 0 ? d.totalCost / d.totalWeight : 0;
       });
@@ -200,7 +205,9 @@ function CostingReportsPanel({ estimates, onClose }) {
     // Single mode (or all with only one mode present): original style
     const modeColor = transportModeFilter === 'air'
       ? { bg: 'rgba(124, 58, 237, 0.8)', border: 'rgb(124, 58, 237)' }
-      : { bg: 'rgba(59, 130, 246, 0.8)', border: 'rgb(59, 130, 246)' };
+      : transportModeFilter === 'road'
+        ? { bg: 'rgba(180, 83, 9, 0.8)', border: 'rgb(180, 83, 9)' }
+        : { bg: 'rgba(59, 130, 246, 0.8)', border: 'rgb(59, 130, 246)' };
 
     return {
       labels,
@@ -239,9 +246,14 @@ function CostingReportsPanel({ estimates, onClose }) {
         if (data.air.estimateCount > 0) {
           rows.push({ name, mode: 'air', ...data.air });
         }
+        if (data.road.estimateCount > 0) {
+          rows.push({ name, mode: 'road', ...data.road });
+        }
       } else {
         // Single mode row
-        const mode = transportModeFilter !== 'all' ? transportModeFilter : (data.sea.estimateCount > 0 ? 'sea' : 'air');
+        const mode = transportModeFilter !== 'all'
+          ? transportModeFilter
+          : (data.sea.estimateCount > 0 ? 'sea' : data.air.estimateCount > 0 ? 'air' : 'road');
         rows.push({ name, mode, ...data.combined });
       }
     });
@@ -258,6 +270,9 @@ function CostingReportsPanel({ estimates, onClose }) {
     estimates.forEach(est => {
       const supplier = est.supplier_name || 'Unknown';
       const mode = est.transport_mode || 'sea';
+      // This comparison is specifically sea vs air -- road estimates have no
+      // bucket here (see map[key] init below) and would otherwise throw.
+      if (mode !== 'sea' && mode !== 'air') return;
       const products = est.products || [];
       const totals = calculateAllTotals(est);
       const totalWeight = products.reduce((s, p) => s + (parseFloat(p.weight_kg) || 0), 0);
@@ -353,6 +368,7 @@ function CostingReportsPanel({ estimates, onClose }) {
       transportModeFilter === value
         ? value === 'sea' ? '#1d4ed8'
           : value === 'air' ? '#7c3aed'
+          : value === 'road' ? '#b45309'
           : '#374151'
         : '#f3f4f6',
     color: transportModeFilter === value ? 'white' : '#6b7280',
@@ -377,6 +393,9 @@ function CostingReportsPanel({ estimates, onClose }) {
                 </button>
                 <button type="button" onClick={() => setTransportModeFilter('air')} style={modeButtonStyle('air')}>
                   Air
+                </button>
+                <button type="button" onClick={() => setTransportModeFilter('road')} style={modeButtonStyle('road')}>
+                  Road
                 </button>
               </div>
             </div>

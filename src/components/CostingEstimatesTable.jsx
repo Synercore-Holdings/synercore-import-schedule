@@ -7,7 +7,7 @@ import {
 
 function CostingEstimatesTable({ estimates, isAdmin, onEdit, onView, onDelete, onDuplicate, onGeneratePDF, onEmailEstimate, isExport = false, initialTransportModeFilter = 'all' }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [transportModeFilter, setTransportModeFilter] = useState(initialTransportModeFilter); // 'all', 'sea', 'air'
+  const [transportModeFilter, setTransportModeFilter] = useState(initialTransportModeFilter); // 'all', 'sea', 'air', 'road'
 
   useEffect(() => {
     setTransportModeFilter(initialTransportModeFilter);
@@ -48,7 +48,7 @@ function CostingEstimatesTable({ estimates, isAdmin, onEdit, onView, onDelete, o
       {/* Search and Sort Controls */}
       <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '2px solid #e5e7eb' }}>
-          {['all', 'sea', 'air'].map(mode => (
+          {['all', 'sea', 'air', 'road'].map(mode => (
             <button
               key={mode}
               type="button"
@@ -64,13 +64,14 @@ function CostingEstimatesTable({ estimates, isAdmin, onEdit, onView, onDelete, o
                   transportModeFilter === mode
                     ? mode === 'sea' ? '#1d4ed8'
                       : mode === 'air' ? '#7c3aed'
+                      : mode === 'road' ? '#b45309'
                       : '#374151'
                     : '#f3f4f6',
                 color: transportModeFilter === mode ? 'white' : '#6b7280',
                 transition: 'all 0.15s ease',
               }}
             >
-              {mode === 'all' ? 'All' : mode === 'sea' ? 'Sea' : 'Air'}
+              {mode === 'all' ? 'All' : mode === 'sea' ? 'Sea' : mode === 'air' ? 'Air' : 'Road'}
             </button>
           ))}
         </div>
@@ -129,6 +130,9 @@ function CostingEstimatesTable({ estimates, isAdmin, onEdit, onView, onDelete, o
                         {est.transport_mode === 'air' && (
                           <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600', backgroundColor: '#ede9fe', color: '#7c3aed' }}>AIR</span>
                         )}
+                        {est.transport_mode === 'road' && (
+                          <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600', backgroundColor: '#fef3c7', color: '#b45309' }}>ROAD</span>
+                        )}
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
@@ -142,12 +146,16 @@ function CostingEstimatesTable({ estimates, isAdmin, onEdit, onView, onDelete, o
                     <td style={{ padding: '12px 16px', color: '#374151' }}>
                       {est.transport_mode === 'air'
                         ? (est.airport_of_arrival || '-')
-                        : (est.port_of_discharge || '-')}
+                        : est.transport_mode === 'road'
+                          ? (est.border_post || '-')
+                          : (est.port_of_discharge || '-')}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#374151' }}>
                       {est.transport_mode === 'air'
                         ? (est.airline_name || '-')
-                        : (est.container_type || '-')}
+                        : est.transport_mode === 'road'
+                          ? (est.trucking_operator || '-')
+                          : (est.container_type || '-')}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#374151' }}>
                       {products.length === 0 ? (

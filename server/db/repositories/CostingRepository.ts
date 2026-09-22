@@ -231,6 +231,11 @@ const COST_ESTIMATE_COLUMNS = [
   'airline_landside_delivery_zar', 'airfreight_insurance_percent', 'airfreight_insurance_zar',
   'airfreight_origin_charges_usd', 'airfreight_origin_charges_eur', 'airfreight_origin_charges_zar',
   'air_local_charges_subtotal_zar', 'total_airfreight_cost_zar',
+  // Roadfreight
+  'border_post', 'trucking_operator', 'road_load_type',
+  'road_freight_zar', 'border_crossing_fee_zar', 'road_documentation_fee_zar',
+  'road_freight_insurance_percent', 'road_freight_total_zar',
+  'road_local_charges_subtotal_zar', 'road_freight_insurance_zar', 'total_road_freight_cost_zar',
   // Last mile charges
   'last_mile_service_type', 'last_mile_route', 'last_mile_weight_kg',
   'last_mile_fuel_levy_percent', 'last_mile_manual_charge_zar',

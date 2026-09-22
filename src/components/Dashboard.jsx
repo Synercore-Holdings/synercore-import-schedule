@@ -178,9 +178,11 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       airAvgLandedPerKg: 0,
       seaCount: 0,
       airCount: 0,
+      roadCount: 0,
       totalCostedValue: 0,
       seaTotalCost: 0,
       airTotalCost: 0,
+      roadTotalCost: 0,
       monthlyStats: [],
       avgMonthlyCostedValue: 0,
       avgMonthlyEstimateCount: 0,
@@ -192,16 +194,19 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
     let airLandedPerKgCount = 0;
     let seaCount = 0;
     let airCount = 0;
+    let roadCount = 0;
     let totalCostedValue = 0;
     let seaTotalCost = 0;
     let airTotalCost = 0;
+    let roadTotalCost = 0;
     const monthlyMap = new Map();
 
     active.forEach(est => {
       const totals = calculateAllTotals(est);
       const landedCost = totals.total_landed_cost_zar || 0;
       const costPerKg = totals.all_in_warehouse_cost_per_kg_zar || 0;
-      const isAir = (est.transport_mode || 'sea') === 'air';
+      const isAir = est.transport_mode === 'air';
+      const isRoad = est.transport_mode === 'road';
 
       totalCostedValue += landedCost;
 
@@ -212,6 +217,9 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
           airTotalLandedPerKg += costPerKg;
           airLandedPerKgCount++;
         }
+      } else if (isRoad) {
+        roadCount++;
+        roadTotalCost += landedCost;
       } else {
         seaCount++;
         seaTotalCost += landedCost;
@@ -245,9 +253,11 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       airAvgLandedPerKg: airLandedPerKgCount > 0 ? airTotalLandedPerKg / airLandedPerKgCount : 0,
       seaCount,
       airCount,
+      roadCount,
       totalCostedValue,
       seaTotalCost,
       airTotalCost,
+      roadTotalCost,
       monthlyStats,
       avgMonthlyCostedValue: totalCostedValue / monthsCount,
       avgMonthlyEstimateCount: active.length / monthsCount,

@@ -346,6 +346,21 @@ export default async function addCostingColumns() {
     if (await addColumn(col)) added++;
   }
 
+  // Roadfreight support: overland trucking from African regions -- quoted
+  // directly in ZAR by the trucking operator, no port/container concept.
+  const roadFreightColumns = [
+    'border_post VARCHAR(255)',
+    'trucking_operator VARCHAR(255)',
+    "road_load_type VARCHAR(10) DEFAULT 'FTL'",
+    'road_freight_zar NUMERIC(12,2) DEFAULT 0',
+    'border_crossing_fee_zar NUMERIC(12,2) DEFAULT 0',
+    'road_documentation_fee_zar NUMERIC(12,2) DEFAULT 0',
+    'road_freight_insurance_percent NUMERIC(5,2) DEFAULT 0',
+  ];
+  for (const col of roadFreightColumns) {
+    if (await addColumn(col)) added++;
+  }
+
   if (added > 0) {
     console.log(`✓ Added ${added} new costing columns`);
   } else {
