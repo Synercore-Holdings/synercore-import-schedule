@@ -1151,6 +1151,7 @@ function QuoteRequestForm({ onClose }) {
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Route</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Supplier</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Mode</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Container</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Incoterm</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left' }}>Cargo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
@@ -1190,6 +1191,10 @@ function QuoteRequestForm({ onClose }) {
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>{req.supplier_name || '—'}</td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>{TRANSPORT_LABELS[req.transport_mode] || req.transport_mode}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>
+                      {req.container_type || '—'}
+                      {req.container_type_2 && <div style={{ color: 'var(--text-500)' }}>+ {req.container_type_2}</div>}
+                    </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem' }}>{req.incoterm || '—'}</td>
                     <td style={{ padding: '12px 16px', maxWidth: '220px' }}>
                       {req.dg_classification === 'dg' && (
@@ -2379,6 +2384,14 @@ function QuoteRequestForm({ onClose }) {
                         <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-500)' }}>
                           ({TRANSPORT_LABELS[group.transport_mode] || group.transport_mode})
                         </span>
+                        {group.container_type && (
+                          <span style={{
+                            marginLeft: '8px', fontSize: '0.7rem', fontWeight: 600, color: '#1d4ed8',
+                            backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '1px 6px',
+                          }}>
+                            {group.container_type}
+                          </span>
+                        )}
                       </div>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-500)' }}>{group.entries.length} quote{group.entries.length > 1 ? 's' : ''}</span>
                     </div>
