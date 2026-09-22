@@ -356,6 +356,11 @@ export default async function addCostingColumns() {
     'border_crossing_fee_zar NUMERIC(12,2) DEFAULT 0',
     'road_documentation_fee_zar NUMERIC(12,2) DEFAULT 0',
     'road_freight_insurance_percent NUMERIC(5,2) DEFAULT 0',
+    // Calculated totals (mirrors airfreight_total_zar / total_airfreight_cost_zar etc.)
+    'road_freight_total_zar NUMERIC(14,2) DEFAULT 0',
+    'road_local_charges_subtotal_zar NUMERIC(14,2) DEFAULT 0',
+    'road_freight_insurance_zar NUMERIC(14,2) DEFAULT 0',
+    'total_road_freight_cost_zar NUMERIC(14,2) DEFAULT 0',
   ];
   for (const col of roadFreightColumns) {
     if (await addColumn(col)) added++;
