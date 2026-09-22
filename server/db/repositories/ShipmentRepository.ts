@@ -48,6 +48,8 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'notes',
     'created_at',
     'updated_at',
+    'updated_by',
+    'updated_by_username',
     // Post-arrival workflow fields
     'unloading_start_date',
     'unloading_completed_date',

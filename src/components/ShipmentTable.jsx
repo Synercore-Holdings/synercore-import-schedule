@@ -16,7 +16,24 @@ import { authFetch } from '../utils/authFetch';
 import { copyToClipboard } from '../utils/clipboard';
 import { useNotification } from '../contexts/NotificationContext';
 
-function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteShipment, onCreateShipment, loading, globalSearchTerm, onClearGlobalSearch }) {
+// Compact relative time for the "Updated" column, e.g. "5m ago", "3h ago", "2d ago".
+const formatRelativeTime = (isoString) => {
+  if (!isoString) return null;
+  const then = new Date(isoString).getTime();
+  if (Number.isNaN(then)) return null;
+  const diffMs = Date.now() - then;
+  if (diffMs < 0) return 'just now';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(isoString).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteShipment, onCreateShipment, loading, globalSearchTerm, onClearGlobalSearch, myViews = {}, onMarkViewed = () => {} }) {
   const { showSuccess, showError, confirm: confirmAction } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState(['all']);
@@ -404,6 +421,13 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
 
   const handleAmendShipment = (shipment) => {
     setAmendingShipment({ ...shipment });
+    onMarkViewed(shipment.id);
+  };
+
+  const openOrderDetails = (shipment) => {
+    setOrderDetailsShipment(shipment);
+    setShowOrderDetailsModal(true);
+    onMarkViewed(shipment.id);
   };
 
   const handleSaveAmendment = async (shipmentData) => {
@@ -652,6 +676,21 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                     <dt>Week</dt><dd>{shipment.weekNumber || '-'}</dd>
                     <dt>Vessel / AWB</dt><dd>{shipment.vesselName || '-'}</dd>
                     <dt>Agent</dt><dd>{shipment.forwardingAgent || '-'}</dd>
+                    {shipment.updatedAt && (
+                      <>
+                        <dt>Updated</dt>
+                        <dd>
+                          {(!myViews[shipment.id] || new Date(shipment.updatedAt) > new Date(myViews[shipment.id])) && (
+                            <span title="Changed since you last viewed this row" style={{
+                              display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                              backgroundColor: '#f59e0b', marginRight: 5,
+                            }} />
+                          )}
+                          {formatRelativeTime(shipment.updatedAt)}
+                          {shipment.updatedByUsername ? ` by ${shipment.updatedByUsername}` : ''}
+                        </dd>
+                      </>
+                    )}
                   </dl>
                   {/* Progress bar */}
                   {!isDelayedStatus(shipment.latestStatus) && shipment.latestStatus !== 'cancelled' && (
@@ -672,7 +711,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                   <div className="card-actions">
                     <button
                       className="btn btn-ghost"
-                      onClick={() => { setOrderDetailsShipment(shipment); setShowOrderDetailsModal(true); }}
+                      onClick={() => openOrderDetails(shipment)}
                       style={{ fontSize: 12, padding: '6px 12px' }}
                     >
                       Details
@@ -722,6 +761,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                 { key: 'vesselName', label: 'Vessel / AWB' },
                 { key: 'incoterm', label: 'Incoterm' },
                 { key: 'forwardingAgent', label: 'Agent' },
+                { key: 'updatedAt', label: 'Updated' },
                 { key: null, label: '' },
               ].map((col, i) => (
                 <th key={col.key || col.label || i}
@@ -739,7 +779,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
           <tbody>
             {filteredAndSortedShipments.length === 0 ? (
               <tr>
-                <td colSpan="13" style={{ textAlign: 'center', padding: '2rem' }}>
+                <td colSpan="14" style={{ textAlign: 'center', padding: '2rem' }}>
                   No shipments found
                 </td>
               </tr>
@@ -762,10 +802,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span
-                        onClick={() => {
-                          setOrderDetailsShipment(shipment);
-                          setShowOrderDetailsModal(true);
-                        }}
+                        onClick={() => openOrderDetails(shipment)}
                         style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
                         title="Click to view order details"
                       >
@@ -1107,6 +1144,30 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                         <option key={agent.value} value={agent.value}>{agent.label}</option>
                       ))}
                     </select>
+                  </td>
+                  <td>
+                    {shipment.updatedAt && (() => {
+                      const isUnseen = !myViews[shipment.id] || new Date(shipment.updatedAt) > new Date(myViews[shipment.id]);
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem' }}>
+                          {isUnseen && (
+                            <span
+                              title="Changed since you last viewed this row"
+                              style={{
+                                display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                                backgroundColor: '#f59e0b', flexShrink: 0,
+                              }}
+                            />
+                          )}
+                          <div>
+                            <div style={{ color: 'var(--text-700)' }}>{formatRelativeTime(shipment.updatedAt)}</div>
+                            {shipment.updatedByUsername && (
+                              <div style={{ color: 'var(--text-500)' }}>by {shipment.updatedByUsername}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td>
                     <div className="actions" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>

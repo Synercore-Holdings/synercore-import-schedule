@@ -54,7 +54,7 @@ const isTbcShipment = (shipment) => {
   });
 };
 
-function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipment, onDeleteShipment, onCreateShipment, loading }) {
+function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipment, onDeleteShipment, onCreateShipment, loading, myViews, onMarkViewed }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = searchParams.get('status') || null;
   const globalSearchTerm = searchParams.get('search') || '';
@@ -245,6 +245,8 @@ function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipmen
         loading={loading}
         globalSearchTerm={globalSearchTerm}
         onClearGlobalSearch={clearGlobalSearch}
+        myViews={myViews}
+        onMarkViewed={onMarkViewed}
       />
     </div>
   );

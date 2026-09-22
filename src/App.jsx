@@ -158,6 +158,7 @@ function App() {
     fetchShipments, handleCreateShipment, handleUpdateShipment,
     handleDeleteShipment, handleArchiveShipment, handleFileUpload,
     importResult, setImportResult,
+    myViews, fetchMyViews, markShipmentViewed,
   } = useShipments();
 
   const {
@@ -333,6 +334,7 @@ function App() {
       setUsername(user.username);
       fetchShipments();
       fetchSuppliers();
+      fetchMyViews();
       checkPasswordExpiry();
     } else {
       if (authUtils.isAuthenticated() || authUtils.getUser()) {
@@ -406,6 +408,7 @@ function App() {
     initializedRef.current = true;
     fetchShipments();
     fetchSuppliers();
+    fetchMyViews();
     if (loginPasswordExpired) {
       setPasswordExpired(true);
     } else {
@@ -1036,6 +1039,8 @@ function App() {
                     onDeleteShipment={handleDeleteShipment}
                     onCreateShipment={handleCreateShipment}
                     loading={loading}
+                    myViews={myViews}
+                    onMarkViewed={markShipmentViewed}
                   />
                 </ErrorBoundary>
               </Suspense>

@@ -26,6 +26,10 @@ export function useShipments() {
   const [loading, setLoading] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [importResult, setImportResult] = useState(null);
+  // This user's own "last viewed" timestamp per shipment ({ shipmentId: isoString }),
+  // so the table can flag rows that changed since they last looked, without
+  // needing to re-check every row.
+  const [myViews, setMyViews] = useState({});
   const loadingCountRef = useRef(0);
   const lastFetchRef = useRef(0);
   const { showSuccess, showError } = useNotification();
@@ -150,6 +154,7 @@ export function useShipments() {
         batchLot: s.batch_lot || s.batchLot || '',
         releaseNumber: s.release_number || s.releaseNumber || '',
         asoNumber: s.aso_number || s.asoNumber || '',
+        updatedByUsername: s.updated_by_username || s.updatedByUsername || '',
       }));
 
       setShipments(normalized);
@@ -346,6 +351,25 @@ export function useShipments() {
     } finally { stopLoading(); }
   }, [fetchShipments, startLoading, stopLoading, showSuccess, showError]);
 
+  const fetchMyViews = useCallback(async () => {
+    try {
+      const response = await authFetch(getApiUrl('/api/shipment-views/mine'));
+      if (!response.ok) return;
+      const data = await response.json();
+      setMyViews(data.data || {});
+    } catch (err) {
+      console.warn('Failed to load shipment views:', err.message);
+    }
+  }, []);
+
+  // Fire-and-forget: record that this user has now seen a shipment's current
+  // state. Updates local state immediately so the "unseen changes" indicator
+  // clears right away, rather than waiting on a round trip.
+  const markShipmentViewed = useCallback((shipmentId) => {
+    setMyViews(prev => ({ ...prev, [shipmentId]: new Date().toISOString() }));
+    authFetch(getApiUrl(`/api/shipment-views/${shipmentId}`), { method: 'POST' }).catch(() => {});
+  }, []);
+
   return {
     shipments,
     setShipments,
@@ -361,6 +385,9 @@ export function useShipments() {
     setImportResult,
     startLoading,
     stopLoading,
+    myViews,
+    fetchMyViews,
+    markShipmentViewed,
   };
 }
 

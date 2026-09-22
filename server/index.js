@@ -59,6 +59,7 @@ import auditRouter from './routes/audit.ts';
 import newsRouter from './routes/news.ts';
 import bolAuditRouter from './routes/bolAudit.ts';
 import docksRouter from './routes/docks.ts';
+import shipmentViewsRouter from './routes/shipmentViews.ts';
 
 import { helmetConfig, apiRateLimiter, authRateLimiter, createRateLimiter, authenticateToken } from './middleware/security.js';
 import { csrfProtection } from './middleware/csrf.js';
@@ -204,6 +205,7 @@ app.use('/api/costing-requests', costingRequestsRouter); // Costing request rout
 app.use('/api/quote-requests', quoteRequestsRouter); // Freight quote request routes (auth within router)
 app.use('/api/fx-rates', fxRatesRouter); // Manually-maintained exchange rates (auth within router)
 app.use('/api/audit', authenticateToken, auditRouter);
+app.use('/api/shipment-views', authenticateToken, shipmentViewsRouter);
 app.use('/api/bol-audit', authenticateToken, bolAuditRouter);
 app.use('/api/docks', authenticateToken, docksRouter);
 app.use('/api/news', newsRouter); // Public - freight news feed proxy
@@ -409,6 +411,13 @@ async function start() {
       await addExpectedVesselFields.default();
     } catch (error) {
       logWarn('Expected vessel fields migration warning', { error: error.message });
+    }
+
+    try {
+      const addShipmentViews = await import('./db/add-shipment-views.js');
+      await addShipmentViews.default();
+    } catch (error) {
+      logWarn('Shipment views migration warning', { error: error.message });
     }
 
     try {

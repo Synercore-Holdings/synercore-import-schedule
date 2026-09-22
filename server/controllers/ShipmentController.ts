@@ -303,7 +303,9 @@ export class ShipmentController {
 
     // Convert camelCase to snake_case for database
     const dbData: Record<string, any> = {
-      updated_at: new Date()
+      updated_at: new Date(),
+      updated_by: user?.id || null,
+      updated_by_username: user?.username || user?.email || null
     };
 
     if (data.latestStatus !== undefined) {
