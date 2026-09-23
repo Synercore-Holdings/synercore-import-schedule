@@ -187,7 +187,7 @@ const formatPercentChange = (value) => {
 const getProductTotals = (estimate) => {
   const products = estimate.products || [];
   const roeCustoms = parseFloat(estimate.roe_customs) || parseFloat(estimate.roe_origin) || 0;
-  const roeEur = parseFloat(estimate.roe_eur) || roeCustoms;
+  const roeEur = parseFloat(estimate.roe_eur) || 0;
   let totalWeight = 0;
   let totalCustomsValue = 0;
   let totalDuties = 0;
@@ -422,7 +422,7 @@ const buildFinalChargeRows = (landsideRows, customsRows) => {
 // Calculate per-product full cost breakdown (matches ImportCosting calculateProductAllocation)
 const getProductCostBreakdown = (product, estimate, totals, productTotals) => {
   const roeCustoms = parseFloat(estimate.roe_customs) || parseFloat(estimate.roe_origin) || 0;
-  const roeEur = parseFloat(estimate.roe_eur) || roeCustoms;
+  const roeEur = parseFloat(estimate.roe_eur) || 0;
   const weight = parseFloat(product.weight_kg) || 0;
   const invoiceValue = parseFloat(product.invoice_value) || 0;
   const dutyPercent = parseFloat(product.duty_percent) || 0;

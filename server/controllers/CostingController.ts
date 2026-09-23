@@ -195,7 +195,7 @@ export class CostingController {
   } {
     const products = this.getProducts(data);
     const roeCustoms = Number(data.roe_customs) || Number(data.roe_origin) || 0;
-    const roeEur = Number(data.roe_eur) || roeCustoms;
+    const roeEur = Number(data.roe_eur) || 0;
 
     return products.reduce((totals, product) => {
       const invoiceValue = Number(product.invoice_value) || 0;
