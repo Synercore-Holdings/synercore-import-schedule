@@ -340,7 +340,7 @@ export class CostingController {
     const totalInWarehouseCostZar = shippingToAllocateZar + customsSubtotalZar;
 
     // Total landed cost (product value + duties + transport)
-    const totalLandedCostZar = customsValueZar + dutiesZar + shippingToAllocateZar;
+    const totalLandedCostZar = customsValueZar + customsSubtotalZar + shippingToAllocateZar;
 
     // Cost per KG
     const allInWarehouseCostPerKgZar = totalGrossWeightKg > 0

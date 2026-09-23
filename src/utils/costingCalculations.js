@@ -654,7 +654,12 @@ export const calculateAllTotals = (data) => {
   // Total in warehouse cost (shipping + customs overhead) - VAT excluded
   const totalInWarehouseCostZar = shippingToAllocateZar + customsSubtotalZar;
 
-  // Total landed cost (product value + duties + allocated shipping) - true all-in cost.
+  // Total landed cost (product value + duties + customs declaration/agency fee +
+  // allocated shipping) - true all-in cost.
+  // Customs declaration + agency fee are included for imports (they're real,
+  // unavoidable costs of clearing the shipment). Excluded for exports: agency
+  // fee there is already folded into exportChargesSubtotalZar above, so adding
+  // it again here would double-count it.
   // Last mile charges are excluded here: they're only ever entered against the
   // specific (often partial) weight they actually moved — e.g. one outlying
   // delivery leg covering 5,000kg of a 25,000kg shipment — so folding them into
@@ -662,7 +667,8 @@ export const calculateAllTotals = (data) => {
   // charge that never applied to most of that weight. They're still counted in
   // total_shipping_cost_zar and reported at their own per-kg rate in the Last
   // Mile Charges table.
-  const totalLandedCostZar = customsItemsTotals.totalCustomsValue + customsItemsTotals.totalDuties + customsItemsTotals.totalSchedule1Duty + shippingToAllocateZar - lastMileChargesSubtotalZar;
+  const customsClearanceFeesZar = isExport ? 0 : (parseFloat(data.customs_declaration_zar) || 0) + agencyFeeZar;
+  const totalLandedCostZar = customsItemsTotals.totalCustomsValue + customsItemsTotals.totalDuties + customsItemsTotals.totalSchedule1Duty + customsClearanceFeesZar + shippingToAllocateZar - lastMileChargesSubtotalZar;
 
   // Cost per KG (based on total landed cost including product value, excluding last mile)
   const allInWarehouseCostPerKgZar = totalGrossWeightKg > 0

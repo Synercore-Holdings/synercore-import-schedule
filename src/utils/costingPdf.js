@@ -456,7 +456,16 @@ const getProductCostBreakdown = (product, estimate, totals, productTotals) => {
   } else {
     shippingToAllocate = Math.max((totals.total_shipping_cost_zar || 0) - (totals.last_mile_charges_subtotal_zar || 0), 0);
   }
-  const allocatedShipping = shippingToAllocate * weightRatio;
+  // Customs declaration + agency fee are estimate-level clearing costs (not
+  // per-product), so allocate them by weight ratio alongside shipping —
+  // matching calculateAllTotals' total_landed_cost_zar, which folds them in.
+  // Excluded for exports: there, agency fee is already counted inside the
+  // export charges that feed shippingToAllocate (see calculateAllTotals).
+  const isExportProduct = estimate.direction === 'export';
+  const customsFeesToAllocate = isExportProduct
+    ? 0
+    : (parseFloat(estimate.customs_declaration_zar) || 0) + (totals.agency_fee_zar || 0);
+  const allocatedShipping = (shippingToAllocate + customsFeesToAllocate) * weightRatio;
   const transportCostPerKg = weight > 0 ? allocatedShipping / weight : 0;
   const totalLanded = customsValue + totalDuties + allocatedShipping;
   const costPerKg = weight > 0 ? totalLanded / weight : 0;
@@ -638,7 +647,10 @@ const buildEstimateHeader = (doc, estimate, productTotals, totals) => {
     if (totals) {
       const incoTerms = (estimate.inco_terms || '').toUpperCase();
       const freightIncluded = ['CIF', 'CIP', 'CFR'].includes(incoTerms);
-      const shippingLabel = freightIncluded ? 'Alloc. Local Charges' : 'Alloc. Shipping';
+      const isExportAlloc = estimate.direction === 'export';
+      const shippingLabel = isExportAlloc
+        ? (freightIncluded ? 'Alloc. Local Charges' : 'Alloc. Shipping')
+        : 'Alloc. Charges';
 
       let sumWeight = 0, sumCustomsValue = 0, sumImportDuty = 0, sumSchedule1Duty = 0;
       let sumAllocatedShipping = 0, sumTotalLanded = 0;

@@ -453,7 +453,8 @@ describe('calculateAllTotals', () => {
     const result = calculateAllTotals(fobGoodsValueData);
     expect(result.origin_charge_zar).toBe(180000);
     expect(result.total_shipping_cost_zar).toBe(36000);
-    expect(result.total_landed_cost_zar).toBe(234000);
+    // 180000 customs value + 18000 duties + 500 customs declaration + 1669.5 agency fee + 36000 shipping
+    expect(result.total_landed_cost_zar).toBe(236169.5);
   });
 
   it('includes ocean freight when a copied CIF estimate is changed to FOB', () => {
@@ -474,9 +475,10 @@ describe('calculateAllTotals', () => {
     const cifResult = calculateAllTotals(copiedCifData);
     const fobResult = calculateAllTotals(changedToFobData);
 
-    expect(cifResult.total_landed_cost_zar).toBe(199500);
+    // Both include the same 500 customs declaration + 1669.5 agency fee (unaffected by incoterm)
+    expect(cifResult.total_landed_cost_zar).toBe(201669.5);
     expect(fobResult.total_shipping_cost_zar).toBe(37500);
-    expect(fobResult.total_landed_cost_zar).toBe(235500);
+    expect(fobResult.total_landed_cost_zar).toBe(237669.5);
   });
 
   it('keeps last mile charges out of total_landed_cost_zar even though total_shipping_cost_zar carries them', () => {
