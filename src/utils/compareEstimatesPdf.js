@@ -37,8 +37,9 @@ const fmtDate = (d) => {
  * @param {Array} options.compositionA - [{ label, color: '#rrggbb', value, pct }] for estA's cost composition bar
  * @param {Array} options.compositionB - same shape, for estB
  * @param {Array} options.rows - [{ label, headline, valA, valB, diff, pctDiff, aIsLower, bIsLower, perKgA, perKgB }]
+ * @param {Array} [options.notes] - [{ text, direction: 'up'|'down'|'info' }] from buildCompareEstimateNotes
  */
-export function generateCompareEstimatesPDF({ estA, estB, compositionA, compositionB, rows }) {
+export function generateCompareEstimatesPDF({ estA, estB, compositionA, compositionB, rows, notes = [] }) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
@@ -153,7 +154,7 @@ export function generateCompareEstimatesPDF({ estA, estB, compositionA, composit
 
   autoTable(doc, {
     startY: y,
-    head: [['Metric', 'Estimate A', 'Estimate B', 'Difference (B − A)']],
+    head: [['Metric', 'Estimate A', 'Estimate B', 'Difference (B - A)']],
     body: rows.map(row => [
       row.label,
       cellText(row.valA, row.aIsLower, row.perKgA),
@@ -191,6 +192,37 @@ export function generateCompareEstimatesPDF({ estA, estB, compositionA, composit
       }
     },
   });
+
+  // === Why the difference? -- same notes shown under the on-screen table ===
+  if (notes.length) {
+    const textX = 20;
+    const textW = pageWidth - textX - 14;
+    const bottomLimit = pageHeight - 16;
+    y = doc.lastAutoTable.finalY + 10;
+    if (y + 14 > bottomLimit) { doc.addPage(); y = 20; }
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(...NAVY);
+    doc.text('Why the difference?', 14, y);
+    y += 6;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    notes.forEach(note => {
+      const lines = doc.splitTextToSize(note.text, textW);
+      const blockH = lines.length * 3.8;
+      if (y + blockH > bottomLimit) { doc.addPage(); y = 20; }
+      const dot = note.direction === 'up' ? DIFF_UP_RED : note.direction === 'down' ? DIFF_DOWN_GREEN : [148, 163, 184];
+      doc.setFillColor(...dot);
+      doc.circle(16, y - 1, 1, 'F');
+      doc.setTextColor(55, 65, 81);
+      doc.text(lines, textX, y);
+      y += blockH + 2;
+    });
+    if (y + 5 > bottomLimit) { doc.addPage(); y = 20; }
+    doc.setFontSize(7);
+    doc.setTextColor(...BODY_MUTED);
+    doc.text('Bullet colour is B relative to A: red = B costs more, green = B costs less.', textX, y + 1);
+  }
 
   // Footer on every page, same wording as the rest of Import Costing's PDFs
   const pageCount = doc.internal.getNumberOfPages();

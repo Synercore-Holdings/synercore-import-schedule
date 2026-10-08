@@ -14,6 +14,7 @@ import {
 } from '../utils/costingCalculations';
 import { generateEstimatePDF, generateEstimatePDFBase64 } from '../utils/costingPdf';
 import { generateCompareEstimatesPDF } from '../utils/compareEstimatesPdf';
+import { buildCompareEstimateNotes } from '../utils/compareEstimatesNotes';
 import { useNotification } from '../contexts/NotificationContext';
 import CostingReportsPanel from './CostingReportsPanel';
 import CostingEstimatesTable from './CostingEstimatesTable';
@@ -505,6 +506,7 @@ function CompareEstimatesView({ estimates, onClose }) {
   };
   const compositionA = buildComposition(totalsA, estA);
   const compositionB = buildComposition(totalsB, estB);
+  const differenceNotes = buildCompareEstimateNotes(estA, estB, totalsA, totalsB);
 
   const handlePrintPDF = () => {
     if (!estA || !estB) return;
@@ -524,6 +526,7 @@ function CompareEstimatesView({ estimates, onClose }) {
       compositionA,
       compositionB,
       rows: comparisonRows,
+      notes: differenceNotes,
     });
   };
 
@@ -695,6 +698,22 @@ function CompareEstimatesView({ estimates, onClose }) {
                 </tbody>
               </table>
             </div>
+
+            {differenceNotes.length > 0 && (
+              <div style={{ marginTop: '1.5rem', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)', marginBottom: '10px' }}>Why the difference?</div>
+                <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {differenceNotes.map((note, idx) => (
+                    <li key={idx} style={{ fontSize: '0.82rem', color: note.direction === 'up' ? '#dc2626' : note.direction === 'down' ? '#16a34a' : '#94a3b8' }}>
+                      <span style={{ color: 'var(--text-700)' }}>{note.text}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-500)', marginTop: '10px' }}>
+                  Bullet colour is B relative to A: red = B costs more, green = B costs less.
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
