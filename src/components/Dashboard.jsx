@@ -40,7 +40,7 @@ const WAREHOUSE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
 const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32', '#64748b', '#64748b'];
 const STORED_AVERAGE_YEAR = 2026;
 
-function Dashboard({ shipments, onOpenLiveBoard }) {
+function Dashboard({ shipments, allShipments, onOpenLiveBoard }) {
   const navigate = useNavigate();
   const [detailShipment, setDetailShipment] = useState(null);
   const [warehouseData, setWarehouseData] = useState([]);
@@ -300,27 +300,40 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
       return ta.some(t => setB.has(t));
     };
 
-    const shipmentIds = new Set((shipments || []).map(s => s.id).filter(Boolean));
-    const shipmentList = shipments || [];
+    // Always match against every shipment, not the calendar-filtered set —
+    // the estimate side isn't date-filtered, so filtering only the shipment
+    // side made the % drop whenever a single month was selected.
+    const shipmentList = allShipments || shipments || [];
+    const shipmentIds = new Set(shipmentList.map(s => s.id).filter(Boolean));
 
-    let convertedCount = 0;
-    active.forEach(est => {
-      if (est.shipment_id && shipmentIds.has(est.shipment_id)) {
-        convertedCount++;
-        return;
-      }
+    const isConverted = (est) => {
+      if (est.shipment_id && shipmentIds.has(est.shipment_id)) return true;
       const products = Array.isArray(est.products) ? est.products : [];
       const relevant = shipmentList.filter(s => fuzzySupplierMatch(est.supplier_name, s.supplier));
-      const matched = relevant.some(s => products.some(p => fuzzyProductMatch(p.name, s.productName)));
-      if (matched) convertedCount++;
+      return relevant.some(s => products.some(p => fuzzyProductMatch(p.name, s.productName)));
+    };
+
+    // Repeat quotes for the same supplier + products (re-quotes, sea vs air)
+    // are one costing, not several — otherwise every unused alternative
+    // quote drags the % down. A group counts as converted if any of its
+    // estimates made it into the schedule.
+    const cleanSupplier = (s) => norm(s).replace(/[.,]/g, ' ').replace(LEGAL_SUFFIXES, ' ').replace(/\s+/g, ' ').trim();
+    const groups = new Map();
+    active.forEach(est => {
+      const products = (Array.isArray(est.products) ? est.products : [])
+        .map(p => norm(p.name)).filter(Boolean).sort().join('|');
+      const key = `${cleanSupplier(est.supplier_name)}::${products}`;
+      groups.set(key, groups.get(key) || isConverted(est));
     });
 
+    const totalCount = groups.size;
+    const convertedCount = [...groups.values()].filter(Boolean).length;
     return {
       convertedCount,
-      totalCount: active.length,
-      pct: (convertedCount / active.length) * 100,
+      totalCount,
+      pct: totalCount ? (convertedCount / totalCount) * 100 : 0,
     };
-  }, [costingEstimates, shipments]);
+  }, [costingEstimates, shipments, allShipments]);
 
   // Consolidated single-pass computation: stats, percentage deltas, and offsite average
   // Separate international and local shipments
@@ -1479,7 +1492,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
               className={`stat-card ${costingConversion.pct >= 50 ? 'ring-success' : 'ring-warning'}`}
               style={{ cursor: 'pointer' }}
               onClick={() => navigate('/costing')}
-              title="Costings matched to a shipment in the Shipping Schedule, by direct shipment link or by fuzzy supplier + product name matching"
+              title="Share of costings that became a real shipment in the Shipping Schedule. Repeat quotes for the same supplier + products (re-quotes, sea vs air) count as one costing. Matched by direct shipment link, or by similar supplier + product names. Not affected by the month/year filter."
             >
               <div style={{
                 width: 24, height: 24, borderRadius: '50%', display: 'flex',
@@ -1493,7 +1506,7 @@ function Dashboard({ shipments, onOpenLiveBoard }) {
                 Costings In Shipping Schedule
               </p>
               <p style={{ fontSize: 10, color: 'var(--text-500)', margin: '2px 0 0' }}>
-                {costingConversion.convertedCount} of {costingConversion.totalCount}
+                {costingConversion.convertedCount} of {costingConversion.totalCount} costings
               </p>
             </div>
           </div>

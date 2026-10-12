@@ -1048,7 +1048,7 @@ function App() {
             <Route path="/dashboard" element={
               <Suspense fallback={<PageLoader />}>
                 <ErrorBoundary>
-                  <Dashboard shipments={calendarFilteredShipments} onOpenLiveBoard={() => setLiveBoardOpen(true)} />
+                  <Dashboard shipments={calendarFilteredShipments} allShipments={shipments} onOpenLiveBoard={() => setLiveBoardOpen(true)} />
                 </ErrorBoundary>
               </Suspense>
             } />
