@@ -44,8 +44,24 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
       .sort((a, b) => b.diffDays - a.diffDays);
   }, [shipments]);
 
-  const needsReviewCount = lateRows.filter(a => !a.lateConfirmed).length;
-  const confirmedCount = lateRows.filter(a => a.lateConfirmed).length;
+  // Counts are per order, not per product line — an order with several late
+  // lines is one late shipment. It's confirmed only once every late line is.
+  const orderKey = (a) => a.orderRef || `id:${a.shipment.id}`;
+  const { needsReviewCount, confirmedCount } = useMemo(() => {
+    const byOrder = new Map();
+    lateRows.forEach(a => {
+      const key = orderKey(a);
+      byOrder.set(key, (byOrder.get(key) ?? true) && !!a.lateConfirmed);
+    });
+    const confirmed = [...byOrder.values()].filter(Boolean).length;
+    return { needsReviewCount: byOrder.size - confirmed, confirmedCount: confirmed };
+  }, [lateRows]);
+
+  const lateLinesPerOrder = useMemo(() => {
+    const counts = new Map();
+    lateRows.forEach(a => counts.set(orderKey(a), (counts.get(orderKey(a)) || 0) + 1));
+    return counts;
+  }, [lateRows]);
 
   const rows = lateRows.filter(a => {
     if (statusFilter === 'needs-review' && a.lateConfirmed) return false;
@@ -78,19 +94,25 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
     }
   }, [highlight, rows]);
 
+  // Confirming is an order-level decision, so it applies to every late line
+  // of the same order at once rather than making the user click each line.
   const updateLateReview = async (row, lateConfirmed) => {
-    setSavingId(row.shipment.id);
+    const key = orderKey(row);
+    const targets = lateRows.filter(a => orderKey(a) === key && !!a.lateConfirmed !== lateConfirmed);
+    setSavingId(key);
     try {
-      const res = await authFetch(getApiUrl(`/api/shipments/${row.shipment.id}/late-review`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lateConfirmed }),
-      });
-      if (res.ok) {
-        if (onRefresh) await onRefresh();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        showError(`Failed to update: ${err.error || 'Unknown error'}`);
+      const results = await Promise.all(targets.map(a =>
+        authFetch(getApiUrl(`/api/shipments/${a.shipment.id}/late-review`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lateConfirmed }),
+        })
+      ));
+      if (onRefresh) await onRefresh();
+      const failed = results.find(r => !r.ok);
+      if (failed) {
+        const err = await failed.json().catch(() => ({}));
+        showError(`Failed to update some line items of ${row.orderRef}: ${err.error || 'Unknown error'}`);
       }
     } catch (err) {
       showError('Failed to update. Please try again.');
@@ -271,6 +293,14 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
                     >
                       {row.orderRef}
                     </span>
+                    {lateLinesPerOrder.get(orderKey(row)) > 1 && (
+                      <span
+                        title="This order has several late line items — confirming one confirms them all, and the order counts once."
+                        style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-500)', cursor: 'help' }}
+                      >
+                        ({lateLinesPerOrder.get(orderKey(row))} lines)
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px' }}>{row.supplierName || '-'}</td>
                   <td style={{ padding: '12px 16px' }}>{row.productName || '-'}</td>
@@ -301,7 +331,7 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
                   <td style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     <button
                       onClick={() => setEditingShipment(row.shipment)}
-                      disabled={savingId === row.shipment.id}
+                      disabled={savingId === orderKey(row)}
                       className="btn btn-ghost"
                       style={{ fontSize: 12, padding: '4px 10px', marginRight: 6 }}
                     >
@@ -309,7 +339,7 @@ function LateShipmentsTracker({ shipments, onUpdateShipment, onRefresh, loading 
                     </button>
                     <button
                       onClick={() => updateLateReview(row, !row.lateConfirmed)}
-                      disabled={savingId === row.shipment.id}
+                      disabled={savingId === orderKey(row)}
                       style={{
                         fontSize: 12, padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
                         backgroundColor: row.lateConfirmed ? 'var(--surface-2)' : 'var(--navy-900)',
