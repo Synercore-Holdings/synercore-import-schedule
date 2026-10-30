@@ -89,9 +89,20 @@ const quoteText = (usd, eur) => {
   return parts.join(' + ') || 'nil';
 };
 
+// Whether an estimate has any cost quoted in this currency (products or *_usd / *_eur fields).
+const usesCurrency = (est, cur) => {
+  const suffix = `_${cur.toLowerCase()}`;
+  return (est.products || []).some(p => (p.currency || 'USD') === cur && num(p.invoice_value))
+    || Object.entries(est).some(([k, v]) => !k.startsWith('roe_') && k.endsWith(suffix) && num(v));
+};
+
 const effectText = ({ price, fx: fxEffect }) => {
-  if (Math.abs(price) < EPS || Math.abs(fxEffect) < EPS) return '';
-  return ` Of that, ${signed(price)} is the quoted price and ${signed(fxEffect)} is the exchange rate.`;
+  const hasPrice = Math.abs(price) >= EPS;
+  const hasFx = Math.abs(fxEffect) >= EPS;
+  if (hasPrice && hasFx) return ` Of that, ${signed(price)} is the quoted price and ${signed(fxEffect)} is the exchange rate.`;
+  if (hasFx) return ' The quoted price is unchanged, so all of this difference comes from the exchange rate.';
+  if (hasPrice) return ' The exchange rate had no effect here, so all of this difference is the quoted price.';
+  return '';
 };
 
 // Top-N line items that differ between two estimates, largest move first.
@@ -148,15 +159,24 @@ export function buildCompareEstimateNotes(estA, estB, totalsA, totalsB) {
   const dateA = new Date(estA.costing_date || estA.created_at);
   const dateB = new Date(estB.costing_date || estB.created_at);
   const daysApart = !isNaN(dateA) && !isNaN(dateB) ? Math.round(Math.abs(dateB - dateA) / 86400000) : 0;
+  // Only mention a currency if either estimate actually has costs in it; if we can't
+  // tell (no foreign amounts at all), fall back to showing both.
+  let showUsd = usesCurrency(estA, 'USD') || usesCurrency(estB, 'USD');
+  let showEur = usesCurrency(estA, 'EUR') || usesCurrency(estB, 'EUR');
+  if (!showUsd && !showEur) { showUsd = true; showEur = true; }
   const roeParts = [];
-  if (roeA && roeB && Math.abs(roeA - roeB) > 0.00005) {
-    roeParts.push(`USD/ZAR ${formatNumber(roeA, 4)} (A) vs ${formatNumber(roeB, 4)} (B), the rand is ${Math.abs(pct(roeA, roeB)).toFixed(1)}% ${roeB < roeA ? 'stronger' : 'weaker'} in B`);
+  let roeMove = 0;
+  const rateText = (pair, a, b) => `${pair} ${formatNumber(a, 4)} (A) vs ${formatNumber(b, 4)} (B), the rand is ${Math.abs(pct(a, b)).toFixed(1)}% ${b < a ? 'stronger' : 'weaker'} in B`;
+  if (showUsd && roeA && roeB && Math.abs(roeA - roeB) > 0.00005) {
+    roeParts.push(rateText('USD/ZAR', roeA, roeB));
+    roeMove += roeB - roeA;
   }
-  if (eurA && eurB && Math.abs(eurA - eurB) > 0.00005) {
-    roeParts.push(`EUR/ZAR ${formatNumber(eurA, 4)} (A) vs ${formatNumber(eurB, 4)} (B)`);
+  if (showEur && eurA && eurB && Math.abs(eurA - eurB) > 0.00005) {
+    roeParts.push(rateText('EUR/ZAR', eurA, eurB));
+    roeMove += eurB - eurA;
   }
   if (roeParts.length) {
-    push(`Exchange rate: ${roeParts.join('; ')}${daysApart ? ` (estimates are ${daysApart} days apart)` : ''}. This moves every foreign-currency cost even where the supplier and freight quotes are unchanged.`, roeB - roeA);
+    push(`Exchange rate: ${roeParts.join('; ')}${daysApart ? ` (estimates are ${daysApart} days apart)` : ''}. This moves every foreign-currency cost even where the supplier and freight quotes are unchanged.`, roeMove);
   }
 
   // --- Goods value (supplier price) ---
@@ -171,9 +191,11 @@ export function buildCompareEstimateNotes(estA, estB, totalsA, totalsB) {
     const perKg = (goodsEurA === 0 && goodsEurB === 0 && wA > 0 && wB > 0)
       ? ` (USD ${formatNumber(goodsUsdA / wA, 4)}/kg vs USD ${formatNumber(goodsUsdB / wB, 4)}/kg)`
       : '';
-    const supplierLine = foreignA || foreignB
-      ? `Supplier price ${quoteText(goodsUsdA, goodsEurA)} vs ${quoteText(goodsUsdB, goodsEurB)}${perKg}. `
-      : '';
+    const quoteA = quoteText(goodsUsdA, goodsEurA);
+    const quoteB = quoteText(goodsUsdB, goodsEurB);
+    const supplierLine = !(foreignA || foreignB) ? ''
+      : quoteA === quoteB ? `Supplier price unchanged at ${quoteA}${perKg}. `
+      : `Supplier price ${quoteA} vs ${quoteB}${perKg}. `;
     push(`Goods value: ${supplierLine}In rand, B is ${signed(goodsDiff)}${pctText(pct(num(totalsA.customs_value_zar), num(totalsB.customs_value_zar)))}.${effectText(split)}`, goodsDiff);
   }
   if (isFobType(estA) || isFobType(estB)) {
