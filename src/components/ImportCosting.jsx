@@ -449,6 +449,92 @@ const COMPARE_METRIC_ROWS = [
   { label: 'Import VAT', key: 'import_vat_zar' },
 ];
 
+// Type-to-search estimate picker. A native <select> only matches the start of
+// the option text and resets its type-ahead after a short pause, so typing a
+// supplier name jumped around instead of filtering.
+function EstimatePicker({ estimates, value, onChange, excludeId, optionLabel }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+
+  const selected = estimates.find(e => e.id === value) || null;
+  const matches = useMemo(() => {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    return estimates.filter(est => {
+      const text = optionLabel(est).toLowerCase();
+      return words.every(w => text.includes(w));
+    });
+  }, [estimates, query, optionLabel]);
+
+  const choose = (est) => {
+    if (!est || est.id === excludeId) return;
+    onChange(est.id);
+    setQuery('');
+    setOpen(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setOpen(true);
+      setHighlight(h => Math.min(h + 1, matches.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight(h => Math.max(h - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      choose(matches[highlight]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      setQuery('');
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={open ? query : (selected ? optionLabel(selected) : '')}
+        placeholder={selected ? optionLabel(selected) : 'Type to search reference, supplier or date...'}
+        onFocus={() => { setOpen(true); setQuery(''); setHighlight(0); }}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlight(0); }}
+        onKeyDown={handleKeyDown}
+        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
+      />
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, marginTop: '2px',
+          maxHeight: '320px', overflowY: 'auto', backgroundColor: 'white',
+          border: '1px solid var(--border)', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+        }}>
+          {matches.length === 0 ? (
+            <div style={{ padding: '8px 12px', color: 'var(--text-500)', fontSize: '0.85rem' }}>No estimates match "{query}"</div>
+          ) : matches.map((est, idx) => {
+            const disabled = est.id === excludeId;
+            return (
+              <div
+                key={est.id}
+                // mousedown (not click) so it fires before the input's blur closes the list
+                onMouseDown={(e) => { e.preventDefault(); choose(est); }}
+                onMouseEnter={() => setHighlight(idx)}
+                style={{
+                  padding: '8px 12px', fontSize: '0.85rem',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  color: disabled ? 'var(--text-500)' : 'var(--text-900)',
+                  backgroundColor: idx === highlight && !disabled ? '#e0f2fe' : est.id === value ? '#f1f5f9' : 'white',
+                }}
+              >
+                {optionLabel(est)}{disabled ? ' (selected as the other estimate)' : ''}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompareEstimatesView({ estimates, onClose }) {
   const [compareIdA, setCompareIdA] = useState('');
   const [compareIdB, setCompareIdB] = useState('');
@@ -577,29 +663,23 @@ function CompareEstimatesView({ estimates, onClose }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)' }}>Estimate A</label>
-            <select
+            <EstimatePicker
+              estimates={activeEstimates}
               value={compareIdA}
-              onChange={(e) => setCompareIdA(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}
-            >
-              <option value="">Select an estimate...</option>
-              {activeEstimates.map(est => (
-                <option key={est.id} value={est.id} disabled={est.id === compareIdB}>{optionLabel(est)}</option>
-              ))}
-            </select>
+              onChange={setCompareIdA}
+              excludeId={compareIdB}
+              optionLabel={optionLabel}
+            />
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-900)' }}>Estimate B</label>
-            <select
+            <EstimatePicker
+              estimates={activeEstimates}
               value={compareIdB}
-              onChange={(e) => setCompareIdB(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)' }}
-            >
-              <option value="">Select an estimate...</option>
-              {activeEstimates.map(est => (
-                <option key={est.id} value={est.id} disabled={est.id === compareIdA}>{optionLabel(est)}</option>
-              ))}
-            </select>
+              onChange={setCompareIdB}
+              excludeId={compareIdA}
+              optionLabel={optionLabel}
+            />
           </div>
         </div>
 
