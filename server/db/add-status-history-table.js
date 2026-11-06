@@ -28,7 +28,8 @@ async function createStatusHistoryTable() {
         changed_by_username VARCHAR(255),
         -- 'live' = recorded by the trigger; 'backfill' = reconstructed from
         -- audit_log (time = when it was saved); 'seed' = status the shipment
-        -- was already in when tracking started (time = estimate)
+        -- was already in when tracking started (time = estimate); 'manual' =
+        -- a missed status a user added afterwards
         source VARCHAR(20) NOT NULL DEFAULT 'live',
         -- Set when a user corrects changed_at (status often updated after the fact)
         original_changed_at TIMESTAMP WITH TIME ZONE,

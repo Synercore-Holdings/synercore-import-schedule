@@ -1,5 +1,6 @@
 import pool from '../connection.js';
 import { logError } from '../../utils/logger.js';
+import { AppError } from '../../utils/AppError.ts';
 
 export interface StatusHistoryEntry {
   id: number;
@@ -9,7 +10,7 @@ export interface StatusHistoryEntry {
   changed_at: string;
   changed_by: string | null;
   changed_by_username: string | null;
-  source: 'live' | 'backfill' | 'seed';
+  source: 'live' | 'backfill' | 'seed' | 'manual';
   original_changed_at: string | null;
   edited_by_username: string | null;
   edited_at: string | null;
@@ -62,6 +63,22 @@ export class StatusHistoryRepository {
     changedAt: Date,
     editedBy: string | null
   ): Promise<StatusHistoryEntry | null> {
+    // The newest entry is the current status — keep it newest, so an edit
+    // can't make an older status look current (or vice versa)
+    const order = await pool.query(
+      `SELECT id, to_status, changed_at FROM shipment_status_history
+       WHERE shipment_id = $1 ORDER BY changed_at DESC, id DESC LIMIT 2`,
+      [shipmentId]
+    );
+    const [newest, previous] = order.rows;
+    if (newest && newest.id === entryId) {
+      if (previous && changedAt.getTime() <= new Date(previous.changed_at).getTime()) {
+        throw AppError.badRequest(`The current status must stay after ${previous.to_status.replace(/_/g, ' ')} (${new Date(previous.changed_at).toISOString().slice(0, 16).replace('T', ' ')} UTC)`);
+      }
+    } else if (newest && changedAt.getTime() >= new Date(newest.changed_at).getTime()) {
+      throw AppError.badRequest('This time must be before the current status started');
+    }
+
     const result = await pool.query(
       `UPDATE shipment_status_history
        SET original_changed_at = COALESCE(original_changed_at, changed_at),
@@ -87,6 +104,55 @@ export class StatusHistoryRepository {
     );
 
     return result.rows[0];
+  }
+
+  /**
+   * Record a status the shipment went through that nobody set at the time
+   * (e.g. it was delayed at port for 3 days before berthing, found out
+   * afterwards). Must fall before the current-status entry so it can't
+   * displace the status the shipment is actually in now.
+   */
+  static async addManual(
+    shipmentId: string,
+    status: string,
+    changedAt: Date,
+    userId: string | null,
+    username: string | null
+  ): Promise<StatusHistoryEntry> {
+    const latest = await pool.query(
+      `SELECT changed_at FROM shipment_status_history
+       WHERE shipment_id = $1 ORDER BY changed_at DESC, id DESC LIMIT 1`,
+      [shipmentId]
+    );
+    if (!latest.rows[0]) {
+      throw AppError.badRequest('This shipment has no status history yet');
+    }
+    if (changedAt.getTime() >= new Date(latest.rows[0].changed_at).getTime()) {
+      throw AppError.badRequest('A missed status must be before the current status. To change the current status, use the status dropdown, then edit its time.');
+    }
+
+    const result = await pool.query(
+      `INSERT INTO shipment_status_history
+         (shipment_id, from_status, to_status, changed_at, changed_by, changed_by_username, source)
+       VALUES ($1::varchar,
+         (SELECT to_status FROM shipment_status_history
+          WHERE shipment_id = $1::varchar AND changed_at <= $3 ORDER BY changed_at DESC, id DESC LIMIT 1),
+         $2, $3, $4, $5, 'manual')
+       RETURNING *`,
+      [shipmentId, status, changedAt, userId, username]
+    );
+    return result.rows[0];
+  }
+
+  /**
+   * Remove a manually added entry (only those — recorded changes stay).
+   */
+  static async deleteManual(shipmentId: string, entryId: number): Promise<boolean> {
+    const result = await pool.query(
+      `DELETE FROM shipment_status_history WHERE id = $2 AND shipment_id = $1 AND source = 'manual'`,
+      [shipmentId, entryId]
+    );
+    return (result.rowCount || 0) > 0;
   }
 
   /**

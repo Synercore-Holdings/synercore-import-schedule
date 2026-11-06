@@ -56,6 +56,17 @@ describe('computePortTimes', () => {
     expect(computePortTimes(history, 'delayed_port', T0 + 2 * D).isEstimated).toBe(false);
   });
 
+  it('measures a delay added afterwards between two recorded statuses', () => {
+    const history = [
+      entry(1, 'moored', 0),
+      entry(2, 'berth_working', 5 * D),
+      entry(3, 'delayed_port', 1 * D, { source: 'manual' }),
+    ];
+    const r = computePortTimes(history, 'berth_working', T0 + 6 * D);
+    expect(r.portDelay).toMatchObject({ ms: 4 * D, ongoing: false });
+    expect(r.isEstimated).toBe(false);
+  });
+
   it('orders by changed_at, not by id (edited times)', () => {
     const history = [entry(2, 'berth_working', 2 * D), entry(1, 'delayed_port', 0)];
     const r = computePortTimes(history, 'berth_working', T0 + 3 * D);

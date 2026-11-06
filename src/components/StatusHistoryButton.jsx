@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { STATUS_LABELS } from '../types/shipment';
+import { STATUS_LABELS, ShipmentStatus } from '../types/shipment';
 import { computePortTimes, buildStatusSegments, formatDuration } from '../utils/portTimes';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
@@ -11,11 +11,28 @@ const POPOVER_EST_HEIGHT = 320;
 
 const statusLabel = (s) => STATUS_LABELS[s] || s || '—';
 
+// Statuses that can be added after the fact — the shipping schedule ones,
+// same list the server accepts (post-arrival steps come from the workflow)
+const ADDABLE_STATUSES = [
+  ShipmentStatus.DELAYED_PORT, ShipmentStatus.MOORED, ShipmentStatus.BERTH_WORKING, ShipmentStatus.BERTH_COMPLETE,
+  ShipmentStatus.GATED_IN_PORT, ShipmentStatus.DELAYED_CUSTOMS, ShipmentStatus.DELAYED_DOCUMENTS, ShipmentStatus.DELAYED_SUPPLIER,
+  ShipmentStatus.PLANNED_AIRFREIGHT, ShipmentStatus.PLANNED_SEAFREIGHT, ShipmentStatus.IN_TRANSIT_AIRFREIGHT,
+  ShipmentStatus.AIR_CUSTOMS_CLEARANCE, ShipmentStatus.IN_TRANSIT_ROADWAY, ShipmentStatus.IN_TRANSIT_SEAWAY,
+  ShipmentStatus.IN_TRANSIT_LAST_MILE, ShipmentStatus.ARRIVED_PTA, ShipmentStatus.ARRIVED_KLM,
+  ShipmentStatus.ARRIVED_OFFSITE, ShipmentStatus.CANCELLED,
+];
+
 // Local "YYYY-MM-DDTHH:mm" for <input type="datetime-local">
 const toLocalInputValue = (ms) => {
   const d = new Date(ms);
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// errorHandler sends { error: 'message' }; validation failures add details[]
+const apiErrorMessage = (body, fallback) => {
+  if (typeof body?.error === 'string') return body.error;
+  return body?.error?.message || body?.message || fallback;
 };
 
 const formatWhen = (ms) => new Date(ms).toLocaleString('en-ZA', {
@@ -44,6 +61,7 @@ function StatusHistoryButton({ shipment }) {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(null); // { id, value }
   const [saving, setSaving] = useState(false);
+  const [adding, setAdding] = useState(null); // { status, value }
   const btnRef = useRef(null);
   const popoverRef = useRef(null);
 
@@ -66,6 +84,7 @@ function StatusHistoryButton({ shipment }) {
       if (btnRef.current?.contains(e.target) || popoverRef.current?.contains(e.target)) return;
       setOpen(false);
       setEditing(null);
+      setAdding(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -75,6 +94,7 @@ function StatusHistoryButton({ shipment }) {
     if (open) {
       setOpen(false);
       setEditing(null);
+      setAdding(null);
       return;
     }
     const rect = btnRef.current.getBoundingClientRect();
@@ -101,7 +121,7 @@ function StatusHistoryButton({ shipment }) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || err.message || 'Failed to update time');
+        throw new Error(apiErrorMessage(err, 'Failed to update time'));
       }
       setEditing(null);
       showSuccess('Status time updated');
@@ -113,9 +133,54 @@ function StatusHistoryButton({ shipment }) {
     }
   };
 
+  const saveAdd = async () => {
+    if (!adding?.value) return;
+    const changedAt = new Date(adding.value);
+    if (Number.isNaN(changedAt.getTime())) return;
+    setSaving(true);
+    try {
+      const res = await authFetch(getApiUrl(`/api/shipments/${shipment.id}/status-history`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: adding.status, changedAt: changedAt.toISOString() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(apiErrorMessage(err, 'Failed to add status'));
+      }
+      setAdding(null);
+      showSuccess(`${statusLabel(adding.status)} added to history`);
+      await load();
+    } catch (err) {
+      showError(err.message || 'Failed to add status');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeManual = async (entryId) => {
+    setSaving(true);
+    try {
+      const res = await authFetch(getApiUrl(`/api/shipments/${shipment.id}/status-history/${entryId}`), { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to remove entry');
+      showSuccess('Entry removed');
+      await load();
+    } catch (err) {
+      showError(err.message || 'Failed to remove entry');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const now = Date.now();
   const segments = buildStatusSegments(entries, shipment.latestStatus, now);
   const port = computePortTimes(entries, shipment.latestStatus, now);
+  // A missed status has to sit before the newest entry (the current status)
+  const latestStart = segments.length ? segments[segments.length - 1].start : null;
+  const startAdding = () => setAdding({
+    status: ShipmentStatus.DELAYED_PORT,
+    value: toLocalInputValue((segments.length > 1 ? segments[segments.length - 2].start : latestStart) ?? now),
+  });
 
   return (
     <>
@@ -207,12 +272,25 @@ function StatusHistoryButton({ shipment }) {
                     >
                       ✎ edit
                     </button>
+                    {e.source === 'manual' && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => removeManual(e.id)}
+                        title="Remove this manually added entry"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0, fontSize: '0.7rem' }}
+                      >
+                        ✕ remove
+                      </button>
+                    )}
                   </div>
                 )}
                 {(e.source !== 'live' || e.edited_at) && (
                   <div style={{ color: e.source === 'seed' && !e.edited_at ? '#b45309' : 'var(--text-500)', fontSize: '0.65rem', fontStyle: 'italic' }}>
                     {e.edited_at
                       ? `Time corrected${e.edited_by_username ? ` by ${e.edited_by_username}` : ''} (was ${formatWhen(new Date(e.original_changed_at).getTime())})`
+                      : e.source === 'manual'
+                      ? 'Added afterwards — not set at the time'
                       : e.source === 'seed'
                       ? 'Estimated (status was set before tracking started) — edit if you know the real time'
                       : 'Reconstructed from audit log — time is when it was saved'}
@@ -221,6 +299,52 @@ function StatusHistoryButton({ shipment }) {
               </div>
             );
           })}
+
+          {!loading && segments.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--border, #eee)', paddingTop: '0.4rem', marginTop: '0.1rem' }}>
+              {adding ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.75rem' }}>Add a status that was missed</div>
+                  <select
+                    className="select"
+                    value={adding.status}
+                    onChange={(ev) => setAdding(a => ({ ...a, status: ev.target.value }))}
+                    style={{ fontSize: '0.75rem', padding: '2px 4px' }}
+                  >
+                    {ADDABLE_STATUSES.map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
+                  </select>
+                  <input
+                    type="datetime-local"
+                    className="input"
+                    value={adding.value}
+                    max={latestStart != null ? toLocalInputValue(latestStart - 60000) : undefined}
+                    onChange={(ev) => setAdding(a => ({ ...a, value: ev.target.value }))}
+                    style={{ fontSize: '0.75rem', padding: '2px 4px' }}
+                  />
+                  <div style={{ color: 'var(--text-500)', fontSize: '0.65rem' }}>
+                    When it started — must be before {statusLabel(segments[segments.length - 1].status)} ({formatWhen(latestStart)})
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button type="button" className="btn btn-primary" disabled={saving} onClick={saveAdd} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                      Add
+                    </button>
+                    <button type="button" className="btn" disabled={saving} onClick={() => setAdding(null)} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startAdding}
+                  title="E.g. the vessel was delayed at port but nobody set Delayed - Port at the time"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1976d2', padding: 0, fontSize: '0.75rem', fontWeight: 600 }}
+                >
+                  + Add missed status
+                </button>
+              )}
+            </div>
+          )}
         </div>,
         document.body
       )}

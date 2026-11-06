@@ -66,8 +66,8 @@ export function computePortTimes(history, currentStatus, now = Date.now()) {
     total,
     hasPortStatus: segs.some(s => PORT_STATUSES.includes(s.status)),
     // Any port-relevant time that came from the audit log or a tracking-start
-    // estimate rather than being recorded live (or corrected by a user)
-    isEstimated: [delay, berth, complete].some(s => s && s.entry.source && s.entry.source !== 'live' && !s.entry.edited_at),
+    // estimate rather than being recorded live or entered/corrected by a user
+    isEstimated: [delay, berth, complete].some(s => s && ['backfill', 'seed'].includes(s.entry.source) && !s.entry.edited_at),
   };
 }
 

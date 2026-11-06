@@ -57,6 +57,31 @@ const validateCreateShipment = [
   body('actualArrivalDate').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('Invalid actual arrival date')
 ];
 
+// Shipping schedule statuses — also the ones a user may add to status
+// history after the fact (post-arrival steps are recorded by the workflow)
+const MANUAL_HISTORY_STATUSES = [
+  'planned_airfreight',
+  'planned_seafreight',
+  'in_transit_airfreight',
+  'in_transit_seafreight',
+  'air_customs_clearance',
+  'in_transit_roadway',
+  'in_transit_seaway',
+  'in_transit_last_mile',
+  'moored',
+  'berth_working',
+  'berth_complete',
+  'gated_in_port',
+  'arrived_pta',
+  'arrived_klm',
+  'arrived_offsite',
+  'delayed_port',
+  'delayed_customs',
+  'delayed_documents',
+  'delayed_supplier',
+  'cancelled',
+];
+
 /**
  * Validation for update shipment
  */
@@ -64,27 +89,7 @@ const validateUpdateShipment = [
   body('latestStatus')
     .optional()
     .isIn([
-      // Shipping schedule statuses
-      'planned_airfreight',
-      'planned_seafreight',
-      'in_transit_airfreight',
-      'in_transit_seafreight',
-      'air_customs_clearance',
-      'in_transit_roadway',
-      'in_transit_seaway',
-      'in_transit_last_mile',
-      'moored',
-      'berth_working',
-      'berth_complete',
-      'gated_in_port',
-      'arrived_pta',
-      'arrived_klm',
-      'arrived_offsite',
-      'delayed_port',
-      'delayed_customs',
-      'delayed_documents',
-      'delayed_supplier',
-      'cancelled',
+      ...MANUAL_HISTORY_STATUSES,
       // Post-arrival workflow statuses
       'clearing_customs',
       'in_warehouse',
@@ -631,6 +636,62 @@ router.patch(
     res.status(200).json({
       data: entry
     });
+  })
+);
+
+/**
+ * POST /api/shipments/:id/status-history
+ * Add a status the shipment went through that wasn't set at the time
+ */
+router.post(
+  '/:id/status-history',
+  body('status').isIn(MANUAL_HISTORY_STATUSES).withMessage('Invalid status'),
+  body('changedAt').notEmpty().isISO8601().withMessage('changedAt must be a valid date'),
+  asyncHandler(async (req: BodyRequest<{ status: string; changedAt: string }>, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const changedAt = new Date(req.body.changedAt);
+    const user = (req as any).user;
+    const entry = await StatusHistoryRepository.addManual(
+      req.params.id!,
+      req.body.status,
+      changedAt,
+      user?.id || null,
+      user ? (user.username || user.email || null) : null
+    );
+
+    if (user) {
+      AuditRepository.logAudit(user.id, user.username || user.email, 'create', 'shipment_status_history', req.params.id!, `${entry.to_status} (added afterwards)`, {
+        entryId: entry.id, status: entry.to_status, changedAt: entry.changed_at
+      });
+    }
+
+    res.status(201).json({
+      data: entry
+    });
+  })
+);
+
+/**
+ * DELETE /api/shipments/:id/status-history/:entryId
+ * Remove a manually added status history entry
+ */
+router.delete(
+  '/:id/status-history/:entryId',
+  asyncHandler(async (req: Request, res: Response) => {
+    const deleted = await StatusHistoryRepository.deleteManual(req.params.id!, parseInt(req.params.entryId!, 10));
+    if (!deleted) {
+      throw AppError.notFound('Only manually added entries can be removed');
+    }
+
+    const user = (req as any).user;
+    if (user) {
+      AuditRepository.logAudit(user.id, user.username || user.email, 'delete', 'shipment_status_history', req.params.id!, 'manual status entry', {
+        entryId: req.params.entryId
+      });
+    }
+
+    res.status(200).json({ message: 'Status history entry removed' });
   })
 );
 
