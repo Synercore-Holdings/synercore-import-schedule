@@ -1125,6 +1125,15 @@ async function start() {
       logWarn('Retention scheduler warning', { error: error.message });
     }
 
+    // Promote Expected Next Vessel -> Vessel Name once its date arrives
+    try {
+      const { default: ExpectedVesselScheduler } = await import('./jobs/expectedVesselScheduler.js');
+      ExpectedVesselScheduler.initializeJobs();
+      logger.info('Expected vessel scheduler initialized');
+    } catch (error) {
+      logWarn('Expected vessel scheduler warning', { error: error.message });
+    }
+
     // Initialize Socket.io for real-time updates
 try {
   socketManager.initialize(httpServer);

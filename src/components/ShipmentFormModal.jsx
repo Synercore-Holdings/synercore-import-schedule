@@ -689,6 +689,11 @@ function ShipmentFormModal({ isOpen, onClose, onSubmit, onDelete, initialData, u
                 style={{ flex: 1 }}
               />
             </div>
+            {formData.expectedNextVessel && formData.expectedVesselDate && (
+              <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--text-500)' }}>
+                Switches to Vessel Name automatically on this date (within the hour) — or switch now:
+              </div>
+            )}
             {formData.expectedNextVessel && (
               <button
                 type="button"
