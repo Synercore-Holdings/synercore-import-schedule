@@ -23,6 +23,7 @@ export const VIEW_ROUTES = {
   'supplier-performance': '/supplier-performance',
   'late-shipments':       '/late-shipments',
   'forwarder-carrier':    '/forwarder-carrier',
+  'port-delays':          '/port-delays',
   receiving:             '/receiving',
   'dock-management':     '/dock-management',
   'local-receiving':     '/local-receiving',

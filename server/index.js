@@ -407,6 +407,13 @@ async function start() {
     }
 
     try {
+      const addStatusHistoryTable = await import('./db/add-status-history-table.js');
+      await addStatusHistoryTable.default();
+    } catch (error) {
+      logWarn('Status history migration warning', { error: error.message });
+    }
+
+    try {
       const addExpectedVesselFields = await import('./db/add-expected-vessel-fields.js');
       await addExpectedVesselFields.default();
     } catch (error) {

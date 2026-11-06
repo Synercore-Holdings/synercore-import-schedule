@@ -86,7 +86,8 @@ export class ShipmentRepository extends BaseRepository<Shipment> {
     'claim_updated_by',
     'late_confirmed',
     'late_confirmed_at',
-    'late_confirmed_by'
+    'late_confirmed_by',
+    'status_changed_at'
   ];
 
   /**

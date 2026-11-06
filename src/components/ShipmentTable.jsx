@@ -11,10 +11,18 @@ import ShipmentFormModal from './ShipmentFormModal';
 import OrderDetailsModal from './OrderDetailsModal';
 import ArchiveDialogs from './ArchiveDialogs';
 import { SkeletonShipmentTable } from './SkeletonLoaders';
+import StatusHistoryButton from './StatusHistoryButton';
+import { formatDuration } from '../utils/portTimes';
 import { getApiUrl } from '../config/api';
 import { authFetch } from '../utils/authFetch';
 import { copyToClipboard } from '../utils/clipboard';
 import { useNotification } from '../contexts/NotificationContext';
+
+// Statuses that show a live "time in this status" counter under the status badge
+const TIMED_STATUSES = [
+  ShipmentStatus.DELAYED_PORT, ShipmentStatus.DELAYED_CUSTOMS, ShipmentStatus.DELAYED_DOCUMENTS,
+  ShipmentStatus.DELAYED_SUPPLIER, ShipmentStatus.MOORED, ShipmentStatus.BERTH_WORKING,
+];
 
 // Compact relative time for the "Updated" column, e.g. "5m ago", "3h ago", "2d ago".
 const formatRelativeTime = (isoString) => {
@@ -829,6 +837,7 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                   </td>
                   <td><span style={{ fontSize: 13 }}>{shipment.finalPod}</span></td>
                   <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <select
                       value={shipment.latestStatus}
                       onChange={(e) => handleStatusUpdate(shipment.id, e.target.value)}
@@ -865,6 +874,19 @@ function ShipmentTable({ shipments, suppliers = [], onUpdateShipment, onDeleteSh
                       </optgroup>
                       <option value={ShipmentStatus.CANCELLED}>Cancelled</option>
                     </select>
+                    <StatusHistoryButton shipment={shipment} />
+                    </div>
+                    {TIMED_STATUSES.includes(shipment.latestStatus) && shipment.statusChangedAt && (
+                      <div
+                        title={`Since ${new Date(shipment.statusChangedAt).toLocaleString('en-ZA')}`}
+                        style={{
+                          fontSize: '0.7rem', fontWeight: 600, marginTop: 2, whiteSpace: 'nowrap',
+                          color: shipment.latestStatus === ShipmentStatus.DELAYED_PORT ? 'var(--danger)' : 'var(--text-500)',
+                        }}
+                      >
+                        ⏱ {formatDuration(Date.now() - new Date(shipment.statusChangedAt).getTime())}
+                      </div>
+                    )}
                   </td>
                   <td>
                     {!isDelayedStatus(shipment.latestStatus) && shipment.latestStatus !== 'cancelled' ? (() => {

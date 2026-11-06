@@ -19,6 +19,7 @@ import ShipmentController, {
 import type { BodyRequest } from '../types/api.js';
 import { AuditRepository } from '../db/repositories/AuditRepository.ts';
 import { VesselHistoryRepository } from '../db/repositories/VesselHistoryRepository.ts';
+import { StatusHistoryRepository } from '../db/repositories/StatusHistoryRepository.ts';
 
 const damagePhotoUpload = createMultipleFileUpload();
 
@@ -514,6 +515,19 @@ router.get(
 );
 
 /**
+ * GET /api/shipments/port-delays
+ * Status history for every shipment that has been through a port status
+ * (moored / delayed at port / berth working / berth complete)
+ */
+router.get(
+  '/port-delays',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const rows = await StatusHistoryRepository.getPortHistory();
+    res.status(200).json({ data: rows });
+  })
+);
+
+/**
  * GET /api/shipments/:id
  * Get single shipment by ID
  */
@@ -568,6 +582,59 @@ router.get(
 );
 
 /**
+ * GET /api/shipments/:id/status-history
+ * Every status change recorded for a shipment, oldest first
+ */
+router.get(
+  '/:id/status-history',
+  asyncHandler(async (req: Request, res: Response) => {
+    const history = await StatusHistoryRepository.getByShipment(req.params.id!);
+
+    res.status(200).json({
+      data: history
+    });
+  })
+);
+
+/**
+ * PATCH /api/shipments/:id/status-history/:entryId
+ * Correct when a status change actually happened
+ */
+router.patch(
+  '/:id/status-history/:entryId',
+  body('changedAt').notEmpty().isISO8601().withMessage('changedAt must be a valid date'),
+  asyncHandler(async (req: BodyRequest<{ changedAt: string }>, res: Response) => {
+    if (!handleValidationErrors(req, res)) return;
+
+    const changedAt = new Date(req.body.changedAt);
+    if (changedAt.getTime() > Date.now() + 60_000) {
+      throw AppError.badRequest('Status change time cannot be in the future');
+    }
+
+    const user = (req as any).user;
+    const entry = await StatusHistoryRepository.updateChangedAt(
+      req.params.id!,
+      parseInt(req.params.entryId!, 10),
+      changedAt,
+      user ? (user.username || user.email || null) : null
+    );
+    if (!entry) {
+      throw AppError.notFound('Status history entry not found');
+    }
+
+    if (user) {
+      AuditRepository.logAudit(user.id, user.username || user.email, 'update', 'shipment_status_history', req.params.id!, `${entry.to_status} time`, {
+        entryId: entry.id, changedAt: entry.changed_at, originalChangedAt: entry.original_changed_at
+      });
+    }
+
+    res.status(200).json({
+      data: entry
+    });
+  })
+);
+
+/**
  * PATCH /api/shipments/:id/status
  * Update shipment status
  */
@@ -610,6 +677,11 @@ router.patch(
       req.body.status as any,
       req.body.notes
     );
+
+    const user = (req as any).user;
+    if (user) {
+      await StatusHistoryRepository.attributeLatest(req.params.id!, user.id, user.username || user.email || null);
+    }
 
     res.status(200).json({
       data: shipment,

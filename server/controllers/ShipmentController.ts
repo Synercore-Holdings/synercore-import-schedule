@@ -9,6 +9,7 @@ import type { Shipment, ShipmentStatus } from '../types/index.js';
 import { AppError } from '../utils/AppError.ts';
 import { shipmentRepository } from '../db/repositories/index.js';
 import { VesselHistoryRepository } from '../db/repositories/VesselHistoryRepository.ts';
+import { StatusHistoryRepository } from '../db/repositories/StatusHistoryRepository.ts';
 import archiveService from '../services/archiveService.js';
 import { getPool, queryAll, queryOne, transaction } from '../db/connection.js';
 
@@ -422,6 +423,11 @@ export class ShipmentController {
         user?.id || null,
         user?.username || user?.email || null
       );
+    }
+
+    // The status-history trigger already logged the change; record who made it.
+    if (user && dbData.latest_status !== undefined && dbData.latest_status !== existing.latest_status) {
+      await StatusHistoryRepository.attributeLatest(id, user.id, user.username || user.email || null);
     }
 
     return shipment;

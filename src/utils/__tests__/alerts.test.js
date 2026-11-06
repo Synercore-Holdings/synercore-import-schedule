@@ -49,6 +49,13 @@ describe('computeShipmentAlerts', () => {
     expect(delayed.description).toContain('port congestion');
   });
 
+  it('says how long a shipment has been delayed when statusChangedAt is known', () => {
+    const statusChangedAt = new Date(Date.now() - 3.5 * 86400000).toISOString();
+    const alerts = computeShipmentAlerts([makeShipment({ latestStatus: 'delayed_port', statusChangedAt })]);
+    const delayed = alerts.find((a) => a.title === 'Delayed Shipment');
+    expect(delayed.description).toContain('for 3 days');
+  });
+
   it('generates critical alert for delayed_customs', () => {
     const shipments = [makeShipment({ latestStatus: 'delayed_customs' })];
     const alerts = computeShipmentAlerts(shipments);

@@ -143,6 +143,8 @@ export interface Shipment {
   late_confirmed?: boolean;
   late_confirmed_at?: Date;
   late_confirmed_by?: string;
+  // When latest_status last changed — maintained by a DB trigger
+  status_changed_at?: Date | null;
   // Reminder fields
   reminder_date?: string | null;
   reminder_note?: string | null;

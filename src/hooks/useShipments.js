@@ -155,6 +155,7 @@ export function useShipments() {
         releaseNumber: s.release_number || s.releaseNumber || '',
         asoNumber: s.aso_number || s.asoNumber || '',
         updatedByUsername: s.updated_by_username || s.updatedByUsername || '',
+        statusChangedAt: s.status_changed_at || s.statusChangedAt || null,
       }));
 
       setShipments(normalized);

@@ -40,6 +40,7 @@ const VIEW_TO_SECTION = {
   'supplier-performance': 'reports',
   'late-shipments': 'reports',
   'forwarder-carrier': 'reports',
+  'port-delays': 'reports',
   audit: 'reports',
 };
 
@@ -68,6 +69,7 @@ const VIEW_TITLES = {
   'supplier-performance': 'Supplier Performance',
   'late-shipments': 'Late Shipments',
   'forwarder-carrier': 'Forwarder vs Carrier',
+  'port-delays': 'Port Delays',
   'costing-requests': 'Cost Requests',
   'quote-requests': 'Quote Requests',
   users: 'User Management',
@@ -100,6 +102,7 @@ const AuditLog = lazy(() => import('./components/AuditLog'));
 const BolAudit = lazy(() => import('./components/BolAudit'));
 const SupplierPerformance = lazy(() => import('./components/SupplierPerformance'));
 const ForwarderCarrierReport = lazy(() => import('./components/ForwarderCarrierReport'));
+const PortDelayReport = lazy(() => import('./components/PortDelayReport'));
 const GoodsReceiving = lazy(() => import('./components/GoodsReceiving'));
 const DockManagement = lazy(() => import('./components/DockManagement'));
 const LocalReceivingSchedule = lazy(() => import('./components/LocalReceivingSchedule'));
@@ -126,7 +129,7 @@ import {
   LayoutDashboard, Building2, Ship, Truck, Repeat, ClipboardList, Factory, Store,
   Package, Wallet, BarChart3, TrendingUp, Target, Inbox, ScrollText, FileText,
   Users, LogOut, Moon, Sun, BookOpen, Bell, Globe, Newspaper, MapPin, Settings as SettingsIcon,
-  Waves, ShieldAlert, Send, Clock,
+  Waves, ShieldAlert, Send, Clock, Anchor,
 } from 'lucide-react';
 import './theme.css';
 
@@ -496,6 +499,7 @@ function App() {
     if (path === '/supplier-performance') return 'supplier-performance';
     if (path === '/late-shipments') return 'late-shipments';
     if (path === '/forwarder-carrier') return 'forwarder-carrier';
+    if (path === '/port-delays') return 'port-delays';
     if (path === '/users') return 'users';
     if (path === '/audit') return 'audit';
     if (path === '/receiving') return 'receiving';
@@ -685,6 +689,7 @@ function App() {
             supplierPerformance: { label: 'Supplier Performance', icon: Target, view: 'supplier-performance' },
             lateShipments: { label: 'Late Shipments', icon: Clock, view: 'late-shipments', badge: lateShipmentsCount, badgeType: 'danger' },
             forwarderCarrier: { label: 'Forwarder vs Carrier', icon: Waves, view: 'forwarder-carrier' },
+            portDelays: { label: 'Port Delays', icon: Anchor, view: 'port-delays' },
             receiving: { label: 'Goods Receiving', icon: Inbox, view: 'receiving' },
             dockManagement: { label: 'Dock Management', icon: Truck, view: 'dock-management' },
             bolAudit: { label: 'BOL Audit', icon: ScrollText, view: 'bol-audit' },
@@ -796,7 +801,7 @@ function App() {
               {renderSection('Warehouse', 'warehouse', ['receiving', 'dockManagement', 'stored', 'rejections'])}
               {renderSection('Warehouse Capacity per site', 'warehouseCapacitySites', ['capacityPretoria', 'capacityKlapmuts', 'capacityOffsite'])}
               {renderSection('Finance', 'finance', ['rates', 'costing', 'exportCosting', 'costingRequests', 'quoteRequests'])}
-              {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'lateShipments', 'forwarderCarrier', 'audit'])}
+              {renderSection('Reports', 'reports', ['reports', 'advancedReports', 'supplierPerformance', 'lateShipments', 'forwarderCarrier', 'portDelays', 'audit'])}
 
               {!sidebarCollapsed && (!q || resourcesVisible.length > 0) && (
                 <div className="sidebar-resources">
@@ -1137,6 +1142,9 @@ function App() {
             } />
             <Route path="/forwarder-carrier" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><ForwarderCarrierReport shipments={shipments} suppliers={suppliers} /></ErrorBoundary></Suspense>
+            } />
+            <Route path="/port-delays" element={
+              <Suspense fallback={<PageLoader />}><ErrorBoundary><PortDelayReport /></ErrorBoundary></Suspense>
             } />
             <Route path="/bol-audit" element={
               <Suspense fallback={<PageLoader />}><ErrorBoundary><BolAudit /></ErrorBoundary></Suspense>

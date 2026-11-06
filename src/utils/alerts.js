@@ -69,11 +69,14 @@ export function computeShipmentAlerts(shipments) {
         'delayed_supplier': 'supplier delay'
       };
       const reason = delayReasons[s.latestStatus] || 'unknown reason';
+      const delayedSince = s.statusChangedAt ? new Date(s.statusChangedAt).getTime() : NaN;
+      const delayedDays = Number.isNaN(delayedSince) ? null : Math.floor((now - delayedSince) / 86400000);
+      const forHowLong = delayedDays == null ? '' : delayedDays < 1 ? ' since today' : ` for ${delayedDays} day${delayedDays !== 1 ? 's' : ''}`;
       alerts.push({
         ...base,
         severity: 'critical',
         title: 'Delayed Shipment',
-        description: `${s.supplier} - ${s.productName || s.orderRef} is delayed (${reason}) and requires attention.`
+        description: `${s.supplier} - ${s.productName || s.orderRef} has been delayed (${reason})${forHowLong} and requires attention.`
       });
     }
 
