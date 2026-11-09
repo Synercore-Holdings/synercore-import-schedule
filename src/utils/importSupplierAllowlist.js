@@ -1,34 +1,32 @@
-// Only these suppliers may come in through the international Excel import —
-// every other row in the sheet is ignored. Matching is keyword-based on a
-// normalized name (uppercase, accents stripped, punctuation removed) because
-// the spreadsheets spell names inconsistently ("Qida Chemical Co. Ltd" vs
-// "QIDA CHEMICAL", "AROMSA BESİN ... A.Ş." vs "AROMSA BESIN ... A.S.").
-export const IMPORT_ALLOWED_SUPPLIERS = [
-  { name: 'SACCO S.R.L', keys: ['SACCO'] },
-  { name: 'AROMSA BESIN AROMA VE KATKI MADDELERI SAN. VE TIC. A.S.', keys: ['AROMSA'] },
-  { name: 'Qida Chemical Co. Ltd', keys: ['QIDA'] },
-  { name: 'GBH Bioscience', keys: ['GBH'] },
-  { name: 'ECOLEX SDN. BHD', keys: ['ECOLEX'] },
-  { name: 'DSM Nutritional Products SA (PTY) Ltd', keys: ['DSM'] },
-  { name: 'JRS Silvateam Ingredients S.R.L.', keys: ['SILVATEAM', 'JRS'] },
-  { name: 'TRISTAR GLOBAL SDN. BHD', keys: ['TRISTAR'] },
-  { name: 'MARCEL CARRAGEENAN', keys: ['MARCEL'] },
-  { name: 'KMC', keys: ['KMC'] },
-  { name: 'Caglificio Clerici', keys: ['CAGLIFICIO', 'CLERICI'] },
-  { name: 'Delta Iris', keys: ['DELTA IRIS'] },
-];
+// The shipment Excel import only accepts rows whose supplier is set up in
+// Supplier Management — every other row is ignored. To allow a new supplier,
+// add it in Supplier Management first, then import.
+//
+// Names are compared after normalizing (uppercase, accents stripped,
+// punctuation and legal suffixes like "Co. Ltd" / "(PTY)" / "SDN. BHD" /
+// "S.R.L" / "A.Ş." removed), and a match is a whole-word containment either
+// way, so "Qida Chemical Co. Ltd" matches "QIDA CHEMICAL" and
+// "JRS Silvateam Ingredients S.R.L." matches "Silvateam".
 
-const normalize = (s) =>
+const LEGAL_SUFFIXES = /\b(PTY|PROPRIETARY|LTD|LIMITED|CO|COMPANY|CC|INC|LLC|SA|S A|SRL|S R L|SPA|GMBH|BV|AS|A S|SDN|BHD|PLC|SAN VE TIC|TIC|SAN)\b/g;
+
+export const normalizeSupplierName = (s) =>
   String(s || '')
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(LEGAL_SUFFIXES, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
-export function isAllowedImportSupplier(supplier) {
-  const n = normalize(supplier);
-  if (!n) return false;
-  const padded = ` ${n} `;
-  return IMPORT_ALLOWED_SUPPLIERS.some(s => s.keys.some(k => padded.includes(` ${k} `)));
+// Returns (rowSupplierName) => boolean for the given list of known supplier names.
+export function buildSupplierMatcher(supplierNames) {
+  const keys = [...new Set((supplierNames || []).map(normalizeSupplierName).filter(k => k.length >= 3))];
+  return (rowSupplier) => {
+    const n = normalizeSupplierName(rowSupplier);
+    if (!n) return false;
+    const padded = ` ${n} `;
+    return keys.some(k => padded.includes(` ${k} `) || (n.length >= 4 && ` ${k} `.includes(padded)));
+  };
 }

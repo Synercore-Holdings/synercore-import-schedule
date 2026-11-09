@@ -2,7 +2,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { authFetch } from '../utils/authFetch';
 import { ExcelProcessor } from '../utils/excelProcessor';
-import { isAllowedImportSupplier } from '../utils/importSupplierAllowlist';
+import { buildSupplierMatcher } from '../utils/importSupplierAllowlist';
 import { getApiUrl } from '../config/api';
 import { authUtils } from '../utils/auth';
 import { useNotification } from '../contexts/NotificationContext';
@@ -254,13 +254,23 @@ export function useShipments() {
       const rowsInFile = processedShipments.length;
 
       // Supplier filter: local imports drop the international suppliers;
-      // international imports keep only the approved supplier list.
-      const keepRow = shipmentType === 'local'
-        ? (s) => {
-            const sup = (s.supplier || '').trim().toUpperCase();
-            return !EXCLUDED_SUPPLIERS.some(exc => sup.includes(exc) || exc.includes(sup));
-          }
-        : (s) => isAllowedImportSupplier(s.supplier);
+      // international imports keep only suppliers set up in Supplier Management
+      // (fetched fresh so a supplier added a moment ago counts).
+      let keepRow;
+      if (shipmentType === 'local') {
+        keepRow = (s) => {
+          const sup = (s.supplier || '').trim().toUpperCase();
+          return !EXCLUDED_SUPPLIERS.some(exc => sup.includes(exc) || exc.includes(sup));
+        };
+      } else {
+        const supRes = await authFetch(getApiUrl('/api/suppliers'));
+        if (!supRes.ok) throw new Error('Could not load the supplier list to filter the import');
+        const supJson = await supRes.json();
+        const supplierNames = (supJson.data || supJson || []).map(s => s.name).filter(Boolean);
+        if (supplierNames.length === 0) throw new Error('No suppliers set up in Supplier Management, nothing can be imported');
+        const isKnownSupplier = buildSupplierMatcher(supplierNames);
+        keepRow = (s) => isKnownSupplier(s.supplier);
+      }
       const kept = [];
       const ignoredBySupplier = new Map();
       let emptyFiltered = 0;
@@ -278,7 +288,7 @@ export function useShipments() {
       if (processedShipments.length === 0) {
         throw new Error(shipmentType === 'local'
           ? 'No local suppliers found after filtering international suppliers'
-          : 'No rows from approved import suppliers found in this file');
+          : 'None of the suppliers in this file are set up in Supplier Management');
       }
 
       const toPlain = (s) => {
@@ -338,8 +348,13 @@ export function useShipments() {
 
       const result = await response.json();
 
-      // Auto-create suppliers from imported shipments
-      const uniqueSuppliers = [...new Set(processedShipments.map(s => s.supplier).filter(Boolean))];
+      // Auto-create suppliers from imported shipments — local imports only.
+      // International imports only accept suppliers that already exist in
+      // Supplier Management, so there's nothing to create (and creating would
+      // add spelling variants as duplicate suppliers).
+      const uniqueSuppliers = shipmentType === 'local' && typeof handleAddSupplier === 'function'
+        ? [...new Set(processedShipments.map(s => s.supplier).filter(Boolean))]
+        : [];
       for (const supplierName of uniqueSuppliers) {
         try {
           await handleAddSupplier({ name: supplierName });
@@ -355,7 +370,7 @@ export function useShipments() {
         emptyRows: (result.emptyRows || 0) + emptyFiltered,
         ignored: ignoredRows,
         ignoredSuppliers,
-        ignoredReason: shipmentType === 'local' ? 'international supplier' : 'not an approved supplier',
+        ignoredReason: shipmentType === 'local' ? 'international supplier' : 'not in Supplier Management',
       });
 
       // Also show a quick toast

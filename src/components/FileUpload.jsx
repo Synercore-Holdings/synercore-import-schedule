@@ -3,10 +3,10 @@ import React, { useState, useRef } from 'react';
 import { ExcelProcessor } from '../utils/excelProcessor';
 import ImportValidationPreview from './ImportValidationPreview';
 import { useNotification } from '../contexts/NotificationContext';
-import { IMPORT_ALLOWED_SUPPLIERS, isAllowedImportSupplier } from '../utils/importSupplierAllowlist';
+import { buildSupplierMatcher } from '../utils/importSupplierAllowlist';
 import './FileUpload.css'; // ← add this
 
-function FileUpload({ onFileUpload, loading }) {
+function FileUpload({ onFileUpload, loading, suppliers = [] }) {
   const { showError, showWarning } = useNotification();
   const [isOpen, setIsOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -33,11 +33,13 @@ function FileUpload({ onFileUpload, loading }) {
       setValidationLoading(true);
       const result = await ExcelProcessor.parseExcelFileWithValidation(file);
 
-      // Only approved import suppliers — every other supplier row is ignored
-      if (result.validRows && result.validRows.length > 0) {
+      // Only suppliers set up in Supplier Management — every other row is ignored.
+      // (The import itself re-checks against a fresh supplier list.)
+      if (result.validRows && result.validRows.length > 0 && suppliers.length > 0) {
+        const isKnownSupplier = buildSupplierMatcher(suppliers.map(s => s.name));
         const before = result.validRows.length;
         result.validRows = result.validRows.filter(row =>
-          isAllowedImportSupplier(row.supplier || row.SUPPLIER || row.Supplier || ''));
+          isKnownSupplier(row.supplier || row.SUPPLIER || row.Supplier || ''));
         if (result.validRows.length < before) result.preview = result.validRows.slice(0, 5);
       }
 
@@ -153,7 +155,7 @@ function FileUpload({ onFileUpload, loading }) {
                 QUANTITY, PALLET QTY, RECEIVING WAREHOUSE, FORWARDING AGENT
               </p>
               <p style={{ color: 'var(--text-500)', fontSize: '0.8rem' }}>
-                <strong>Note:</strong> Only these suppliers are imported, all other rows are ignored: {IMPORT_ALLOWED_SUPPLIERS.map(s => s.name).join(', ')}.
+                <strong>Note:</strong> Only suppliers set up in Supplier Management ({suppliers.length}) are imported, all other rows are ignored. To import a new supplier, add it in Supplier Management first.
               </p>
             </div>
           </div>

@@ -234,7 +234,7 @@ function ShippingView({ shipments, suppliers = [], onFileUpload, onUpdateShipmen
         </div>
       )}
 
-      <FileUpload onFileUpload={onFileUpload} loading={loading} />
+      <FileUpload onFileUpload={onFileUpload} loading={loading} suppliers={suppliers} />
 
       <ShipmentTable
         shipments={shippingShipments}
