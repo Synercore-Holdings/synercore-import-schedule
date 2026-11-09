@@ -251,18 +251,34 @@ export function useShipments() {
 
       let processedShipments = await ExcelProcessor.parseExcelFile(file);
       if (processedShipments.length === 0) throw new Error('No data found in Excel file');
+      const rowsInFile = processedShipments.length;
 
-      // Filter out international suppliers for local imports
-      if (shipmentType === 'local') {
-        processedShipments = processedShipments.filter(s => {
-          const sup = (s.supplier || '').trim().toUpperCase();
-          return !EXCLUDED_SUPPLIERS.some(exc => sup.includes(exc) || exc.includes(sup));
-        });
-        if (processedShipments.length === 0) throw new Error('No local suppliers found after filtering international suppliers');
-      } else {
-        // International imports: only the approved supplier list, ignore everyone else
-        processedShipments = processedShipments.filter(s => isAllowedImportSupplier(s.supplier));
-        if (processedShipments.length === 0) throw new Error('No rows from approved import suppliers found in this file');
+      // Supplier filter: local imports drop the international suppliers;
+      // international imports keep only the approved supplier list.
+      const keepRow = shipmentType === 'local'
+        ? (s) => {
+            const sup = (s.supplier || '').trim().toUpperCase();
+            return !EXCLUDED_SUPPLIERS.some(exc => sup.includes(exc) || exc.includes(sup));
+          }
+        : (s) => isAllowedImportSupplier(s.supplier);
+      const kept = [];
+      const ignoredBySupplier = new Map();
+      let emptyFiltered = 0;
+      for (const s of processedShipments) {
+        if (keepRow(s)) { kept.push(s); continue; }
+        const name = (s.supplier || '').trim();
+        if (!name) { emptyFiltered++; continue; }
+        ignoredBySupplier.set(name, (ignoredBySupplier.get(name) || 0) + 1);
+      }
+      processedShipments = kept;
+      const ignoredRows = rowsInFile - kept.length - emptyFiltered;
+      const ignoredSuppliers = [...ignoredBySupplier.entries()]
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      if (processedShipments.length === 0) {
+        throw new Error(shipmentType === 'local'
+          ? 'No local suppliers found after filtering international suppliers'
+          : 'No rows from approved import suppliers found in this file');
       }
 
       const toPlain = (s) => {
@@ -333,19 +349,22 @@ export function useShipments() {
       }
 
       // Store detailed import result for summary modal
-      setImportResult(result);
+      setImportResult({
+        ...result,
+        totalInFile: rowsInFile,
+        emptyRows: (result.emptyRows || 0) + emptyFiltered,
+        ignored: ignoredRows,
+        ignoredSuppliers,
+        ignoredReason: shipmentType === 'local' ? 'international supplier' : 'not an approved supplier',
+      });
 
       // Also show a quick toast
       const parts = [];
       if (result.imported > 0) parts.push(`${result.imported} new shipments imported`);
-      if (result.skipped > 0) parts.push(`${result.skipped} duplicates skipped`);
-      if (result.emptyRows > 0) parts.push(`${result.emptyRows} empty rows ignored`);
+      if (result.skipped > 0) parts.push(`${result.skipped} already in system`);
+      if (ignoredRows > 0) parts.push(`${ignoredRows} from other suppliers ignored`);
       if (parts.length === 0) parts.push('No new shipments to import');
-      if (result.skipped > 0) {
-        showError(parts.join(', '));
-      } else {
-        showSuccess(parts.join(', '));
-      }
+      showSuccess(parts.join(', '));
       await fetchShipments();
 
       // Ensure palletQty is preserved in UI after import (match by orderRef)

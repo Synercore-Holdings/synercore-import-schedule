@@ -77,6 +77,13 @@ const VIEW_TITLES = {
 };
 
 // Lazy-loaded pages (code-split for faster initial load)
+// Collapse repeated order refs (one per product line) into [ref, lineCount] pairs, preserving first-seen order
+const groupRefs = (refs) => {
+  const m = new Map();
+  for (const r of refs) m.set(r, (m.get(r) || 0) + 1);
+  return [...m.entries()];
+};
+
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const ArchiveView = lazy(() => import('./components/ArchiveView'));
 const ReportsView = lazy(() => import('./components/ReportsView'));
@@ -1234,20 +1241,43 @@ function App() {
             </div>
 
             {/* Stats tiles */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f0fdf4', textAlign: 'center', border: '1px solid #bbf7d0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ padding: '12px 8px', borderRadius: '8px', backgroundColor: '#f0fdf4', textAlign: 'center', border: '1px solid #bbf7d0' }}>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#16a34a' }}>{importResult.imported}</div>
                 <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '600' }}>Imported</div>
               </div>
-              <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: importResult.skipped > 0 ? '#fef2f2' : '#f9fafb', textAlign: 'center', border: `1px solid ${importResult.skipped > 0 ? '#fecaca' : '#e5e7eb'}` }}>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: importResult.skipped > 0 ? '#dc2626' : '#6b7280' }}>{importResult.skipped}</div>
-                <div style={{ fontSize: '0.75rem', color: importResult.skipped > 0 ? '#991b1b' : '#6b7280', fontWeight: '600' }}>Duplicates Skipped</div>
+              <div style={{ padding: '12px 8px', borderRadius: '8px', backgroundColor: '#eff6ff', textAlign: 'center', border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#2563eb' }}>{importResult.skipped || 0}</div>
+                <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>Already in System</div>
               </div>
-              <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#f9fafb', textAlign: 'center', border: '1px solid #e5e7eb' }}>
+              <div style={{ padding: '12px 8px', borderRadius: '8px', backgroundColor: importResult.ignored > 0 ? '#fffbeb' : '#f9fafb', textAlign: 'center', border: `1px solid ${importResult.ignored > 0 ? '#fde68a' : '#e5e7eb'}` }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: importResult.ignored > 0 ? '#d97706' : '#6b7280' }}>{importResult.ignored || 0}</div>
+                <div style={{ fontSize: '0.75rem', color: importResult.ignored > 0 ? '#92400e' : '#6b7280', fontWeight: '600' }}>Ignored{importResult.ignoredReason ? <><br /><span style={{ fontWeight: 400 }}>{importResult.ignoredReason}</span></> : ''}</div>
+              </div>
+              <div style={{ padding: '12px 8px', borderRadius: '8px', backgroundColor: '#f9fafb', textAlign: 'center', border: '1px solid #e5e7eb' }}>
                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#6b7280' }}>{importResult.totalInFile || 0}</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>Total in File</div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>Rows in File</div>
               </div>
             </div>
+
+            {/* Ignored suppliers list */}
+            {importResult.ignored > 0 && importResult.ignoredSuppliers?.length > 0 && (
+              <details style={{ marginBottom: '12px' }}>
+                <summary style={{ fontSize: '0.85rem', fontWeight: '600', color: '#b45309', cursor: 'pointer', marginBottom: '6px' }}>
+                  Ignored suppliers ({importResult.ignoredSuppliers.length}), check none of your import suppliers are in here
+                </summary>
+                <div style={{
+                  maxHeight: '150px', overflow: 'auto', padding: '8px', backgroundColor: '#fffbeb',
+                  borderRadius: '6px', border: '1px solid #fde68a', fontSize: '0.8rem', color: '#92400e',
+                }}>
+                  {importResult.ignoredSuppliers.map((s, i) => (
+                    <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0', borderBottom: i < importResult.ignoredSuppliers.length - 1 ? '1px solid #fde68a' : 'none' }}>
+                      <span>{s.name}</span><span style={{ whiteSpace: 'nowrap' }}>{s.count} row{s.count === 1 ? '' : 's'}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
 
             {importResult.emptyRows > 0 && (
               <div style={{ padding: '8px 12px', backgroundColor: '#fffbeb', borderRadius: '6px', fontSize: '0.85rem', color: '#92400e', marginBottom: '12px', border: '1px solid #fde68a' }}>
@@ -1256,42 +1286,48 @@ function App() {
             )}
 
             {/* Skipped duplicates list */}
-            {importResult.skipped > 0 && importResult.skippedRefs?.length > 0 && (
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#dc2626', marginBottom: '6px' }}>
-                  Duplicate Order References (already in system):
-                </div>
-                <div style={{
-                  maxHeight: '150px', overflow: 'auto', padding: '8px', backgroundColor: '#fef2f2',
-                  borderRadius: '6px', border: '1px solid #fecaca', fontSize: '0.8rem', color: '#991b1b',
-                }}>
-                  {importResult.skippedRefs.map((ref, i) => (
-                    <div key={i} style={{ padding: '2px 0', borderBottom: i < importResult.skippedRefs.length - 1 ? '1px solid #fecaca' : 'none' }}>
-                      {ref}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {importResult.skipped > 0 && importResult.skippedRefs?.length > 0 && (() => {
+              const grouped = groupRefs(importResult.skippedRefs);
+              return (
+                <details style={{ marginBottom: '12px' }}>
+                  <summary style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1e40af', cursor: 'pointer', marginBottom: '6px' }}>
+                    Already in system, not imported again ({grouped.length} order{grouped.length === 1 ? '' : 's'})
+                  </summary>
+                  <div style={{
+                    maxHeight: '150px', overflow: 'auto', padding: '8px', backgroundColor: '#eff6ff',
+                    borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.8rem', color: '#1e40af',
+                  }}>
+                    {grouped.map(([ref, n], i) => (
+                      <div key={ref} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: i < grouped.length - 1 ? '1px solid #bfdbfe' : 'none' }}>
+                        <span>{ref}</span>{n > 1 && <span>× {n} lines</span>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })()}
 
             {/* Imported list */}
-            {importResult.imported > 0 && importResult.importedRefs?.length > 0 && (
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#16a34a', marginBottom: '6px' }}>
-                  Successfully Imported:
+            {importResult.imported > 0 && importResult.importedRefs?.length > 0 && (() => {
+              const grouped = groupRefs(importResult.importedRefs);
+              return (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#16a34a', marginBottom: '6px' }}>
+                    Successfully Imported:
+                  </div>
+                  <div style={{
+                    maxHeight: '150px', overflow: 'auto', padding: '8px', backgroundColor: '#f0fdf4',
+                    borderRadius: '6px', border: '1px solid #bbf7d0', fontSize: '0.8rem', color: '#166534',
+                  }}>
+                    {grouped.map(([ref, n], i) => (
+                      <div key={ref} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: i < grouped.length - 1 ? '1px solid #bbf7d0' : 'none' }}>
+                        <span>{ref}</span>{n > 1 && <span>× {n} lines</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{
-                  maxHeight: '150px', overflow: 'auto', padding: '8px', backgroundColor: '#f0fdf4',
-                  borderRadius: '6px', border: '1px solid #bbf7d0', fontSize: '0.8rem', color: '#166534',
-                }}>
-                  {importResult.importedRefs.map((ref, i) => (
-                    <div key={i} style={{ padding: '2px 0', borderBottom: i < importResult.importedRefs.length - 1 ? '1px solid #bbf7d0' : 'none' }}>
-                      {ref}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <button
               onClick={() => setImportResult(null)}

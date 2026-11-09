@@ -7,8 +7,7 @@ import { IMPORT_ALLOWED_SUPPLIERS, isAllowedImportSupplier } from '../utils/impo
 import './FileUpload.css'; // ← add this
 
 function FileUpload({ onFileUpload, loading }) {
-  const { showError, showWarning, showSuccess } = useNotification();
-  const [ignoredCount, setIgnoredCount] = useState(0);
+  const { showError, showWarning } = useNotification();
   const [isOpen, setIsOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [validationData, setValidationData] = useState(null);
@@ -39,9 +38,7 @@ function FileUpload({ onFileUpload, loading }) {
         const before = result.validRows.length;
         result.validRows = result.validRows.filter(row =>
           isAllowedImportSupplier(row.supplier || row.SUPPLIER || row.Supplier || ''));
-        const removed = before - result.validRows.length;
-        setIgnoredCount(removed);
-        if (removed > 0) result.preview = result.validRows.slice(0, 5);
+        if (result.validRows.length < before) result.preview = result.validRows.slice(0, 5);
       }
 
       setValidationData(result);
@@ -68,10 +65,8 @@ function FileUpload({ onFileUpload, loading }) {
 
   const handleProceedWithImport = () => {
     if (validationData?.validRows && validationData.validRows.length > 0) {
-      if (ignoredCount > 0) showSuccess(`${ignoredCount} row(s) from non-approved suppliers ignored`);
       onFileUpload(currentFileRef.current);
       setValidationData(null);
-      setIgnoredCount(0);
     }
   };
 
