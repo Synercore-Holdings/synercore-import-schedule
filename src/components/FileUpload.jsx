@@ -3,10 +3,12 @@ import React, { useState, useRef } from 'react';
 import { ExcelProcessor } from '../utils/excelProcessor';
 import ImportValidationPreview from './ImportValidationPreview';
 import { useNotification } from '../contexts/NotificationContext';
+import { IMPORT_ALLOWED_SUPPLIERS, isAllowedImportSupplier } from '../utils/importSupplierAllowlist';
 import './FileUpload.css'; // ← add this
 
 function FileUpload({ onFileUpload, loading }) {
-  const { showError, showWarning } = useNotification();
+  const { showError, showWarning, showSuccess } = useNotification();
+  const [ignoredCount, setIgnoredCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [validationData, setValidationData] = useState(null);
@@ -31,6 +33,17 @@ function FileUpload({ onFileUpload, loading }) {
     try {
       setValidationLoading(true);
       const result = await ExcelProcessor.parseExcelFileWithValidation(file);
+
+      // Only approved import suppliers — every other supplier row is ignored
+      if (result.validRows && result.validRows.length > 0) {
+        const before = result.validRows.length;
+        result.validRows = result.validRows.filter(row =>
+          isAllowedImportSupplier(row.supplier || row.SUPPLIER || row.Supplier || ''));
+        const removed = before - result.validRows.length;
+        setIgnoredCount(removed);
+        if (removed > 0) result.preview = result.validRows.slice(0, 5);
+      }
+
       setValidationData(result);
       currentFileRef.current = file;
     } catch (error) {
@@ -55,8 +68,10 @@ function FileUpload({ onFileUpload, loading }) {
 
   const handleProceedWithImport = () => {
     if (validationData?.validRows && validationData.validRows.length > 0) {
+      if (ignoredCount > 0) showSuccess(`${ignoredCount} row(s) from non-approved suppliers ignored`);
       onFileUpload(currentFileRef.current);
       setValidationData(null);
+      setIgnoredCount(0);
     }
   };
 
@@ -141,6 +156,9 @@ function FileUpload({ onFileUpload, loading }) {
               <p>
                 <strong>Expected columns:</strong> SUPPLIER, ORDER/REF, FINAL POD, LATEST STATUS, WEEK NUMBER, PRODUCT NAME,
                 QUANTITY, PALLET QTY, RECEIVING WAREHOUSE, FORWARDING AGENT
+              </p>
+              <p style={{ color: 'var(--text-500)', fontSize: '0.8rem' }}>
+                <strong>Note:</strong> Only these suppliers are imported, all other rows are ignored: {IMPORT_ALLOWED_SUPPLIERS.map(s => s.name).join(', ')}.
               </p>
             </div>
           </div>

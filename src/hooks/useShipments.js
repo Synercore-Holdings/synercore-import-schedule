@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { authFetch } from '../utils/authFetch';
 import { ExcelProcessor } from '../utils/excelProcessor';
+import { isAllowedImportSupplier } from '../utils/importSupplierAllowlist';
 import { getApiUrl } from '../config/api';
 import { authUtils } from '../utils/auth';
 import { useNotification } from '../contexts/NotificationContext';
@@ -258,6 +259,10 @@ export function useShipments() {
           return !EXCLUDED_SUPPLIERS.some(exc => sup.includes(exc) || exc.includes(sup));
         });
         if (processedShipments.length === 0) throw new Error('No local suppliers found after filtering international suppliers');
+      } else {
+        // International imports: only the approved supplier list, ignore everyone else
+        processedShipments = processedShipments.filter(s => isAllowedImportSupplier(s.supplier));
+        if (processedShipments.length === 0) throw new Error('No rows from approved import suppliers found in this file');
       }
 
       const toPlain = (s) => {
