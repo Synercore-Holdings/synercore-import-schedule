@@ -790,6 +790,7 @@ function App() {
 
           const externalLinks = [
             { label: 'Transnet Portal', url: 'https://www.transnet.net/SubsiteRender.aspx?id=8137383', icon: Ship },
+            { label: 'ICTSI DGT Terminal Updates', url: 'https://dgt.ictsi.com/terminalupdates', icon: Anchor },
             { label: 'Marine Traffic', url: 'https://www.marinetraffic.com/en/ais/home/shipid:157944/zoom:10', icon: Waves },
             { label: 'FreightNews', url: 'https://www.freightnews.co.za/customs/3610/3823-19', icon: Newspaper },
             { label: 'Track-Trace', url: 'https://www.track-trace.com/', icon: MapPin },
